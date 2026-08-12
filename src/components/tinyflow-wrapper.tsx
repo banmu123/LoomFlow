@@ -326,10 +326,12 @@ export default function TinyflowWrapper() {
 
   // ===== Save Workflow =====
   const [savingWorkflow, setSavingWorkflow] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
 
   const handleSaveWorkflow = useCallback(async () => {
     if (!instanceRef.current || savingWorkflow) return;
     setSavingWorkflow(true);
+    setSavedFlash(false);
     try {
       const data = instanceRef.current.getData();
       const res = await fetch('/api/workflow-history', {
@@ -341,7 +343,16 @@ export default function TinyflowWrapper() {
         }),
       });
       if (res.ok) {
-        toast.success('工作流已保存到历史记录');
+        setSavedFlash(true);
+        toast.success('工作流已保存到历史记录', {
+          duration: 4000,
+          action: {
+            label: '查看历史',
+            onClick: () => router.push('/workflows/history'),
+          },
+        });
+        // 1.5s 后恢复按钮状态
+        setTimeout(() => setSavedFlash(false), 1500);
       } else {
         const err = await res.json().catch(() => null);
         toast.error(err?.error || '保存失败');
@@ -351,7 +362,7 @@ export default function TinyflowWrapper() {
     } finally {
       setSavingWorkflow(false);
     }
-  }, [savingWorkflow]);
+  }, [savingWorkflow, router]);
 
   // ===== Build inputs object =====
   const buildInputs = useCallback((): Record<string, unknown> => {
