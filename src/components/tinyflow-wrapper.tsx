@@ -938,7 +938,7 @@ export default function TinyflowWrapper() {
 
       {/* Confirm dialog */}
       <Dialog open={!!confirmReq} onOpenChange={(open) => !open && !running && setConfirmReq(null)}>
-        <DialogContent>
+        <DialogContent className="z-[1200]">
           <DialogHeader>
             <DialogTitle>{t('workflows.needConfirm')}</DialogTitle>
             <DialogDescription>{confirmReq?.message}</DialogDescription>
@@ -960,7 +960,7 @@ export default function TinyflowWrapper() {
 
       {/* {t('workflows.json')} viewer dialog */}
       <Dialog open={jsonDialogOpen} onOpenChange={setJsonDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="z-[1200] max-w-2xl">
           <DialogHeader>
             <DialogTitle>工作流 {t('workflows.json')} 数据</DialogTitle>
           </DialogHeader>

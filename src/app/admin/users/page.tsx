@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { useT } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -339,7 +340,7 @@ export default function AdminUsersPage() {
                           {t('admin.unlock')}
                         </Button>
                       )}
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(u)} title="{t('common.edit')}">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(u)} title={t('common.edit')}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                       {u.chat_quota !== -1 && u.chat_used > 0 && (
@@ -359,7 +360,7 @@ export default function AdminUsersPage() {
                         size="icon"
                         className="h-7 w-7 hover:text-destructive"
                         onClick={() => handleDelete(u)}
-                        title="{t('common.delete')}"
+                        title={t('common.delete')}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
@@ -389,8 +390,7 @@ export default function AdminUsersPage() {
             </div>
             <div className="space-y-1.5">
               <Label>{t('admin.password')} *</Label>
-              <Input
-                type="password"
+              <PasswordInput
                 value={createForm.password}
                 onChange={(e) => setCreateForm((f) => ({ ...f, password: e.target.value }))}
                 placeholder="至少 6 位"
@@ -501,11 +501,10 @@ export default function AdminUsersPage() {
               </div>
               <div className="space-y-1.5">
                 <Label>{t('admin.resetPassword')}</Label>
-                <Input
-                  type="password"
+                <PasswordInput
                   value={editForm.password}
                   onChange={(e) => setEditForm((f) => ({ ...f, password: e.target.value }))}
-                  placeholder="{t('admin.passwordPlaceholder')}"
+                  placeholder={t('admin.passwordPlaceholder')}
                 />
               </div>
             </div>

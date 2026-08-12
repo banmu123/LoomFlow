@@ -6,6 +6,7 @@ import { setPendingWorkflow } from '@/lib/pending-workflow';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -948,7 +949,7 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
               <Input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="{t('chat.searchConversations')}"
+                placeholder={t('chat.searchConversations')}
                 className="h-7 bg-background pl-7 text-xs"
               />
             </div>
@@ -1112,7 +1113,7 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
                 size="icon"
                 className="h-7 w-7"
                 onClick={() => router.push('/admin/users')}
-                title="{t('chat.userManagement')}"
+                title={t('chat.userManagement')}
               >
                 <Settings className="h-4 w-4" />
               </Button>
@@ -1125,7 +1126,7 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
                 setError(null);
                 setPwdOpen(true);
               }}
-              title="{t('chat.changePassword')}"
+              title={t('chat.changePassword')}
             >
               <KeyRound className="h-4 w-4" />
             </Button>
@@ -1134,7 +1135,7 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
               size="icon"
               className="h-7 w-7"
               onClick={handleLogout}
-              title="{t('chat.logout')}"
+              title={t('chat.logout')}
             >
               <LogOut className="h-4 w-4" />
             </Button>
@@ -1218,7 +1219,7 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
 
       {/* === Change Password Dialog === */}
       <AlertDialog open={pwdOpen} onOpenChange={(open) => !open && setPwdOpen(false)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="z-[1200]">
           <AlertDialogHeader>
             <AlertDialogTitle>{t('chat.changePassword')}</AlertDialogTitle>
             <AlertDialogDescription>
@@ -1226,21 +1227,18 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-3 py-2">
-            <Input
-              type="password"
-              placeholder="{t('chat.oldPassword')}"
+            <PasswordInput
+              placeholder={t('chat.oldPassword')}
               value={pwdForm.old_password}
               onChange={(e) => setPwdForm((f) => ({ ...f, old_password: e.target.value }))}
             />
-            <Input
-              type="password"
-              placeholder="{t('chat.newPassword')}"
+            <PasswordInput
+              placeholder={t('chat.newPassword')}
               value={pwdForm.new_password}
               onChange={(e) => setPwdForm((f) => ({ ...f, new_password: e.target.value }))}
             />
-            <Input
-              type="password"
-              placeholder="{t('chat.confirmNewPassword')}"
+            <PasswordInput
+              placeholder={t('chat.confirmNewPassword')}
               value={pwdConfirm}
               onChange={(e) => setPwdConfirm(e.target.value)}
             />
@@ -1262,7 +1260,7 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
       >
-        <AlertDialogContent>
+        <AlertDialogContent className="z-[1200]">
           <AlertDialogHeader>
             <AlertDialogTitle>{t('chat.deleteConversation')}</AlertDialogTitle>
             <AlertDialogDescription>

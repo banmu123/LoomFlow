@@ -399,7 +399,7 @@ export default function WorkflowsPage() {
                         <button
                           onClick={() => handleExport(wf)}
                           className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                          title="{t('workflows.exportWorkflow')}为 JSON 文件"
+                          title={t('workflows.exportWorkflow')}
                         >
                           <Download className="h-3 w-3" />
                           {t('workflows.exportWorkflow')}

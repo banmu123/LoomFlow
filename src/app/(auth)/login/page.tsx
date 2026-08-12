@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Video, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { useT } from '@/lib/i18n';
 import { LocaleSwitcher } from '@/components/LocaleSwitcher';
 
@@ -138,12 +139,11 @@ function LoginForm() {
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUsername(e.target.value)}
           className="h-11"
         />
-        <Input
-          type="password"
+        <PasswordInput
+          className="h-11"
           placeholder={t('login.password')}
           value={password}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
-          className="h-11"
         />
         <Button type="submit" className="h-11 w-full" disabled={loading || initializing}>
           {loading ? (
