@@ -19,7 +19,7 @@ export const en: ZhMessages = {
     failed: 'Failed',
   },
   app: {
-    name: 'AI Workflow Platform',
+    name: 'LoomFlow',
     tagline: 'Intelligent workflow orchestration & collaboration',
   },
   login: {

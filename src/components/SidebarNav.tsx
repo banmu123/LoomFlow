@@ -45,7 +45,7 @@ export function SidebarNav({
       {/* LOGO 区域 */}
       <div className="flex h-[60px] items-center border-b border-border px-5">
         <span className="text-lg font-extrabold tracking-wide text-primary whitespace-nowrap">
-          ForgeFlow
+          LoomFlow
         </span>
       </div>
 

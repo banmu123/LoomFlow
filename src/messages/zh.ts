@@ -17,7 +17,7 @@ export const zh = {
     failed: '失败',
   },
   app: {
-    name: 'AI工作流平台',
+    name: 'LoomFlow',
     tagline: '智能工作流编排与协作平台',
   },
   login: {

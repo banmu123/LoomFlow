@@ -5,12 +5,12 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: {
-    default: 'AI工作流平台',
-    template: '%s | AI工作流平台',
+    default: 'LoomFlow',
+    template: '%s | LoomFlow',
   },
-  description: 'AI工作流平台 - 智能工作流编排与管理',
-  keywords: ['AI工作流', '工作流编排', 'Tinyflow'],
-  authors: [{ name: 'AI工作流平台' }],
+  description: 'LoomFlow - AI 原生工作流平台',
+  keywords: ['LoomFlow', 'AI工作流', '工作流编排'],
+  authors: [{ name: 'LoomFlow' }],
 };
 
 export default function RootLayout({
