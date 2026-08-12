@@ -5,18 +5,9 @@ import type { ExpressionEvaluator } from '../engine/ExpressionEvaluator';
 import { generateText } from 'ai';
 import type { ModelMessage } from 'ai';
 
-// 从 Model Registry（内置 + 用户配置合并）获取模型对应的 provider 客户端
-import { getProviderClientForModel } from '@/lib/ai';
+// 模型动态注册：从注册表（内置 + 用户配置合并）解析模型与 provider
+import { getProviderClientForModel, hasCapability } from '@/lib/ai';
 import { getAllModels } from '@/lib/ai/db-models';
-
-async function getProviderForModel(modelId: string) {
-  const models = await getAllModels();
-  const model = models.find((m) => m.id === modelId);
-  if (!model) throw new Error(`未知模型: ${modelId}`);
-  const client = getProviderClientForModel(model);
-  if (!client) throw new Error(`未知 provider: ${model.provider}`);
-  return client;
-}
 
 export class LLMExecutor extends BaseExecutor {
   constructor(paramResolver: ParameterResolver, exprEvaluator: ExpressionEvaluator) {
@@ -34,11 +25,24 @@ export class LLMExecutor extends BaseExecutor {
     const rawModelId = String(
       data.llmId || process.env.DEEPSEEK_MODEL_ID || 'deepseek-v4-flash',
     );
-    // 兜底：仅支持 deepseek-v4-flash / deepseek-v4-pro，其他一律回退 flash
-    const SUPPORTED_MODELS = ['deepseek-v4-flash', 'deepseek-v4-pro'];
-    const modelId = SUPPORTED_MODELS.includes(rawModelId)
-      ? rawModelId
-      : 'deepseek-v4-flash';
+
+    // 模型合法性完全交给 Model Registry（动态注册），不做硬编码白名单/静默回退
+    const models = await getAllModels();
+    const model = models.find((m) => m.id === rawModelId);
+    if (!model) {
+      throw new Error(
+        `未知模型: ${rawModelId}，请在「模型配置」中添加该模型或修改 LLM 节点配置`,
+      );
+    }
+    const modelId = model.id;
+    const supportsVision = hasCapability(model, 'vision');
+
+    // provider 从模型定义解析（模型级 baseURL/apiKey 优先）
+    const provider = getProviderClientForModel(model);
+    if (!provider) {
+      throw new Error(`未知 provider: ${model.provider}（模型 ${modelId}）`);
+    }
+
     const temperature = data.temperature ?? 0.7;
     const outType = data.outType || 'text';
 
@@ -65,8 +69,8 @@ export class LLMExecutor extends BaseExecutor {
     // 构造消息（system prompt 走 system 选项，AI SDK v7 不允许放 messages 里）
     const messages: ModelMessage[] = [];
 
-    if (imageUrls.length > 0) {
-      // 多模态：部分模型支持图片 URL（AI SDK v7 格式）
+    if (imageUrls.length > 0 && supportsVision) {
+      // 视觉模型：附带图片（AI SDK v7 格式）
       const parts: Array<{ type: 'text'; text: string } | { type: 'image'; image: string }> = [
         { type: 'text', text: userPrompt },
       ];
@@ -75,6 +79,7 @@ export class LLMExecutor extends BaseExecutor {
       }
       messages.push({ role: 'user', content: parts });
     } else {
+      // 非视觉模型或纯文本：忽略图片，仅发送文本
       messages.push({ role: 'user', content: userPrompt });
     }
 
@@ -89,8 +94,7 @@ export class LLMExecutor extends BaseExecutor {
       }
     }
 
-    const provider = await getProviderForModel(modelId);
-    const { text } = await generateText({
+        const { text } = await generateText({
       model: provider(modelId),
       messages,
       system: systemPrompt || undefined,
