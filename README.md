@@ -75,10 +75,6 @@ pnpm dev
 完整部署手册：**[docs/config/Deployment-Manual.md](docs/config/Deployment-Manual.md)**
 （覆盖：服务器准备、Nginx + HTTPS、域名、一键部署脚本、换服务器迁移）
 
-### 外部调用 API 文档
-
-**[docs/api-external.md](docs/api-external.md)**
-
 ---
 
 ## 🏗️ 技术栈
