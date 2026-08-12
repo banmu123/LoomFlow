@@ -20,6 +20,7 @@ tar -czf /tmp/forgeflow-deploy.tar.gz \
   --exclude='.env.local' \
   --exclude='.env' \
   --exclude='tsconfig.tsbuildinfo' \
+  --exclude='.git' \
   .
 
 echo "▶ 2/4 上传到服务器..."
