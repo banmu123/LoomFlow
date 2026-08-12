@@ -168,3 +168,6 @@ Desktop.ini
 docs/
 # 内部开发记录（不公开）
 devlopRecprd/
+# 本地工具目录
+.claude/
+.mimocode/
