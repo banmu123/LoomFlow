@@ -22,6 +22,55 @@ Nginx（可选，80/443）──▶ Node 应用（dist/server.js，pm2 守护，
 - **数据**：在 Supabase 云端 → 换服务器/换数据库时分别处理（见第六章/附录 A）
 - **外部调用**：已发布工作流通过 API Key 对外提供 HTTP 接口（`docs/api-external.md`）
 
+---
+
+## English Summary
+
+**LoomFlow** is a self-hosted, AI-native workflow platform. Describe a process in plain language, get a runnable workflow on a visual canvas, then publish it as a secured HTTP API.
+
+### Quick Start (Self-Host)
+
+```bash
+# Requirements: Node.js >= 20.9, pnpm 9+, a Supabase project (or self-hosted PostgreSQL)
+
+# 1. Install dependencies
+pnpm install
+
+# 2. Configure environment (copy .env.example to .env.local)
+#    Required: COZE_SUPABASE_URL / COZE_SUPABASE_SERVICE_ROLE_KEY / DEEPSEEK_API_KEY / AUTH_SECRET
+cp .env.example .env.local
+
+# 3. Initialize database (run in Supabase SQL Editor, in order):
+#    scripts/supabase-init.sql → supabase-users.sql → supabase-updates.sql
+
+# 4. Build & start (production)
+pnpm build
+COZE_PROJECT_ENV=PROD PORT=5000 pm2 start dist/server.js --name loomflow
+```
+
+### Documentation Map
+
+| Section | Topic |
+|---------|-------|
+| 1-3 | Server preparation, code upload, process management (pm2) |
+| 4 | Nginx reverse proxy, domain, HTTPS (certbot) — **must disable buffering for SSE** |
+| 5 | Deployment updates (one-click script `deploy.sh`) |
+| 6 | **Server migration** — copy `.env.local` (keep `AUTH_SECRET`!), database needs no action |
+| 7-9 | App-specific config: Supabase SQL init, environment variables, build commands |
+| 10 | Publish workflows as external HTTP APIs (API Key auth) |
+| 11 | **Database migration** to self-hosted PostgreSQL (Docker self-hosted Supabase, zero code changes) |
+| Appendix A | Tech-stack replacement reference table |
+
+### Key Notes
+
+- **AUTH_SECRET** (required in production): `openssl rand -hex 32` — keep it identical when migrating servers, or all login sessions will be invalidated
+- **SSE streaming**: Nginx must set `proxy_buffering off` for `/api/`, otherwise AI chat replies are delayed as whole blocks
+- **Data isolation**: all user data is fully isolated (including admin); no migration needed when switching servers (data lives in Supabase cloud / your database)
+- **AI models**: configurable via Admin → Model settings (per-model API key & base URL, model-level config overrides environment variables)
+- **ICP filing** (China mainland servers): domains must be filed before serving on ports 80/443
+
+---
+
 ## 符号约定
 
 | 变量 | 含义 | 当前值参考 |
