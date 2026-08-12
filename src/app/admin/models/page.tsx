@@ -48,6 +48,8 @@ const EMPTY_FORM = {
   provider: 'deepseek',
   capabilities: ['text'] as string[],
   label: '',
+  base_url: '',
+  api_key: '',
 };
 
 const CAP_LABELS: Record<string, string> = {
@@ -107,6 +109,8 @@ export default function AdminModelsPage() {
       provider: m.provider,
       capabilities: m.capabilities,
       label: m.label || '',
+      base_url: (m as unknown as { base_url?: string }).base_url || '',
+      api_key: '', // 编辑时 key 不回显（留空不修改）
     });
     setDialogOpen(true);
   };
@@ -245,7 +249,7 @@ export default function AdminModelsPage() {
 
       <div className="mt-3 rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
         <p className="mb-1 font-medium text-foreground">说明</p>
-        <p>· Provider 的 API Key / 端点地址在服务器环境变量中配置（DEEPSEEK_API_KEY / ARK_API_KEY / ARK_BASE_URL），不会存储在数据库</p>
+        <p>· 每个模型可单独配置「请求地址 + API Key」（优先于服务器环境变量）；未配置时回退到环境变量（DEEPSEEK_API_KEY / ARK_API_KEY 等）</p>
         <p>· 添加带「视觉」能力的模型后，对话图片上传与画布多模态节点自动启用</p>
         <p>· 删除或修改模型后，画布与对话列表即时生效（30 秒内同步）</p>
       </div>
@@ -306,6 +310,28 @@ export default function AdminModelsPage() {
                 onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))}
                 placeholder="如 DeepSeek Flash"
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label>请求地址（Base URL）</Label>
+              <Input
+                value={form.base_url}
+                onChange={(e) => setForm((f) => ({ ...f, base_url: e.target.value }))}
+                placeholder="https://api.example.com/v1（留空用 provider 默认）"
+                className="font-mono text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>API Key {editingId ? '（留空不修改）' : ''}</Label>
+              <Input
+                type="password"
+                value={form.api_key}
+                onChange={(e) => setForm((f) => ({ ...f, api_key: e.target.value }))}
+                placeholder="sk-..."
+                className="font-mono text-sm"
+              />
+              <p className="text-[11px] text-amber-600">
+                ⚠️ Key 存储在本系统数据库中（仅 admin 可管理），请妥善保管
+              </p>
             </div>
           </div>
           <DialogFooter>

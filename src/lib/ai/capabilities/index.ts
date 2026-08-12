@@ -11,6 +11,10 @@ export interface ModelDefinition {
   capabilities: ModelCapability[];
   /** 显示名 */
   label?: string;
+  /** 自定义请求地址（模型级，优先于 provider 环境变量） */
+  baseURL?: string;
+  /** 自定义 API Key（模型级，优先于 provider 环境变量） */
+  apiKey?: string;
 }
 
 /** 判断模型是否具备某能力 */

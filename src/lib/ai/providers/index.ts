@@ -60,3 +60,21 @@ export function getProviderClient(id: string) {
   if (!resolved) return null;
   return createProviderClient(resolved);
 }
+
+/** 模型级配置优先创建客户端（baseURL/apiKey 覆盖 provider 环境变量） */
+export function getProviderClientForModel(model: {
+  provider: string;
+  baseURL?: string;
+  apiKey?: string;
+}) {
+  if (model.baseURL && model.apiKey) {
+    return createOpenAICompatible({
+      baseURL: model.baseURL,
+      apiKey: model.apiKey,
+      name: model.provider,
+    });
+  }
+  const resolved = resolveProvider(model.provider);
+  if (!resolved) return null;
+  return createProviderClient(resolved);
+}

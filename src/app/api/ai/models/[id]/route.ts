@@ -33,6 +33,13 @@ export async function PATCH(
   if (typeof body.label === 'string') {
     updates.label = body.label.trim() || null;
   }
+  if (typeof body.base_url === 'string') {
+    updates.base_url = body.base_url.trim() || null;
+  }
+  // api_key 留空表示不修改；非空则更新
+  if (typeof body.api_key === 'string' && body.api_key.trim()) {
+    updates.api_key = body.api_key.trim();
+  }
 
   if (Object.keys(updates).length === 0) {
     return Response.json({ error: '没有可更新的字段' }, { status: 400 });

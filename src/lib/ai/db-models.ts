@@ -8,6 +8,8 @@ interface DbModelRow {
   provider: string;
   capabilities: string[];
   label: string | null;
+  base_url: string | null;
+  api_key: string | null;
 }
 
 let cache: ModelDefinition[] | null = null;
@@ -22,7 +24,7 @@ export function invalidateModelsCache(): void {
 async function loadFromDb(): Promise<ModelDefinition[]> {
   const { data, error } = await supabase
     .from('ai_models')
-    .select('id, provider, capabilities, label');
+    .select('id, provider, capabilities, label, base_url, api_key');
 
   if (error || !data) return [];
 
@@ -31,6 +33,8 @@ async function loadFromDb(): Promise<ModelDefinition[]> {
     provider: row.provider,
     capabilities: (Array.isArray(row.capabilities) ? row.capabilities : ['text']) as ModelCapability[],
     label: row.label || undefined,
+    baseURL: row.base_url || undefined,
+    apiKey: row.api_key || undefined,
   }));
 }
 

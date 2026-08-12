@@ -6,16 +6,16 @@ import { generateText } from 'ai';
 import type { ModelMessage } from 'ai';
 
 // 从 Model Registry（内置 + 用户配置合并）获取模型对应的 provider 客户端
-import { resolveProvider, createProviderClient } from '@/lib/ai';
+import { getProviderClientForModel } from '@/lib/ai';
 import { getAllModels } from '@/lib/ai/db-models';
 
 async function getProviderForModel(modelId: string) {
   const models = await getAllModels();
   const model = models.find((m) => m.id === modelId);
-  const providerId = model?.provider || 'deepseek';
-  const resolved = resolveProvider(providerId);
-  if (!resolved) throw new Error(`未知 provider: ${providerId}`);
-  return createProviderClient(resolved);
+  if (!model) throw new Error(`未知模型: ${modelId}`);
+  const client = getProviderClientForModel(model);
+  if (!client) throw new Error(`未知 provider: ${model.provider}`);
+  return client;
 }
 
 export class LLMExecutor extends BaseExecutor {

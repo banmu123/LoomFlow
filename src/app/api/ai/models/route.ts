@@ -13,9 +13,10 @@ export async function GET() {
     return Response.json({ error: '未登录，请先登录' }, { status: 401 });
   }
 
+  // 不返回 api_key（避免泄露）
   const { data, error } = await supabase
     .from('ai_models')
-    .select('*')
+    .select('id, provider, capabilities, label, base_url, created_at')
     .order('id');
 
   if (error) {
@@ -56,8 +57,10 @@ export async function POST(request: NextRequest) {
       provider,
       capabilities,
       label: body?.label?.trim() || null,
+      base_url: body?.base_url?.trim() || null,
+      api_key: body?.api_key?.trim() || null,
     })
-    .select()
+    .select('id, provider, capabilities, label, base_url, created_at')
     .single();
 
   if (error) {
@@ -72,7 +75,7 @@ export async function POST(request: NextRequest) {
     userId: user.id,
     username: user.username,
     action: 'model_create',
-    detail: { modelId: id, provider, capabilities },
+    detail: { modelId: id, provider, capabilities, hasKey: !!body?.api_key },
     ip: getClientIp(request),
   });
 
