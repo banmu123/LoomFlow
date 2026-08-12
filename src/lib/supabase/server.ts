@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- supabase 无数据库类型定义，延迟初始化需宽松类型 */
 import { createClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
 import { resolve } from 'path';
