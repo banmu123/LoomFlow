@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { nodeRegistry } from '@/lib/tinyflow';
+import { validateNodeRegistry } from '@/lib/tinyflow/nodes/builtin';
 import { getCurrentUser } from '@/lib/server-auth';
 
 // 节点库：返回 NodeRegistry 中全部节点定义（按分类分组）
@@ -16,8 +17,12 @@ export async function GET(request: NextRequest) {
     nodes = nodes.filter((n) => n.category === category);
   }
 
+  // 运行时一致性校验（executorType 绑定执行器）
+  const warnings = await validateNodeRegistry();
+
   return Response.json({
     total: nodes.length,
+    warnings,
     nodes: nodes.map((n) => ({
       type: n.type,
       label: n.label,

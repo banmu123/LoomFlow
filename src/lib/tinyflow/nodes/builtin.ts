@@ -1,6 +1,5 @@
 import type { NodeDefinition } from '../node-definition';
 import { nodeRegistry } from '../node-registry';
-import { ExecutorRegistry } from '../executors';
 
 // ===== 内置节点注册（最小定义，与 NodeData 保持分离） =====
 
@@ -251,11 +250,17 @@ nodeRegistry.register(TEMPLATE_NODE);
 nodeRegistry.register(CONFIRM_NODE);
 nodeRegistry.register(LOOP_NODE);
 
-// ===== 一致性校验：executorType 必须可执行（防幽灵节点） =====
-for (const def of nodeRegistry.list()) {
-  if (!ExecutorRegistry.get(def.executorType)) {
-    throw new Error(
-      `节点 ${def.type} 的 executorType（${def.executorType}）未注册执行器，请先在 ExecutorRegistry 注册`,
-    );
+// ===== 一致性校验（运行时动态执行，避免静态打包 coze SDK） =====
+// 校验每个节点的 executorType 在 ExecutorRegistry 中存在（防幽灵节点）
+export async function validateNodeRegistry(): Promise<string[]> {
+  const { ExecutorRegistry } = await import('../executors');
+  const missing: string[] = [];
+  for (const def of nodeRegistry.list()) {
+    if (!ExecutorRegistry.get(def.executorType)) {
+      missing.push(
+        `节点 ${def.type} 的 executorType（${def.executorType}）未注册执行器，请先在 ExecutorRegistry 注册`,
+      );
+    }
   }
+  return missing;
 }
