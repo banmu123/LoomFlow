@@ -37,7 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Play, Square, Loader2, CheckCircle2, XCircle, Clock, Settings2, ArrowLeft, Braces, Upload, Save } from 'lucide-react';
+import { Play, Square, Loader2, CheckCircle2, XCircle, Clock, Settings2, ArrowLeft, Braces, Upload, Save, Boxes } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useT } from '@/lib/i18n';
 import { toast } from 'sonner';
@@ -129,6 +129,35 @@ export default function TinyflowWrapper() {
   const [confirmReq, setConfirmReq] = useState<ConfirmRequest | null>(null);
   const [confirmData, setConfirmData] = useState<Record<string, string>>({});
   const [showResults, setShowResults] = useState(false);
+
+  // 节点库
+  const [nodesOpen, setNodesOpen] = useState(false);
+  const [nodeLibrary, setNodeLibrary] = useState<Array<{
+    type: string; label: string; description: string; category: string; capabilities: string[];
+  }>>([]);
+
+  useEffect(() => {
+    if (!nodesOpen) return;
+    (async () => {
+      try {
+        const res = await fetch('/api/nodes');
+        const data = await res.json();
+        if (Array.isArray(data?.nodes)) setNodeLibrary(data.nodes);
+      } catch {
+        // ignore
+      }
+    })();
+  }, [nodesOpen]);
+
+  // 分类标签
+  const CATEGORY_LABELS: Record<string, string> = {
+    core: '核心',
+    ai: 'AI',
+    integration: '集成',
+    logic: '逻辑',
+    data: '数据',
+    custom: '自定义',
+  };
 
   // 动态模型列表（从模型注册表加载）
   const [modelOptions, setModelOptions] = useState([
