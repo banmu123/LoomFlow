@@ -165,7 +165,10 @@ Desktop.ini
 .codegraph/
 
 # 内部文档（不公开）
-docs/
+docs/*
+!docs/config/
+!docs/config/Deployment-Manual.md
+!docs/api-external.md
 # 内部开发记录（不公开）
 devlopRecprd/
 # 本地工具目录
