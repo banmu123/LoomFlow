@@ -36,6 +36,7 @@ import { SimpleChatMessage, type ChatMessageStatus } from './SimpleChatMessage';
 import { SimpleChatInput } from './SimpleChatInput';
 import { uploadFileToOSS } from '@/lib/oss-upload-client';
 import { useT } from '@/lib/i18n';
+import { ChevronsLeft } from 'lucide-react';
 import { validateWorkflow } from '@/lib/tinyflow/schema';
 import { LocaleSwitcher } from './LocaleSwitcher';
 
@@ -66,7 +67,13 @@ interface Conversation {
 let seq = 0;
 const nextId = () => `${Date.now()}-${seq++}`;
 
-export function ChatPanel({ onClose }: { onClose?: () => void }) {
+export function ChatPanel({
+  onClose,
+  onCollapse,
+}: {
+  onClose?: () => void;
+  onCollapse?: () => void;
+}) {
   const router = useRouter();
   const t = useT();
   const [conversations, setConversations] = useState<Conversation[]>([
@@ -1122,6 +1129,17 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
                 </button>
               </div>
             </div>
+            {onCollapse && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="ml-auto h-7 w-7"
+                onClick={onCollapse}
+                title="收起对话"
+              >
+                <ChevronsLeft className="h-4 w-4" />
+              </Button>
+            )}
           </div>
 
         </div>
