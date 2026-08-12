@@ -167,6 +167,9 @@ Desktop.ini
 # 内部文档（不公开）
 docs/*
 !docs/config/Deployment-Manual.md
+!docs/config/architecture.md
+!docs/config/security.md
+!docs/config/custom-node-guide.md
 # 内部开发记录（不公开）
 devlopRecprd/
 # 本地工具目录

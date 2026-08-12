@@ -80,6 +80,13 @@ Open http://localhost:5000 — default admin account `admin` (password set in `s
 Full deployment manual: **[docs/config/Deployment-Manual.md](docs/config/Deployment-Manual.md)**
 (Server setup, Nginx + HTTPS, domain, one-click deploy script, server migration, self-hosted PostgreSQL migration)
 
+## 📚 Documentation
+
+- **[Architecture](docs/config/architecture.md)** — from natural language to executable API, end-to-end
+- **[Security](docs/config/security.md)** — sandbox, auth, quotas, audit, isolation
+- **[Custom Node Guide](docs/config/custom-node-guide.md)** — build your own nodes (developer platform)
+- **[Deployment Manual](docs/config/Deployment-Manual.md)** — self-host, migrate, HTTPS
+
 ---
 
 ## 🏗️ Tech Stack
