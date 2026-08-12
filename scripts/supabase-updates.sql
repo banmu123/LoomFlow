@@ -1,6 +1,7 @@
 -- =====================================================
--- ForgeFlow 增量更新 SQL（在 supabase-init.sql + supabase-users.sql 之后执行）
+-- LoomFlow 增量更新 SQL（在 supabase-init.sql + supabase-users.sql 之后执行）
 -- 全部幂等（IF NOT EXISTS），可重复执行
+-- 覆盖：数据隔离 / 配额 / 去重 / 审计 / API 日志 / 执行历史 / 模型配置 / 定时任务
 -- =====================================================
 
 -- 1. 工作流去重：data_hash 列 + 每用户唯一索引
@@ -12,6 +13,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_workflow_history_user_hash ON workflow_his
 ALTER TABLE users ADD COLUMN IF NOT EXISTS chat_quota INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS chat_used INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_attempts INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ;
 -- admin 默认大配额（-1 表示不限，如已设置则跳过）
 UPDATE users SET chat_quota = 99999 WHERE username = 'admin' AND chat_quota = 0;
 
@@ -28,6 +31,101 @@ CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id);
 CREATE INDEX IF NOT EXISTS idx_messages_user ON messages(user_id);
 CREATE INDEX IF NOT EXISTS idx_workflow_history_user ON workflow_history(user_id);
 
--- 4. 工作流发布（外部 API 调用）
+-- 4. 工作流：发布 / 分享 / API 配额
 ALTER TABLE workflow_history ADD COLUMN IF NOT EXISTS published BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE workflow_history ADD COLUMN IF NOT EXISTS api_key TEXT;
+ALTER TABLE workflow_history ADD COLUMN IF NOT EXISTS api_quota INTEGER NOT NULL DEFAULT -1;
+ALTER TABLE workflow_history ADD COLUMN IF NOT EXISTS api_used INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE workflow_history ADD COLUMN IF NOT EXISTS share_token TEXT;
+CREATE INDEX IF NOT EXISTS idx_workflow_history_share ON workflow_history(share_token);
+
+-- 5. 消息：图片附件
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS images JSONB;
+
+-- 6. 审计日志表
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  username TEXT,
+  action TEXT NOT NULL,
+  detail JSONB,
+  ip TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at DESC);
+
+-- 7. API 调用日志表
+CREATE TABLE IF NOT EXISTS api_call_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workflow_id UUID REFERENCES workflow_history(id) ON DELETE CASCADE,
+  status TEXT NOT NULL,
+  inputs JSONB,
+  outputs JSONB,
+  error TEXT,
+  duration_ms INTEGER,
+  ip TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_api_call_logs_workflow ON api_call_logs(workflow_id);
+CREATE INDEX IF NOT EXISTS idx_api_call_logs_created ON api_call_logs(created_at DESC);
+
+-- 8. 执行记录表
+CREATE TABLE IF NOT EXISTS flow_runs (
+  id UUID PRIMARY KEY,
+  workflow_id UUID REFERENCES workflow_history(id) ON DELETE SET NULL,
+  user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  source TEXT NOT NULL DEFAULT 'internal',
+  status TEXT NOT NULL,
+  inputs JSONB,
+  outputs JSONB,
+  events JSONB,
+  error TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_flow_runs_user ON flow_runs(user_id);
+CREATE INDEX IF NOT EXISTS idx_flow_runs_created ON flow_runs(created_at DESC);
+
+-- 9. 定时任务表
+CREATE TABLE IF NOT EXISTS scheduled_runs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workflow_id UUID NOT NULL REFERENCES workflow_history(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  cron_expr TEXT NOT NULL,
+  inputs JSONB DEFAULT '{}',
+  webhook_url TEXT,
+  enabled BOOLEAN NOT NULL DEFAULT true,
+  last_run_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_scheduled_runs_workflow ON scheduled_runs(workflow_id);
+
+-- 10. 模型配置表（含默认种子）
+CREATE TABLE IF NOT EXISTS ai_models (
+  id TEXT PRIMARY KEY,
+  provider TEXT NOT NULL,
+  capabilities JSONB NOT NULL DEFAULT '["text"]',
+  label TEXT,
+  base_url TEXT,
+  api_key TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+INSERT INTO ai_models (id, provider, capabilities, label) VALUES
+('deepseek-v4-flash', 'deepseek', '["text"]', 'DeepSeek Flash'),
+('deepseek-v4-pro', 'deepseek', '["text"]', 'DeepSeek Pro')
+ON CONFLICT (id) DO NOTHING;
+
+-- 11. RLS（与现有表一致，宽松策略）
+ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE api_call_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE flow_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE scheduled_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ai_models ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "Allow all on audit_logs" ON audit_logs FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY IF NOT EXISTS "Allow all on api_call_logs" ON api_call_logs FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY IF NOT EXISTS "Allow all on flow_runs" ON flow_runs FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY IF NOT EXISTS "Allow all on scheduled_runs" ON scheduled_runs FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY IF NOT EXISTS "Allow all on ai_models" ON ai_models FOR ALL USING (true) WITH CHECK (true);
