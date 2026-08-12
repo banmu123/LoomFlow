@@ -8,6 +8,12 @@ export class SearchEngineExecutor extends BaseExecutor {
     super(paramResolver, exprEvaluator);
   }
 
+  validate(node: FlowNode): string | null {
+    const data = node.data as Record<string, unknown>;
+    if (!data.keyword) return '搜索节点缺少 keyword';
+    return null;
+  }
+
   async execute(node: FlowNode, context: FlowContext): Promise<Record<string, unknown>> {
     const { SearchClient, Config } = await import('coze-coding-dev-sdk');
 

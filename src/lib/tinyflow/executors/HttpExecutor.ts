@@ -8,6 +8,12 @@ export class HttpExecutor extends BaseExecutor {
     super(paramResolver, exprEvaluator);
   }
 
+  validate(node: FlowNode): string | null {
+    const data = node.data as Record<string, unknown>;
+    if (!data.url) return 'HTTP 节点缺少 url';
+    return null;
+  }
+
   async execute(node: FlowNode, context: FlowContext): Promise<Record<string, unknown>> {
     const data = node.data;
     const method = (data.method || 'GET').toUpperCase();

@@ -36,6 +36,7 @@ import { SimpleChatMessage, type ChatMessageStatus } from './SimpleChatMessage';
 import { SimpleChatInput } from './SimpleChatInput';
 import { uploadFileToOSS } from '@/lib/oss-upload-client';
 import { useT } from '@/lib/i18n';
+import { validateWorkflow } from '@/lib/tinyflow/schema';
 import { LocaleSwitcher } from './LocaleSwitcher';
 
 const CHAT_PANEL_WIDTH = 440;
@@ -557,18 +558,41 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
               workflowData = JSON.parse(assistantContent.slice(start, end + 1));
             }
           }
-          // 验证是否是有效的 workflow JSON
+          // 用 Schema 校验工作流；无效则自动调用 AI 修复一次
           if (workflowData && typeof workflowData === 'object' && 'nodes' in workflowData && 'edges' in workflowData) {
-            // 是工作流 JSON，更新消息内容
-            assistantContent = '已为你生成工作流，已加载到画布';
-            updateConversation(convId, (c) => ({
-              ...c,
-              messages: c.messages.map((m) =>
-                m.id === assistantMsg.id
-                  ? { ...m, content: assistantContent }
-                  : m,
-              ),
-            }));
+            const validation = validateWorkflow(workflowData);
+            if (!validation.valid) {
+              try {
+                const repairRes = await fetch('/api/workflow-ai/repair', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    workflow: workflowData,
+                    errors: validation.errors.map((e) => e.message),
+                  }),
+                });
+                const repairData = await repairRes.json();
+                if (repairRes.ok && repairData?.workflow && repairData.valid) {
+                  workflowData = repairData.workflow; // 修复成功，使用修复后的工作流
+                } else {
+                  workflowData = null; // 修复失败
+                }
+              } catch {
+                workflowData = null;
+              }
+            }
+            if (workflowData) {
+              // 是工作流 JSON，更新消息内容
+              assistantContent = '已为你生成工作流，已加载到画布';
+              updateConversation(convId, (c) => ({
+                ...c,
+                messages: c.messages.map((m) =>
+                  m.id === assistantMsg.id
+                    ? { ...m, content: assistantContent }
+                    : m,
+                ),
+              }));
+            }
           } else {
             workflowData = null; // 不是有效的 workflow
           }

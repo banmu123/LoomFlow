@@ -8,6 +8,12 @@ export class KnowledgeExecutor extends BaseExecutor {
     super(paramResolver, exprEvaluator);
   }
 
+  validate(node: FlowNode): string | null {
+    const data = node.data as Record<string, unknown>;
+    if (!data.keyword) return '知识库节点缺少 keyword';
+    return null;
+  }
+
   async execute(node: FlowNode, context: FlowContext): Promise<Record<string, unknown>> {
     const data = node.data;
     const keyword = data.keyword

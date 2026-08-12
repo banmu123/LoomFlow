@@ -8,6 +8,12 @@ export class TemplateExecutor extends BaseExecutor {
     super(paramResolver, exprEvaluator);
   }
 
+  validate(node: FlowNode): string | null {
+    const data = node.data as Record<string, unknown>;
+    if (!data.template) return '模板节点缺少 template';
+    return null;
+  }
+
   async execute(node: FlowNode, context: FlowContext): Promise<Record<string, unknown>> {
     const template = node.data.template || '';
     if (!template) throw new Error('模板节点缺少模板内容');

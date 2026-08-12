@@ -63,6 +63,17 @@ export class FlowEngine {
   /** 运行整个流程 */
   async run(): Promise<void> {
     try {
+      // 执行前校验：未知节点类型 + 节点配置合法性（validate 接口）
+      for (const node of this.parser.getAllNodes()) {
+        const executor = await this.getExecutor(node.type);
+        const configError = (
+          executor as { validate?: (n: FlowNode) => string | null }
+        ).validate?.(node);
+        if (configError) {
+          throw new Error(`节点 ${node.id} 配置错误: ${configError}`);
+        }
+      }
+
       const startNode = this.parser.getStartNode();
       await this.executeFromNode(startNode.id);
       this.options.onFlowComplete?.(this.getEndOutputs());

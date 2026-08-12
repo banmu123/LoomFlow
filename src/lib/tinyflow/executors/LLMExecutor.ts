@@ -28,6 +28,12 @@ export class LLMExecutor extends BaseExecutor {
     super(paramResolver, exprEvaluator);
   }
 
+  validate(node: FlowNode): string | null {
+    const data = node.data as Record<string, unknown>;
+    if (!data.llmId) return 'LLM 节点缺少 llmId（模型配置）';
+    return null;
+  }
+
   async execute(node: FlowNode, context: FlowContext): Promise<Record<string, unknown>> {
     const data = node.data;
     const rawModelId = String(

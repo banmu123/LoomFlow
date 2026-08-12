@@ -17,6 +17,14 @@ export abstract class BaseExecutor {
     subFlowRunner?: SubFlowRunner
   ): Promise<Record<string, unknown>>;
 
+  /**
+   * 校验节点配置（执行前调用，返回错误信息；null = 通过）
+   * 子类可覆盖实现配置级校验
+   */
+  validate(_node: FlowNode): string | null {
+    return null;
+  }
+
   /** 生成空结果 */
   protected emptyResult(): Record<string, unknown> {
     return {};
