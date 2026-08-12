@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getWorkflowByApiKey } from '@/lib/publish-auth';
 import { flowRunStore } from '@/lib/tinyflow';
+import { extractFinalOutputs } from '@/lib/tinyflow/runFlow';
 
 // 外部查询执行状态/结果
 export async function GET(
@@ -19,10 +20,7 @@ export async function GET(
   // 汇总最终输出
   let outputs: Record<string, unknown> | undefined;
   if (record.status === 'completed') {
-    const endNode = auth.workflow.data?.nodes?.find((n) => n.type === 'endNode');
-    outputs = endNode
-      ? record.context.nodeOutputs.get(endNode.id) || {}
-      : {};
+    outputs = extractFinalOutputs(auth.workflow.data, record.engine);
   }
 
   return Response.json({

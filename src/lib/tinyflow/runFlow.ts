@@ -17,6 +17,32 @@ export interface RunFlowOptions {
   userId?: string | null;
 }
 
+// 提取最终输出：endNode 配置了输出引用时用 endNode 结果；
+// 否则回退汇总所有已完成节点的输出（保证外部调用总能拿到结果）
+export function extractFinalOutputs(
+  flowData: TinyflowData,
+  engine: FlowEngine,
+): Record<string, unknown> {
+  const endNode = flowData.nodes.find((n) => n.type === 'endNode');
+  if (endNode) {
+    const endOutputs = engine.getContext().nodeOutputs.get(endNode.id);
+    if (endOutputs && Object.keys(endOutputs).length > 0) {
+      return endOutputs;
+    }
+  }
+
+  // 回退：汇总所有有输出的节点（跳过 start/end 的空输出）
+  const summary: Record<string, unknown> = {};
+  for (const [nodeId, outputs] of engine.getContext().nodeOutputs) {
+    if (outputs && typeof outputs === 'object' && Object.keys(outputs).length > 0) {
+      const nodeType = flowData.nodes.find((n) => n.id === nodeId)?.type;
+      if (nodeType === 'startNode' || nodeType === 'endNode') continue;
+      summary[nodeId] = outputs;
+    }
+  }
+  return summary;
+}
+
 // 写入/更新执行记录（落库持久化）
 export async function saveFlowRun(
   flowId: string,
@@ -115,10 +141,7 @@ export async function runFlow(
     await engine.run();
     flowRunStore.update(flowId, { status: 'completed' });
 
-    const endNode = flowData.nodes.find((n) => n.type === 'endNode');
-    const finalOutputs = endNode
-      ? engine.getContext().nodeOutputs.get(endNode.id) || {}
-      : {};
+    const finalOutputs = extractFinalOutputs(flowData, engine);
 
     await saveFlowRun(flowId, {
       status: 'completed',

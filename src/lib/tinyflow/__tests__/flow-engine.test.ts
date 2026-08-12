@@ -58,3 +58,25 @@ describe('FlowEngine', () => {
     await expect(engine.run()).resolves.not.toThrow();
   });
 });
+
+describe('extractFinalOutputs 回退汇总', () => {
+  it('endNode 无输出配置时汇总各节点结果', async () => {
+    const { runFlow } = await import('../runFlow');
+    const flow = {
+      nodes: [
+        { id: 'start', type: 'startNode', data: { parameters: [] } },
+        { id: 'llm', type: 'llmNode', data: { llmId: 'deepseek-v4-flash', userPrompt: '说你好', outType: 'text' } },
+        { id: 'end', type: 'endNode', data: {} },
+      ],
+      edges: [
+        { id: 'e1', source: 'start', target: 'llm' },
+        { id: 'e2', source: 'llm', target: 'end' },
+      ],
+    };
+    const result = await runFlow(flow as never, {});
+    expect(result.status).toBe('completed');
+    // endNode 无 outputDefs → 回退汇总应包含 llm 节点输出
+    expect(result.outputs).toBeDefined();
+    expect(JSON.stringify(result.outputs)).toContain('llm');
+  }, 30000);
+});

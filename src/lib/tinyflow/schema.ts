@@ -1,24 +1,12 @@
 import type { TinyflowData } from './types';
 import { GraphParser } from './engine/GraphParser';
+import { nodeRegistry } from './node-registry';
+import './nodes/builtin'; // 确保内置节点已注册（NodeRegistry 为节点唯一来源）
 
 // ===== Workflow Schema v1 =====
 // Workflow 定义成为可保存、分享、校验、迁移的开发者资产
 
 export const WORKFLOW_SCHEMA_VERSION = 1;
-
-// 已知节点类型（与 ExecutorRegistry 保持一致）
-export const KNOWN_NODE_TYPES = [
-  'startNode',
-  'endNode',
-  'llmNode',
-  'httpNode',
-  'codeNode',
-  'knowledgeNode',
-  'searchEngineNode',
-  'templateNode',
-  'confirmNode',
-  'loopNode',
-] as const;
 
 export interface WorkflowValidationError {
   code: string; // missing_field / unknown_type / duplicate_id / dangling_edge / self_loop / cycle / missing_start / missing_end / invalid_config
@@ -71,7 +59,7 @@ export function validateWorkflow(data: unknown): WorkflowValidationResult {
 
     if (!node.type) {
       errors.push({ code: 'missing_field', nodeId: node.id, message: `节点 ${node.id} 缺少 type` });
-    } else if (!KNOWN_NODE_TYPES.includes(node.type as (typeof KNOWN_NODE_TYPES)[number])) {
+    } else if (!nodeRegistry.has(node.type)) {
       errors.push({
         code: 'unknown_type',
         nodeId: node.id,

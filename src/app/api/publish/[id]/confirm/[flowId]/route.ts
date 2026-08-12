@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getWorkflowByApiKey } from '@/lib/publish-auth';
 import { flowRunStore } from '@/lib/tinyflow';
+import { extractFinalOutputs } from '@/lib/tinyflow/runFlow';
 import { saveFlowRun } from '@/lib/tinyflow/runFlow';
 import type { FlowError } from '@/lib/tinyflow/types';
 
@@ -37,10 +38,7 @@ export async function POST(
     await saveFlowRun(flowId, { status: 'completed' });
 
     // 返回最终输出
-    const endNode = auth.workflow.data?.nodes?.find((n) => n.type === 'endNode');
-    const outputs = endNode
-      ? record.context.nodeOutputs.get(endNode.id) || {}
-      : {};
+    const outputs = extractFinalOutputs(auth.workflow.data, record.engine);
 
     return Response.json({ flowId, status: 'completed', outputs });
   } catch (err) {
