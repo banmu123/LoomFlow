@@ -1,7 +1,6 @@
-# ForgeFlow 部署手册
+# LoomFlow 部署手册
 
-> 分两层：**第一层通用部署流程**（与数据库/后端技术栈无关，换任何技术都能用）；
-> **第二层本应用配置**（当前为 Next.js + Supabase，换技术栈时替换这一层，见附录 A）。
+> LoomFlow 自托管部署指南：从服务器准备、Nginx/HTTPS 到数据库迁移。
 > `{占位符}` 为每台服务器不同的变量，见符号约定。
 
 ---
@@ -77,13 +76,13 @@ COZE_PROJECT_ENV=PROD PORT=5000 pm2 start dist/server.js --name loomflow
 |------|------|-----------|
 | `{SERVER_USER}` | SSH 登录用户 | `ubuntu` |
 | `{SERVER_IP}` | 服务器公网 IP | `your-server-ip` |
-| `{APP_DIR}` | 应用部署目录 | `/opt/forgeflow` |
+| `{APP_DIR}` | 应用部署目录 | `/opt/loomflow` |
 | `{PORT}` | 应用端口 | `5000` |
 | `{DOMAIN}` | 域名 | `your-domain.com` |
 
 ---
 
-# 第一层：通用部署流程（与任何技术栈无关）
+# 第一部分：部署流程
 
 ## 一、服务器准备
 
@@ -188,7 +187,7 @@ sudo apt-get update && sudo apt-get install -y nginx
 
 ### 4.2 反代配置（通用模板，SSE 必须关缓冲）
 
-创建 `/etc/nginx/sites-available/forgeflow`：
+创建 `/etc/nginx/sites-available/loomflow`：
 
 ```nginx
 server {
@@ -225,7 +224,7 @@ server {
 启用并测试：
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/forgeflow /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/loomflow /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default      # 移除默认站点（可选）
 sudo nginx -t && sudo systemctl reload nginx
 ```
@@ -370,7 +369,7 @@ pm2 restart app-name
 
 ---
 
-# 第二层：本应用配置（ForgeFlow / Next.js / Supabase）
+# 第二层：本应用配置（LoomFlow / Next.js / Supabase）
 
 > 换技术栈时，**本章整层替换**，第一层不动。替换对照见附录 A。
 
@@ -412,7 +411,7 @@ cd {APP_DIR}
 pnpm install --prefer-frozen-lockfile
 pnpm build          # = next build + tsup 打包 server.ts → dist/server.js
 
-COZE_PROJECT_ENV=PROD PORT={PORT} pm2 start dist/server.js --name forgeflow
+COZE_PROJECT_ENV=PROD PORT={PORT} pm2 start dist/server.js --name loomflow
 pm2 save
 ```
 
@@ -434,6 +433,39 @@ POST /api/publish/{workflowId}/confirm/{flowId}
 ```
 
 ---
+
+## 十.五、搜索引擎节点配置
+
+搜索节点（searchEngineNode）通过可配置的 HTTP 端点执行搜索，不再依赖特定 SDK。
+
+### 环境变量
+
+```bash
+SEARCH_API_URL=https://your-search-endpoint/search
+SEARCH_API_KEY=your_api_key_optional
+```
+
+### 请求格式（LoomFlow → 搜索端点）
+
+```json
+POST {SEARCH_API_URL}
+Authorization: Bearer {SEARCH_API_KEY}
+Content-Type: application/json
+
+{ "query": "搜索关键词", "limit": 5 }
+```
+
+### 响应格式（搜索端点 → LoomFlow）
+
+```json
+{
+  "results": [
+    { "title": "...", "url": "...", "snippet": "..." }
+  ]
+}
+```
+
+> `results` 为数组；也兼容直接返回数组的格式。未配置 `SEARCH_API_URL` 时，节点执行会明确报错提示配置。
 
 ## 十一、自建 PostgreSQL 迁移指南
 
@@ -506,7 +538,7 @@ COZE_SUPABASE_SERVICE_ROLE_KEY=你的SERVICE_ROLE_KEY
 重启应用：
 
 ```bash
-pm2 restart forgeflow --update-env
+pm2 restart loomflow --update-env
 ```
 
 **⑥ 验证**：登录、对话、工作流列表、执行历史均正常；数据可在自托管 Studio 查看。
@@ -561,7 +593,7 @@ pm2 restart forgeflow --update-env
 |----|-----|
 | 服务器 | 腾讯云轻量（Ubuntu） |
 | SSH | `{SERVER_USER}@{SERVER_IP}` |
-| 应用目录 | `/opt/forgeflow` |
+| 应用目录 | `/opt/loomflow` |
 | 端口 | 5000（直连）/ 80（Nginx 待配域名） |
 | 域名 | 未接入 |
 | 数据库 | Supabase（自己的项目） |

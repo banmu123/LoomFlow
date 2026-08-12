@@ -9,7 +9,7 @@ set -e
 # ===== 配置区（改成你的服务器） =====
 SERVER_USER="${SERVER_USER:-ubuntu}"
 SERVER_IP="${SERVER_IP:-your-server-ip}"
-APP_DIR="${APP_DIR:-/opt/forgeflow}"
+APP_DIR="${APP_DIR:-/opt/loomflow}"
 # =====================================
 
 echo "▶ 1/4 打包代码..."

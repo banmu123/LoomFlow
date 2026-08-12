@@ -53,35 +53,72 @@ curl -X POST https://your-host/api/publish/{workflowId}/execute \
 
 ## 🚀 快速开始
 
-### 环境要求
-- Node.js ≥ 20.9
-- pnpm 9+
-- Supabase 项目（或自建 PostgreSQL，见部署手册）
+### 🧑‍💻 本地开发
 
-### 本地开发
+环境要求：Node.js ≥ 20.9、pnpm 9+、一个 Supabase 项目。
 
 ```bash
 # 1. 安装依赖
 pnpm install
 
-# 2. 配置环境变量（参考 .env.example 创建 .env.local）
-#    COZE_SUPABASE_URL / COZE_SUPABASE_SERVICE_ROLE_KEY / DEEPSEEK_API_KEY / AUTH_SECRET
+# 2. 配置环境变量
+cp .env.example .env.local
+```
 
-# 3. 初始化数据库（Supabase SQL Editor 按顺序执行）
-#    scripts/supabase-init.sql
-#    scripts/supabase-users.sql
-#    scripts/supabase-updates.sql
+环境变量（从哪里获取）：
 
-# 4. 启动开发服务器（默认端口 5000）
+| 变量 | 获取方式 |
+|------|---------|
+| `COZE_SUPABASE_URL` | Supabase → Project Settings → API |
+| `COZE_SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API（service_role） |
+| `DEEPSEEK_API_KEY` | [platform.deepseek.com](https://platform.deepseek.com) → API Keys |
+| `AUTH_SECRET` | `openssl rand -hex 32` |
+
+```bash
+# 3. 初始化数据库 —— 数据库设置清单
+#    创建 Supabase 项目 → SQL Editor → 按顺序执行：
+#    ① scripts/supabase-init.sql
+#    ② scripts/supabase-users.sql   ← ⚠️ 执行前先把默认 admin 密码改成你自己的
+#    ③ scripts/supabase-updates.sql
+#    验证表：conversations / messages / workflow_history / users / ai_models ...
+
+# 4. 启动
 pnpm dev
 ```
 
-打开 http://localhost:5000，默认管理员账号 `admin`（密码在 supabase-users.sql 中设置）。
+打开 http://localhost:5000。
 
-### 生产部署
+> ⚠️ **安全提示**：初始 admin 密码在 `supabase-users.sql` 中设置——**首次部署前必须修改为强密码**。系统无法自动强制，请把它视为必做步骤。
 
-完整部署手册：**[docs/config/Deployment-Manual.md](docs/config/Deployment-Manual.md)**
-（覆盖：服务器准备、Nginx + HTTPS、域名、一键部署脚本、换服务器迁移）
+### 🚀 生产部署 / 自托管
+
+完整指南：**[docs/config/Deployment-Manual.md](docs/config/Deployment-Manual.md)**
+
+```bash
+pnpm build
+COZE_PROJECT_ENV=PROD PORT=5000 pm2 start dist/server.js --name loomflow
+pm2 save
+```
+
+最低服务器：1 核 CPU / 1GB 内存 / Ubuntu 20.04+ / Node ≥ 20.9。
+
+### 🗄️ 自建 PostgreSQL
+
+通过 **Docker 自托管 Supabase** 从云切换到自己的 PostgreSQL——**代码零改动**。见[部署手册第十一章](docs/config/Deployment-Manual.md)。
+
+### ✅ 部署后验证
+
+```bash
+curl http://localhost:5000/api/health
+# {"status":"ok","service":"loomflow","version":"v0.1.0",...}
+```
+
+检查清单：
+- ✅ `http://localhost:5000` 可打开（登录页）
+- ✅ admin 账号可登录
+- ✅ 工作流画布可加载
+- ✅ 创建一个简单工作流 → 保存
+- ✅ 发布为 API → 用 API Key 调用
 
 ## 📚 文档
 

@@ -68,34 +68,72 @@ Admin → Model Settings → Add Model
 
 ## 🚀 Quick Start
 
-### Requirements
-- Node.js ≥ 20.9
-- pnpm 9+
-- A Supabase project (or self-hosted PostgreSQL, see Deployment Manual)
+### 🧑‍💻 Local Development
 
-### Local Development
+Requirements: Node.js ≥ 20.9, pnpm 9+, a Supabase project.
 
 ```bash
 # 1. Install dependencies
 pnpm install
 
-# 2. Configure environment (copy .env.example to .env.local)
-#    Required: COZE_SUPABASE_URL / COZE_SUPABASE_SERVICE_ROLE_KEY / DEEPSEEK_API_KEY / AUTH_SECRET
+# 2. Configure environment
 cp .env.example .env.local
+```
 
-# 3. Initialize database (run in Supabase SQL Editor, in order)
-#    scripts/supabase-init.sql → supabase-users.sql → supabase-updates.sql
+Environment variables (where to get them):
 
-# 4. Start dev server (default port 5000)
+| Variable | Where to get |
+|----------|--------------|
+| `COZE_SUPABASE_URL` | Supabase → Project Settings → API |
+| `COZE_SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API (service_role) |
+| `DEEPSEEK_API_KEY` | [platform.deepseek.com](https://platform.deepseek.com) → API Keys |
+| `AUTH_SECRET` | `openssl rand -hex 32` |
+
+```bash
+# 3. Initialize database — Database Setup Checklist
+#    Create Supabase project → SQL Editor → run in order:
+#    ① scripts/supabase-init.sql
+#    ② scripts/supabase-users.sql   ← ⚠️ set your own admin password BEFORE running
+#    ③ scripts/supabase-updates.sql
+#    Verify tables: conversations / messages / workflow_history / users / ai_models ...
+
+# 4. Start
 pnpm dev
 ```
 
-Open http://localhost:5000 — default admin account `admin` (password set in `supabase-users.sql`).
+Open http://localhost:5000.
 
-### Production Deployment
+> ⚠️ **Security**: the initial admin account password is set inside `supabase-users.sql` — **change it to a strong password before the first deployment**. It cannot be auto-forced, so treat this as a required step.
 
-Full deployment manual: **[docs/config/Deployment-Manual.md](docs/config/Deployment-Manual.md)**
-(Server setup, Nginx + HTTPS, domain, one-click deploy script, server migration, self-hosted PostgreSQL migration)
+### 🚀 Production / Self-Host
+
+Full guide: **[docs/config/Deployment-Manual.md](docs/config/Deployment-Manual.md)**
+
+```bash
+pnpm build
+COZE_PROJECT_ENV=PROD PORT=5000 pm2 start dist/server.js --name loomflow
+pm2 save
+```
+
+Minimum server: 1 CPU / 1 GB RAM / Ubuntu 20.04+ / Node ≥ 20.9.
+
+### 🗄️ Self-Hosted PostgreSQL
+
+Switch from Supabase cloud to your own PostgreSQL via **Docker self-hosted Supabase** — zero code changes. See [Deployment Manual §11](docs/config/Deployment-Manual.md).
+
+### ✅ Post-Deploy Verification
+
+```bash
+curl http://localhost:5000/api/health
+# {"status":"ok","service":"loomflow","version":"v0.1.0",...}
+```
+
+Checklist:
+- ✅ `http://localhost:5000` opens (login page)
+- ✅ Sign in with admin account
+- ✅ Workflow canvas loads
+- ✅ Create a simple workflow → save
+- ✅ Publish as API → call it with the API key
 
 ## 📚 Documentation
 
