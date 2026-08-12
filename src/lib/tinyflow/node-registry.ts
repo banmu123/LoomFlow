@@ -1,4 +1,4 @@
-import type { NodeDefinition } from './node-definition';
+import type { NodeCategory, NodeDefinition } from './node-definition';
 
 // ===== NodeRegistry：统一注册/查询/获取节点定义 =====
 
@@ -19,6 +19,11 @@ export class NodeRegistry {
 
   list(): NodeDefinition[] {
     return [...this.nodes.values()];
+  }
+
+  /** 按分类查询节点定义 */
+  listByCategory(category: NodeCategory): NodeDefinition[] {
+    return this.list().filter((n) => n.category === category);
   }
 
   has(type: string): boolean {

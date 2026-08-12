@@ -1,5 +1,6 @@
 import type { NodeDefinition } from '../node-definition';
 import { nodeRegistry } from '../node-registry';
+import { ExecutorRegistry } from '../executors';
 
 // ===== 内置节点注册（最小定义，与 NodeData 保持分离） =====
 
@@ -249,3 +250,12 @@ nodeRegistry.register(SEARCH_ENGINE_NODE);
 nodeRegistry.register(TEMPLATE_NODE);
 nodeRegistry.register(CONFIRM_NODE);
 nodeRegistry.register(LOOP_NODE);
+
+// ===== 一致性校验：executorType 必须可执行（防幽灵节点） =====
+for (const def of nodeRegistry.list()) {
+  if (!ExecutorRegistry.get(def.executorType)) {
+    throw new Error(
+      `节点 ${def.type} 的 executorType（${def.executorType}）未注册执行器，请先在 ExecutorRegistry 注册`,
+    );
+  }
+}
