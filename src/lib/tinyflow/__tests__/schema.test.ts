@@ -93,3 +93,19 @@ describe('serializeWorkflow / migrateWorkflow', () => {
     expect(m.viewport).toBeDefined();
   });
 });
+
+describe('开始/结束节点单例', () => {
+  it('多个开始节点拒绝', () => {
+    const flow = validFlow();
+    flow.nodes.push({ id: 'start2', type: 'startNode', data: {} } as never);
+    const r = validateWorkflow(flow);
+    expect(r.errors.some((e) => e.code === 'duplicate_start')).toBe(true);
+  });
+
+  it('多个结束节点拒绝', () => {
+    const flow = validFlow();
+    flow.nodes.push({ id: 'end2', type: 'endNode', data: {} } as never);
+    const r = validateWorkflow(flow);
+    expect(r.errors.some((e) => e.code === 'duplicate_end')).toBe(true);
+  });
+});

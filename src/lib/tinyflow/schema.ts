@@ -42,10 +42,10 @@ export function validateWorkflow(data: unknown): WorkflowValidationResult {
   const nodes = flow.nodes;
   const edges = flow.edges;
 
-  // 节点 id 唯一性 + 类型合法性
+  // 节点 id 唯一性 + 类型合法性 + 单例限制
   const seenIds = new Set<string>();
-  let hasStart = false;
-  let hasEnd = false;
+  let startCount = 0;
+  let endCount = 0;
 
   for (const node of nodes) {
     if (!node.id) {
@@ -67,14 +67,29 @@ export function validateWorkflow(data: unknown): WorkflowValidationResult {
       });
     }
 
-    if (node.type === 'startNode') hasStart = true;
-    if (node.type === 'endNode') hasEnd = true;
+    // 开始/结束节点单例：一个工作流只能有一个
+    if (node.type === 'startNode') startCount++;
+    if (node.type === 'endNode') endCount++;
+    if (startCount > 1) {
+      errors.push({
+        code: 'duplicate_start',
+        nodeId: node.id,
+        message: `开始节点只能有一个（重复: ${node.id}）`,
+      });
+    }
+    if (endCount > 1) {
+      errors.push({
+        code: 'duplicate_end',
+        nodeId: node.id,
+        message: `结束节点只能有一个（重复: ${node.id}）`,
+      });
+    }
   }
 
-  if (!hasStart) {
+  if (startCount === 0) {
     errors.push({ code: 'missing_start', message: '缺少开始节点（startNode）' });
   }
-  if (!hasEnd) {
+  if (endCount === 0) {
     errors.push({ code: 'missing_end', message: '缺少结束节点（endNode）' });
   }
 
