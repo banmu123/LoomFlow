@@ -16,6 +16,17 @@ export const zh = {
     success: '成功',
     failed: '失败',
   },
+
+  sidebar: {
+    workspace: '工作区',
+    management: '管理',
+    workflows: '工作流列表',
+    editor: '画布',
+    history: '执行历史',
+    schedules: '定时任务',
+    models: '模型配置',
+    admin: '管理后台',
+  },
   app: {
     name: 'LoomFlow',
     tagline: '智能工作流编排与协作平台',

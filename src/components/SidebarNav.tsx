@@ -1,95 +1,129 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import {
-  LayoutDashboard,
-  FolderKanban,
   GitBranch,
-  Factory,
-  ShieldCheck,
-  Sparkles,
-  type LucideIcon,
+  LayoutDashboard,
+  History,
+  Clock,
+  Cpu,
+  Settings,
+  LogOut,
+  Workflow,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { UserMenu } from './UserMenu';
+import { useT } from '@/lib/i18n';
+import { LocaleSwitcher } from './LocaleSwitcher';
 
-type NavItem = {
-  label: string;
+interface NavItem {
   href: string;
-  icon: LucideIcon;
-};
+  labelKey: string;
+  icon: typeof GitBranch;
+}
 
+// 左侧菜单栏：工作区导航 + 管理入口
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Command 总控', href: '/command', icon: LayoutDashboard },
-  { label: 'Project 项目事实', href: '/project', icon: FolderKanban },
-  { label: 'Workflows 工作流', href: '/workflows', icon: GitBranch },
-  { label: 'Production 生产', href: '/production', icon: Factory },
-  { label: 'Governance 治理', href: '/governance', icon: ShieldCheck },
+  { href: '/workflows', labelKey: 'sidebar.workflows', icon: Workflow },
+  { href: '/workflows/editor', labelKey: 'sidebar.editor', icon: LayoutDashboard },
+  { href: '/workflows/history', labelKey: 'sidebar.history', icon: History },
+  { href: '/workflows/schedules', labelKey: 'sidebar.schedules', icon: Clock },
 ];
 
-export function SidebarNav({
-  panelOpen,
-  onTogglePanel,
-}: {
-  panelOpen: boolean;
-  onTogglePanel: () => void;
-}) {
+const ADMIN_ITEMS: NavItem[] = [
+  { href: '/admin/models', labelKey: 'sidebar.models', icon: Cpu },
+  { href: '/admin/users', labelKey: 'sidebar.admin', icon: Settings },
+];
+
+export function SidebarNav() {
+  const router = useRouter();
   const pathname = usePathname();
+  const t = useT();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/auth/me');
+        const data = await res.json();
+        if (data?.authenticated && data?.user?.role === 'admin') {
+          setIsAdmin(true);
+        }
+      } catch {
+        // ignore
+      }
+    })();
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // ignore
+    }
+    router.push('/login');
+  };
 
   const isActive = (href: string) =>
-    pathname === href || pathname?.startsWith(href + '/');
+    pathname === href || (href !== '/workflows' && pathname.startsWith(href + '/'));
+
+  const renderItem = (item: NavItem) => {
+    const Icon = item.icon;
+    const active = isActive(item.href);
+    return (
+      <button
+        key={item.href}
+        onClick={() => router.push(item.href)}
+        className={cn(
+          'flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm transition-colors',
+          active
+            ? 'bg-primary/10 font-medium text-primary'
+            : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+        )}
+      >
+        <Icon className="h-4 w-4 shrink-0" />
+        <span className="truncate">{t(item.labelKey)}</span>
+      </button>
+    );
+  };
 
   return (
-    <aside className="flex w-[200px] shrink-0 flex-col border-r border-border bg-card">
-      {/* LOGO 区域 */}
-      <div className="flex h-[60px] items-center border-b border-border px-5">
-        <span className="text-lg font-extrabold tracking-wide text-primary whitespace-nowrap">
-          LoomFlow
-        </span>
+    <aside className="flex w-[180px] shrink-0 flex-col border-r border-border bg-card">
+      {/* Logo */}
+      <div className="flex items-center gap-2 border-b border-border px-3 py-3">
+        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10">
+          <GitBranch className="h-4 w-4 text-primary" />
+        </div>
+        <span className="truncate text-sm font-semibold">{t('app.name')}</span>
       </div>
 
-      {/* 导航菜单区域 */}
-      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-3">
-        {NAV_ITEMS.map((item) => {
-          const active = isActive(item.href);
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors',
-                active
-                  ? 'bg-primary/10 font-medium text-primary'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-              )}
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              {item.label}
-            </Link>
-          );
-        })}
+      {/* 导航 */}
+      <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
+        <p className="px-2.5 pb-1 pt-2 text-[10px] font-medium uppercase text-muted-foreground/70">
+          {t('sidebar.workspace')}
+        </p>
+        {NAV_ITEMS.map(renderItem)}
+
+        {isAdmin && (
+          <>
+            <p className="px-2.5 pb-1 pt-3 text-[10px] font-medium uppercase text-muted-foreground/70">
+              {t('sidebar.management')}
+            </p>
+            {ADMIN_ITEMS.map(renderItem)}
+          </>
+        )}
       </nav>
 
-      {/* 底部操作区域 */}
-      <div className="space-y-2 border-t border-border p-3">
-        {/* AI 对话按钮 */}
+      {/* 底部：语言 + 退出 */}
+      <div className="flex items-center justify-between border-t border-border p-2">
+        <LocaleSwitcher compact />
         <button
-          onClick={onTogglePanel}
-          className={cn(
-            'flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors',
-            panelOpen
-              ? 'bg-primary/10 font-medium text-primary'
-              : 'text-muted-foreground hover:bg-primary/10 hover:text-primary',
-          )}
+          onClick={handleLogout}
+          className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-destructive"
+          title={t('chat.logout')}
         >
-          <Sparkles className="h-4 w-4 shrink-0" />
-          AI 对话
+          <LogOut className="h-4 w-4" />
         </button>
-
-        {/* 用户菜单 */}
-        <UserMenu />
       </div>
     </aside>
   );

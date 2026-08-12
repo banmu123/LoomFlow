@@ -18,6 +18,17 @@ export const en: ZhMessages = {
     success: 'Success',
     failed: 'Failed',
   },
+
+  sidebar: {
+    workspace: 'Workspace',
+    management: 'Admin',
+    workflows: 'Workflows',
+    editor: 'Canvas',
+    history: 'History',
+    schedules: 'Schedules',
+    models: 'Models',
+    admin: 'Admin',
+  },
   app: {
     name: 'LoomFlow',
     tagline: 'Intelligent workflow orchestration & collaboration',
