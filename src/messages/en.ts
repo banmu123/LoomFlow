@@ -27,6 +27,10 @@ export const en: ZhMessages = {
     history: 'History',
     schedules: 'Schedules',
     models: 'Models',
+    users: 'Users',
+    stats: 'Statistics',
+    logs: 'Audit Logs',
+    apiLogs: 'API Calls',
     admin: 'Admin',
   },
   app: {
