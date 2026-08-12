@@ -7,11 +7,13 @@ import { supabase } from '@/lib/supabase/server';
 
 export const runtime = 'nodejs';
 
-// 从 Model Registry 获取模型对应的 provider 客户端
-import { modelRegistry, resolveProvider, createProviderClient } from '@/lib/ai';
+// 从 Model Registry（内置 + 用户配置合并）获取模型对应的 provider 客户端
+import { resolveProvider, createProviderClient, hasCapability } from '@/lib/ai';
+import { getAllModels } from '@/lib/ai/db-models';
 
-function getProviderForModel(modelId: string) {
-  const model = modelRegistry.get(modelId);
+async function getProviderForModel(modelId: string) {
+  const models = await getAllModels();
+  const model = models.find((m) => m.id === modelId);
   const providerId = model?.provider || 'deepseek';
   const resolved = resolveProvider(providerId);
   if (!resolved) throw new Error(`未知 provider: ${providerId}`);
@@ -99,10 +101,10 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const messages = body?.messages as ChatMessage[] | undefined;
   const images = (body?.images as string[] | undefined) || [];
-  // 模型选择：仅允许 flash / pro，默认 flash
-  const SUPPORTED_MODELS = ['deepseek-v4-flash', 'deepseek-v4-pro'];
+  // 模型选择：从模型注册表校验，默认 flash
+  const allModels = await getAllModels();
   const requestedModel = (body?.model as string | undefined) || 'deepseek-v4-flash';
-  const modelId = SUPPORTED_MODELS.includes(requestedModel)
+  const modelId = allModels.some((m) => m.id === requestedModel)
     ? requestedModel
     : 'deepseek-v4-flash';
 
@@ -127,7 +129,8 @@ export async function POST(request: NextRequest) {
   }));
 
   // 最后一条用户消息附加图片（仅视觉模型支持；DeepSeek 官方 API 不支持，忽略避免挂起）
-  const supportsVision = modelRegistry.canUse(modelId, 'vision');
+  const activeModel = allModels.find((m) => m.id === modelId);
+  const supportsVision = activeModel ? hasCapability(activeModel, 'vision') : false;
   if (supportsVision && images.length > 0 && promptMessages.length > 0) {
     const last = promptMessages[promptMessages.length - 1];
     promptMessages[promptMessages.length - 1] = {
@@ -139,7 +142,7 @@ export async function POST(request: NextRequest) {
     };
   }
 
-  const provider = getProviderForModel(modelId);
+  const provider = await getProviderForModel(modelId);
   console.log('[chat-ai] Using model:', modelId);
 
   // 使用 streamText 流式调用

@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Loader2, Users, FileClock, Activity, BarChart3 } from 'lucide-react';
+import { Loader2, Users, FileClock, Activity, BarChart3, Cpu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useT } from '@/lib/i18n';
 
 const NAV_ITEMS = [
   { href: '/admin/users', labelKey: 'admin.users', icon: Users },
+  { href: '/admin/models', labelKey: 'admin.models', icon: Cpu },
   { href: '/admin/stats', labelKey: 'admin.stats', icon: BarChart3 },
   { href: '/admin/logs', labelKey: 'admin.logs', icon: FileClock },
   { href: '/admin/api-logs', labelKey: 'admin.apiLogs', icon: Activity },

@@ -5,12 +5,13 @@ import type { ExpressionEvaluator } from '../engine/ExpressionEvaluator';
 import { generateText } from 'ai';
 import type { ModelMessage } from 'ai';
 
-// 从 Model Registry 获取模型对应的 provider 客户端
-import { modelRegistry } from '@/lib/ai';
+// 从 Model Registry（内置 + 用户配置合并）获取模型对应的 provider 客户端
 import { resolveProvider, createProviderClient } from '@/lib/ai';
+import { getAllModels } from '@/lib/ai/db-models';
 
-function getProviderForModel(modelId: string) {
-  const model = modelRegistry.get(modelId);
+async function getProviderForModel(modelId: string) {
+  const models = await getAllModels();
+  const model = models.find((m) => m.id === modelId);
   const providerId = model?.provider || 'deepseek';
   const resolved = resolveProvider(providerId);
   if (!resolved) throw new Error(`未知 provider: ${providerId}`);
@@ -88,7 +89,7 @@ export class LLMExecutor extends BaseExecutor {
       }
     }
 
-    const provider = getProviderForModel(modelId);
+    const provider = await getProviderForModel(modelId);
     const { text } = await generateText({
       model: provider(modelId),
       messages,

@@ -199,6 +199,7 @@ export const en: ZhMessages = {
     title: 'Admin',
     backToWorkspace: 'Back to workspace',
     users: 'Users',
+    models: 'Models',
     stats: 'Statistics',
     logs: 'Audit Logs',
     apiLogs: 'API Calls',

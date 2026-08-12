@@ -191,6 +191,7 @@ export const zh = {
     title: '管理后台',
     backToWorkspace: '返回工作台',
     users: '用户管理',
+    models: '模型配置',
     stats: '用量统计',
     logs: '审计日志',
     apiLogs: 'API 调用',

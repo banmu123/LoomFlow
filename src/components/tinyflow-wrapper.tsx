@@ -130,6 +130,31 @@ export default function TinyflowWrapper() {
   const [confirmData, setConfirmData] = useState<Record<string, string>>({});
   const [showResults, setShowResults] = useState(false);
 
+  // 动态模型列表（从模型注册表加载）
+  const [modelOptions, setModelOptions] = useState([
+    { value: 'deepseek-v4-flash', label: 'DeepSeek Flash' },
+    { value: 'deepseek-v4-pro', label: 'DeepSeek Pro' },
+  ]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/ai/models');
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setModelOptions(
+            data.map((m: { id: string; label: string | null }) => ({
+              value: m.id,
+              label: m.label || m.id,
+            })),
+          );
+        }
+      } catch {
+        // 保留默认模型
+      }
+    })();
+  }, []);
+
   // Panel state
   const [panelOpen, setPanelOpen] = useState(false);
   const [inputMode, setInputMode] = useState<InputMode>('form');
@@ -148,10 +173,7 @@ export default function TinyflowWrapper() {
         element: containerRef.current,
         defaultTheme: 'light',
         provider: {
-          llm: () => [
-            { value: 'deepseek-v4-flash', label: 'DeepSeek Flash' },
-            { value: 'deepseek-v4-pro', label: 'DeepSeek Pro' },
-          ],
+          llm: () => modelOptions,
         },
         onDataChange: (data) => {
           // 数据变化时触发重新计算 startParams
