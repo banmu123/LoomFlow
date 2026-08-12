@@ -2,25 +2,19 @@ import type { FlowNode, FlowContext } from '../types';
 import { BaseExecutor } from './BaseExecutor';
 import type { ParameterResolver } from '../engine/ParameterResolver';
 import type { ExpressionEvaluator } from '../engine/ExpressionEvaluator';
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { generateText } from 'ai';
 import type { ModelMessage } from 'ai';
 
-// 创建 OpenAI 兼容 provider（与 /api/chat-ai 同款实现：优先 Ark，回退 DeepSeek 官方）
-function getProvider() {
-  const arkKey = process.env.ARK_API_KEY;
-  const deepseekKey = process.env.DEEPSEEK_API_KEY;
-  const apiKey = arkKey || deepseekKey || '';
+// 从 Model Registry 获取模型对应的 provider 客户端
+import { modelRegistry } from '@/lib/ai';
+import { resolveProvider, createProviderClient } from '@/lib/ai';
 
-  const baseURL = arkKey
-    ? process.env.ARK_BASE_URL || 'https://ark.cn-beijing.volces.com/api/v3'
-    : process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1';
-
-  return createOpenAICompatible({
-    baseURL,
-    apiKey,
-    name: 'ai-provider',
-  });
+function getProviderForModel(modelId: string) {
+  const model = modelRegistry.get(modelId);
+  const providerId = model?.provider || 'deepseek';
+  const resolved = resolveProvider(providerId);
+  if (!resolved) throw new Error(`未知 provider: ${providerId}`);
+  return createProviderClient(resolved);
 }
 
 export class LLMExecutor extends BaseExecutor {
@@ -94,7 +88,7 @@ export class LLMExecutor extends BaseExecutor {
       }
     }
 
-    const provider = getProvider();
+    const provider = getProviderForModel(modelId);
     const { text } = await generateText({
       model: provider(modelId),
       messages,

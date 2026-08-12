@@ -1,5 +1,4 @@
 import { NextRequest } from 'next/server';
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { streamText } from 'ai';
 import type { ModelMessage } from 'ai';
 import { buildSystemPrompt } from '@/lib/workflow-ai/prompts';
@@ -8,22 +7,15 @@ import { supabase } from '@/lib/supabase/server';
 
 export const runtime = 'nodejs';
 
-// 创建 OpenAI 兼容实例（优先 Ark，回退 DeepSeek）
-function getProvider() {
-  const arkKey = process.env.ARK_API_KEY;
-  const deepseekKey = process.env.DEEPSEEK_API_KEY;
-  const apiKey = arkKey || deepseekKey || '';
+// 从 Model Registry 获取模型对应的 provider 客户端
+import { modelRegistry, resolveProvider, createProviderClient } from '@/lib/ai';
 
-  // Ark 有独立 key 时走 Ark，否则走 DeepSeek 官方 API
-  const baseURL = arkKey
-    ? process.env.ARK_BASE_URL || 'https://ark.cn-beijing.volces.com/api/v3'
-    : process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1';
-
-  return createOpenAICompatible({
-    baseURL,
-    apiKey,
-    name: 'ai-provider',
-  });
+function getProviderForModel(modelId: string) {
+  const model = modelRegistry.get(modelId);
+  const providerId = model?.provider || 'deepseek';
+  const resolved = resolveProvider(providerId);
+  if (!resolved) throw new Error(`未知 provider: ${providerId}`);
+  return createProviderClient(resolved);
 }
 
 const MAX_MESSAGES = 20;
@@ -135,7 +127,7 @@ export async function POST(request: NextRequest) {
   }));
 
   // 最后一条用户消息附加图片（仅视觉模型支持；DeepSeek 官方 API 不支持，忽略避免挂起）
-  const supportsVision = !!process.env.ARK_API_KEY;
+  const supportsVision = modelRegistry.canUse(modelId, 'vision');
   if (supportsVision && images.length > 0 && promptMessages.length > 0) {
     const last = promptMessages[promptMessages.length - 1];
     promptMessages[promptMessages.length - 1] = {
@@ -147,7 +139,7 @@ export async function POST(request: NextRequest) {
     };
   }
 
-  const provider = getProvider();
+  const provider = getProviderForModel(modelId);
   console.log('[chat-ai] Using model:', modelId);
 
   // 使用 streamText 流式调用
