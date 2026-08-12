@@ -386,6 +386,99 @@ POST /api/publish/{workflowId}/confirm/{flowId}
 
 ---
 
+## 十一、自建 PostgreSQL 迁移指南
+
+> 目标：把数据库从 Supabase 云迁移到**自己服务器上的 PostgreSQL**（数据完全自持）。
+
+### 11.1 先了解：三条路径
+
+| 方案 | 做法 | 代码改动 | 适合 |
+|------|------|---------|------|
+| **A. Docker 自托管 Supabase**（推荐） | 服务器跑官方自托管栈（Postgres + PostgREST + Studio） | **零改动** | 想数据自持、又要兼容现架构 |
+| **B. 数据访问兼容层** | 用 pg 驱动重写数据访问层 | 大 | 彻底去掉 Supabase 依赖（后续工程） |
+| **C. 纯 SQL 不可行** | supabase-js 是 PostgREST 协议，不能直连裸 PG | — | 仅 SQL 可复用 |
+
+> 本项目所有 SQL 脚本（`scripts/*.sql`）均为标准 PostgreSQL 语法（UUID/JSONB/RLS），**在自建 PG 上可直接执行**。
+
+### 11.2 方案 A：Docker 自托管 Supabase（推荐）
+
+**① 前置**：服务器安装 Docker + Docker Compose
+
+```bash
+sudo apt-get install -y docker.io docker-compose-plugin
+sudo systemctl enable --now docker
+```
+
+**② 获取自托管配置**（Supabase 官方维护）
+
+```bash
+git clone --depth 1 https://github.com/supabase/supabase ~/supabase-selfhosted
+cd ~/supabase-selfhosted/docker
+cp .env.example .env
+# 编辑 .env：设置 POSTGRES_PASSWORD、ANON_KEY、SERVICE_ROLE_KEY 等（生成强随机值）
+```
+
+**③ 启动**
+
+```bash
+docker compose up -d
+# 等待就绪（首次拉镜像约 5-10 分钟）
+docker compose ps        # 全部 running 即成功
+```
+
+**④ 数据迁移（从 Supabase 云导出 → 导入自托管）**
+
+```bash
+# 4.1 导出云端数据（Supabase 项目 → Settings → Database → Connection string）
+pg_dump "postgresql://postgres.xxx:密码@aws-0-xxx.pooler.supabase.com:6543/postgres" \
+  --data-only --exclude-table=users > /tmp/supabase-data.sql
+
+# 4.2 在自托管环境执行项目初始化 SQL（新建库时）
+psql "postgresql://postgres:密码@localhost:5432/postgres" \
+  -f /path/to/scripts/supabase-init.sql
+psql ... -f /path/to/scripts/supabase-users.sql   # 先改脚本里的初始密码
+psql ... -f /path/to/scripts/supabase-updates.sql
+
+# 4.3 导入数据（跳过 users 表——密码哈希随初始化脚本创建）
+psql "postgresql://postgres:密码@localhost:5432/postgres" < /tmp/supabase-data.sql
+```
+
+> ⚠️ 数据迁移建议先小库演练；`--exclude-table=users` 是因为 admin 密码在初始化脚本创建，避免冲突。
+
+**⑤ 切换应用指向自托管**
+
+修改 `.env.local`：
+
+```bash
+COZE_SUPABASE_URL=http://localhost:8000        # 自托管 API 网关地址（Kong）
+COZE_SUPABASE_SERVICE_ROLE_KEY=你的SERVICE_ROLE_KEY
+```
+
+重启应用：
+
+```bash
+pm2 restart forgeflow --update-env
+```
+
+**⑥ 验证**：登录、对话、工作流列表、执行历史均正常；数据可在自托管 Studio 查看。
+
+> 自托管栈端口：Kong API 网关 8000、Studio 3000、Postgres 5432。生产请用 Nginx 反代 + HTTPS。
+
+### 11.3 方案 B：数据访问兼容层（后续工程）
+
+保持所有业务代码不变，替换 `src/lib/supabase/server.ts` 为 pg 驱动实现相同的链式 API（`from().select().eq().order().insert().update().delete()`）。改动面大（几十处调用），列为后续工程。
+
+### 11.4 迁移检查清单
+
+- [ ] Docker + Compose 就绪、自托管栈启动成功
+- [ ] 初始化 SQL 在自托管库执行成功（3 个脚本）
+- [ ] 数据导入完成（pg_dump 演练过）
+- [ ] `.env.local` 指向自托管地址（URL + SERVICE_ROLE_KEY）
+- [ ] 应用重启后全功能验证
+- [ ] 旧 Supabase 云项目数据备份保留（迁移后确认无误再停）
+
+---
+
 # 附录
 
 ## A：技术栈替换对照表
@@ -397,6 +490,7 @@ POST /api/publish/{workflowId}/confirm/{flowId}
 | Supabase → 其他 BaaS | ✅ 不动 | 第七章 + 第八章 | 用其 SDK/管理台建表；改客户端初始化代码 |
 | 数据库迁移 | ✅ 不动 | 第六章步骤 7 | 数据在云端则无需迁移；自建库需 dump/restore |
 | Next.js → 其他后端框架 | ✅ 不动 | 第九章 + 第十章 | 构建/启动命令换框架；API 路由换框架语法（外部 API 契约保持不变最好） |
+| Supabase → **Docker 自托管 Supabase** | ✅ 不动 | 第八章 | 见「十一、自建 PostgreSQL 迁移指南」（代码零改动） |
 | 自托管 → 托管平台（Vercel/Railway 等） | 第五章跳过 | 整个第二层 | 平台对接仓库自动部署；环境变量在平台面板配置；无服务器概念 |
 | Node 版本/包管理器 | 第一章微调 | — | 按框架要求 |
 
