@@ -74,7 +74,7 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
   const [activeId, setActiveId] = useState<string>('');
   const [input, setInput] = useState('');
   const [historyWidth, setHistoryWidth] = useState(HISTORY_DEFAULT_WIDTH);
-  const [historyCollapsed, setHistoryCollapsed] = useState(false);
+  const [historyCollapsed, setHistoryCollapsed] = useState(true);
   const [dragging, setDragging] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -1071,13 +1071,7 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
               </Button>
             )}
             <div className="flex items-center gap-1.5">
-              <Avatar className="h-5 w-5">
-                <AvatarFallback className="bg-primary/10 p-0">
-                  <Sparkles className="h-3 w-3 text-primary" />
-                </AvatarFallback>
-              </Avatar>
-              <span className="text-sm font-medium">{t('chat.title')}</span>
-              <div className="ml-1 flex items-center overflow-hidden rounded-md border border-border">
+              <div className="flex items-center overflow-hidden rounded-md border border-border">
                 <button
                   className={cn(
                     'px-1.5 py-0.5 text-[10px] transition-colors',
