@@ -1123,52 +1123,7 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-1">
-            <LocaleSwitcher compact />
-            {isAdmin && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                onClick={() => router.push('/admin/users')}
-                title={t('chat.userManagement')}
-              >
-                <Settings className="h-4 w-4" />
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => {
-                setError(null);
-                setPwdOpen(true);
-              }}
-              title={t('chat.changePassword')}
-            >
-              <KeyRound className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={handleLogout}
-              title={t('chat.logout')}
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
-            {onClose && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                onClick={onClose}
-                title="关闭面板"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
+
         </div>
 
         {/* error alert */}

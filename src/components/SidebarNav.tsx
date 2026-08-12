@@ -8,13 +8,17 @@ import {
   History,
   Clock,
   Cpu,
-  Settings,
+  Users,
+  BarChart3,
+  FileClock,
+  Activity,
   LogOut,
   Workflow,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useT } from '@/lib/i18n';
 import { LocaleSwitcher } from './LocaleSwitcher';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 interface NavItem {
   href: string;
@@ -22,7 +26,7 @@ interface NavItem {
   icon: typeof GitBranch;
 }
 
-// 左侧菜单栏：工作区导航 + 管理入口
+// 左侧菜单栏：工作区 + 管理
 const NAV_ITEMS: NavItem[] = [
   { href: '/workflows', labelKey: 'sidebar.workflows', icon: Workflow },
   { href: '/workflows/editor', labelKey: 'sidebar.editor', icon: LayoutDashboard },
@@ -32,7 +36,10 @@ const NAV_ITEMS: NavItem[] = [
 
 const ADMIN_ITEMS: NavItem[] = [
   { href: '/admin/models', labelKey: 'sidebar.models', icon: Cpu },
-  { href: '/admin/users', labelKey: 'sidebar.admin', icon: Settings },
+  { href: '/admin/users', labelKey: 'sidebar.users', icon: Users },
+  { href: '/admin/stats', labelKey: 'sidebar.stats', icon: BarChart3 },
+  { href: '/admin/logs', labelKey: 'sidebar.logs', icon: FileClock },
+  { href: '/admin/api-logs', labelKey: 'sidebar.apiLogs', icon: Activity },
 ];
 
 export function SidebarNav() {
@@ -40,14 +47,18 @@ export function SidebarNav() {
   const pathname = usePathname();
   const t = useT();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [username, setUsername] = useState('');
+  const [role, setRole] = useState('');
 
   useEffect(() => {
     (async () => {
       try {
         const res = await fetch('/api/auth/me');
         const data = await res.json();
-        if (data?.authenticated && data?.user?.role === 'admin') {
-          setIsAdmin(true);
+        if (data?.authenticated) {
+          setUsername(data.user?.username || '');
+          setRole(data.user?.role || '');
+          if (data.user?.role === 'admin') setIsAdmin(true);
         }
       } catch {
         // ignore
@@ -88,7 +99,7 @@ export function SidebarNav() {
   };
 
   return (
-    <aside className="flex w-[180px] shrink-0 flex-col border-r border-border bg-card">
+    <aside className="flex w-[190px] shrink-0 flex-col border-r border-border bg-card">
       {/* Logo */}
       <div className="flex items-center gap-2 border-b border-border px-3 py-3">
         <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10">
@@ -114,16 +125,31 @@ export function SidebarNav() {
         )}
       </nav>
 
-      {/* 底部：语言 + 退出 */}
-      <div className="flex items-center justify-between border-t border-border p-2">
-        <LocaleSwitcher compact />
-        <button
-          onClick={handleLogout}
-          className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-destructive"
-          title={t('chat.logout')}
-        >
-          <LogOut className="h-4 w-4" />
-        </button>
+      {/* 底部：用户信息 + 语言 + 退出 */}
+      <div className="space-y-1.5 border-t border-border p-2">
+        <div className="flex items-center gap-2 px-1 py-1.5">
+          <Avatar className="h-7 w-7 shrink-0 border border-border">
+            <AvatarFallback className="bg-primary/10 text-xs text-primary">
+              {(username || 'U').slice(0, 1).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <p className="truncate text-xs font-medium">{username || '...'}</p>
+            <p className="text-[10px] text-muted-foreground">
+              {role === 'admin' ? t('admin.admin') : t('admin.user')}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center justify-between px-1">
+          <LocaleSwitcher compact />
+          <button
+            onClick={handleLogout}
+            className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-destructive"
+            title={t('chat.logout')}
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </aside>
   );
