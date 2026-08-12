@@ -15,8 +15,6 @@ export class SearchEngineExecutor extends BaseExecutor {
   }
 
   async execute(node: FlowNode, context: FlowContext): Promise<Record<string, unknown>> {
-    const { SearchClient, Config } = await import('coze-coding-dev-sdk');
-
     const data = node.data;
     const keyword = data.keyword
       ? this.paramResolver.interpolateTemplate(data.keyword, context)
@@ -26,18 +24,36 @@ export class SearchEngineExecutor extends BaseExecutor {
 
     const limit = Number(data.limit || 5);
 
-    // 使用 coze-coding-dev-sdk 的 SearchClient
-    const config = new Config({
-      apiKey: process.env.COZE_API_KEY || '',
-      baseUrl: process.env.COZE_API_BASE || '',
+    // 搜索服务端点需在环境变量配置（SEARCH_API_URL / SEARCH_API_KEY）
+    const searchUrl = process.env.SEARCH_API_URL;
+    if (!searchUrl) {
+      throw new Error('搜索服务未配置（SEARCH_API_URL），请联系管理员配置后使用');
+    }
+
+    const response = await fetch(searchUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(process.env.SEARCH_API_KEY
+          ? { Authorization: `Bearer ${process.env.SEARCH_API_KEY}` }
+          : {}),
+      },
+      body: JSON.stringify({ query: keyword, limit }),
     });
 
-    const client = new SearchClient(config);
+    if (!response.ok) {
+      throw new Error(`搜索服务请求失败 (${response.status})`);
+    }
 
-    const response = await client.webSearch(keyword, limit);
+    const result = await response.json();
+    const items = Array.isArray(result?.results)
+      ? result.results
+      : Array.isArray(result)
+        ? result
+        : [];
 
     return {
-      results: response?.web_items || [],
+      results: items,
       keyword,
     };
   }
