@@ -60,23 +60,31 @@ describe('FlowEngine', () => {
 });
 
 describe('extractFinalOutputs 回退汇总', () => {
-  it('endNode 无输出配置时汇总各节点结果', async () => {
+  it('endNode 无输出配置时汇总各节点结果（不依赖外部 API）', async () => {
     const { runFlow } = await import('../runFlow');
     const flow = {
       nodes: [
         { id: 'start', type: 'startNode', data: { parameters: [] } },
-        { id: 'llm', type: 'llmNode', data: { llmId: 'deepseek-v4-flash', userPrompt: '说你好', outType: 'text' } },
+        {
+          id: 'code',
+          type: 'codeNode',
+          data: {
+            code: 'return { answer: 42 };',
+            outputDefs: [{ id: 'o1', name: 'result' }],
+          },
+        },
         { id: 'end', type: 'endNode', data: {} },
       ],
       edges: [
-        { id: 'e1', source: 'start', target: 'llm' },
-        { id: 'e2', source: 'llm', target: 'end' },
+        { id: 'e1', source: 'start', target: 'code' },
+        { id: 'e2', source: 'code', target: 'end' },
       ],
     };
     const result = await runFlow(flow as never, {});
     expect(result.status).toBe('completed');
-    // endNode 无 outputDefs → 回退汇总应包含 llm 节点输出
+    // endNode 无 outputDefs → 回退汇总应包含 code 节点输出
     expect(result.outputs).toBeDefined();
-    expect(JSON.stringify(result.outputs)).toContain('llm');
-  }, 30000);
+    expect(JSON.stringify(result.outputs)).toContain('code');
+    expect(JSON.stringify(result.outputs)).toContain('42');
+  }, 15000);
 });

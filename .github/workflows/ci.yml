@@ -37,6 +37,11 @@ jobs:
 
       - name: Unit tests
         run: pnpm test
+        env:
+          COZE_SUPABASE_URL: 'https://placeholder.supabase.co'
+          COZE_SUPABASE_SERVICE_ROLE_KEY: 'placeholder'
+          DEEPSEEK_API_KEY: 'placeholder'
+          AUTH_SECRET: 'ci-placeholder-secret'
 
   build:
     name: Production Build
