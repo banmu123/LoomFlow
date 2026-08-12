@@ -8,8 +8,14 @@ Describe a process in plain language → get a runnable workflow on a visual can
 
 ## ✨ Highlights
 
-### 🤖 AI-Generated Workflows
-Describe your process in natural language ("build a video script generation flow"), and the AI generates an executable workflow directly onto the canvas.
+### 💬 Natural Language → Workflow
+No drag-and-drop required to start — just **describe your process in plain language**, and the AI generates an executable workflow directly onto the canvas:
+
+> **You:** "帮我做一个流程：输入产品名，AI 生成卖点文案，再生成推广视频脚本"
+>
+> **AI:** ✅ Generated a 4-node workflow (Start → LLM 文案 → LLM 脚本 → End), loaded to canvas
+
+Then fine-tune visually and publish as an API.
 
 ### 🎨 Visual Canvas
 Tinyflow canvas editor: drag nodes, connect flows, configure parameters. 10 node types (LLM / HTTP / Code / Template / Loop / Human Confirm, etc.).
@@ -44,8 +50,19 @@ App, data, and storage can all be deployed on your own server. Database can be s
 ### 🧩 Extensible Node System
 `NodeRegistry` + `NodeDefinition` — a single source of truth for nodes. Custom nodes can be registered with one entry, with automated validation (executor binding, start/end singleton).
 
-### 🤖 Configurable Model Layer
-`ModelRegistry` — add any model (DeepSeek / Ark / OpenAI-compatible) via the admin UI with per-model API key & base URL. Vision capability drives image input automatically.
+### 🧠 Bring Your Own Model
+Add **any model** (DeepSeek / Ark / any OpenAI-compatible endpoint) through the admin UI — **no code changes**:
+
+- Per-model API key & base URL (overrides environment defaults)
+- Declare capabilities (text / vision / ...) — vision models enable image input automatically
+- Canvas & chat model lists sync instantly after adding
+
+```text
+Admin → Model Settings → Add Model
+  id: qwen-vl-max · provider: openai-compatible
+  base URL: https://... · api key: sk-...
+  capabilities: [text, vision]  →  ✅ instantly available everywhere
+```
 
 ---
 
