@@ -43,11 +43,9 @@ interface WorkflowRecord {
   created_at: string;
   updated_at: string;
   published: boolean;
-  api_key: string | null;
-  api_quota: number;
-  api_used: number;
-  api_key_expires_at: string | null;
   share_token: string | null;
+  // 仅发布响应中返回（首次生成时显示一次），列表接口不返回
+  api_key?: string | null;
 }
 
 function formatTime(iso: string): string {
@@ -114,17 +112,22 @@ export default function WorkflowsPage() {
   );
 
   const handlePublish = useCallback(
-    async (wf: WorkflowRecord, apiQuota?: number) => {
+    async (wf: WorkflowRecord) => {
       setPublishingId(wf.id);
       try {
         const res = await fetch(`/api/workflow-history/${wf.id}/publish`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ api_quota: apiQuota ?? -1 }),
+          body: JSON.stringify({}),
         });
         const data = await res.json();
         if (res.ok) {
-          toast.success('工作流已发布，API Key 已生成');
+          // 首次发布自动生成全局 API Key，仅在本次响应显示一次
+          toast.success(
+            data?.api_key
+              ? '工作流已发布，全局 API Key 已生成（仅显示一次）'
+              : '工作流已发布',
+          );
           setPublishInfo(data);
           loadWorkflows();
         } else {
@@ -281,7 +284,7 @@ export default function WorkflowsPage() {
 
   const curlExample = publishInfo
     ? `curl -X POST ${window.location.origin}/api/publish/${publishInfo.id}/execute \\
-  -H "Authorization: Bearer ${publishInfo.api_key}" \\
+  -H "Authorization: Bearer ${publishInfo.api_key ?? '<API Key>'}" \\
   -H "Content-Type: application/json" \\
   -d '{"inputs": {"query": "请输入"}}'`
     : '';
@@ -458,7 +461,7 @@ export default function WorkflowsPage() {
                           </>
                         ) : (
                           <button
-                            onClick={() => handlePublish(wf, -1)}
+                            onClick={() => handlePublish(wf)}
                             disabled={publishingId === wf.id}
                             className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                           >
@@ -563,9 +566,18 @@ export default function WorkflowsPage() {
                   </Button>
                 )}
               </div>
-              <code className="block break-all rounded-md bg-muted p-2 text-xs">
-                {publishInfo?.api_key ?? t('common.loading')}
-              </code>
+              {publishInfo?.api_key ? (
+                <code className="block break-all rounded-md bg-muted p-2 text-xs">
+                  {publishInfo.api_key}
+                </code>
+              ) : (
+                <p className="rounded-md bg-muted p-2 text-xs text-muted-foreground">
+                  {t('publish.keyHiddenHint')}{' '}
+                  <Link href="/workflows/api-keys" className="text-primary underline">
+                    {t('apiKeys.title')}
+                  </Link>
+                </p>
+              )}
             </div>
 
             {/* 调用示例 */}
@@ -595,52 +607,12 @@ export default function WorkflowsPage() {
               <p>· 确认：POST /api/publish/{publishInfo?.id}/confirm/[flowId]</p>
               <p>· 所有请求需带请求头：Authorization: Bearer &lt;API Key&gt;</p>
               <p>
-                · 调用配额：
-                {publishInfo?.api_quota === -1
-                  ? '不限次数'
-                  : `${publishInfo?.api_used ?? 0} / ${publishInfo?.api_quota} 次`}
+                · 全局 API Key（有效期配置）：
+                <Link href="/workflows/api-keys" className="text-primary hover:underline">
+                  {t('apiKeys.title')}
+                </Link>
               </p>
-              <p>
-                · Key 有效期：
-                {publishInfo?.api_key_expires_at
-                  ? new Date(publishInfo.api_key_expires_at).toLocaleString('zh-CN')
-                  : '永不过期'}
-              </p>
-              <p className="mt-1">
-                · 配置（配额 / 有效期）：
-                <button
-                  onClick={() => {
-                    const quotaInput = prompt('调用配额（-1 = 不限次数）', '-1');
-                    if (quotaInput === null) return;
-                    const quota = parseInt(quotaInput, 10);
-                    if (isNaN(quota)) return;
-                    const daysInput = prompt('Key 有效期（天数，0 = 永不过期）', '0');
-                    if (daysInput === null) return;
-                    const days = parseInt(daysInput, 10);
-                    if (isNaN(days)) return;
-                    fetch(`/api/workflow-history/${publishInfo!.id}/api-config`, {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ api_quota: quota, expires_days: days }),
-                    })
-                      .then((r) => r.json())
-                      .then((d) => {
-                        if (d?.id) {
-                          toast.success('API 配置已更新');
-                          setPublishInfo({ ...publishInfo!, ...d });
-                          loadWorkflows();
-                        } else {
-                          toast.error(d?.error || '更新失败');
-                        }
-                      })
-                      .catch(() => toast.error('更新失败'));
-                  }}
-                  className="text-xs text-primary hover:underline"
-                >
-                  点击设置
-                </button>
-              </p>
-              <p className="mt-1 text-amber-600">⚠️ API Key 只显示一次，请妥善保存；泄露可重新{t('workflows.publish')}轮换</p>
+              <p className="mt-1 text-amber-600">⚠️ API Key 只显示一次，请妥善保存；泄露可在「API 管理」重新生成</p>
             </div>
           </div>
 

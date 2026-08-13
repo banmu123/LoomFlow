@@ -21,7 +21,7 @@ Then fine-tune visually and publish as an API.
 Tinyflow canvas editor: drag nodes, connect flows, configure parameters. 10 node types (LLM / HTTP / Code / Template / Loop / Human Confirm, etc.).
 
 ### 🚀 Workflow as API
-One-click publish a workflow as an HTTP endpoint (API Key auth + call quota + call logs) for external systems:
+One-click publish a workflow as an HTTP endpoint — **one global API Key calls all of your published workflows**, with unlimited calls and call logs:
 
 ```bash
 curl -X POST https://your-host/api/publish/{workflowId}/execute \
@@ -30,12 +30,14 @@ curl -X POST https://your-host/api/publish/{workflowId}/execute \
   -d '{"inputs": {"query": "..."}}'
 ```
 
+> The API Key is auto-generated on first publish and shown only once; when it expires, regenerate it on the **API Keys** page.
+
 ### 🔗 Shareable Workflow Pages
 Generate a public link — recipients can view nodes, fill inputs, and run the workflow without signing in. Perfect for demos and delivery.
 
 ### 🏢 Team & Permissions
 - Full data isolation (including admin)
-- Chat quota + API quota control
+- Chat quota control (API calls are unlimited)
 - Audit logs for all critical operations
 
 ### 📊 Admin Dashboard
@@ -122,6 +124,7 @@ Environment variables (where to get them):
 #    ① scripts/supabase-init.sql
 #    ② scripts/supabase-users.sql   ← ⚠️ set your own admin password BEFORE running
 #    ③ scripts/supabase-updates.sql
+#    ④ scripts/supabase-apikeys.sql  ← global API Key table (idempotent)
 #    Verify tables: conversations / messages / workflow_history / users / ai_models ...
 
 # 4. Start

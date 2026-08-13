@@ -1,5 +1,26 @@
 # Changelog
 
+## [v0.2.0] - 2026-08-13
+
+### 新增
+
+- **全局 API Key**：一个用户一个 Key，可调用该用户所有已发布工作流（`user_api_keys` 表）
+- **API 管理页**（工作区 → API 管理）：查看 Key 状态 / 有效期配置 / 生成与重新生成（新 Key 仅显示一次）
+- Key 首次发布时自动生成；重新生成保留有效期配置，旧 Key 立即失效
+- 迁移脚本 `scripts/supabase-apikeys.sql`（幂等，含存量 Key 提升与 Docker initdb 挂载）
+
+### 变更
+
+- 移除按工作流的 API Key 与调用配额（`api_quota`/`api_used`），API 调用不限次数
+- 发布对话框：Key 仅首次生成时显示，其余情况引导至 API 管理页
+- `api_call_logs` / 审计保留；`/api/workflow-history` 不再返回任何 Key 字段
+
+### 文档
+
+- README（中英）、docs/api-external.md、docs/config/security.md、docs/config/architecture.md、docs/docker-deploy.md 同步全局 Key 模型
+
+---
+
 ## [v0.1.0] - 2026-08-12
 
 ### 新增

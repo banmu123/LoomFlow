@@ -77,6 +77,7 @@ docker compose up -d --build      # 更新代码后重新构建
 10-init.sql（基础表）
 20-users.sql（用户表 + 默认 admin）
 30-updates.sql（全部增量表/列/索引）
+35-apikeys.sql（全局 API Key 表 + 存量 Key 迁移，可重复执行）
 40-grants.sql（PostgREST 角色授权）
 ```
 
@@ -92,6 +93,9 @@ docker compose up -d --build      # 更新代码后重新构建
 
 ```bash
 git pull
+# 已有数据卷不会自动执行 initdb 脚本——新版本若新增表，需手动执行迁移 SQL：
+#   （示例：v0.2 全局 API Key 表）
+docker exec -i loomflow-postgres psql -U postgres -d loomflow < scripts/supabase-apikeys.sql
 docker compose up -d --build
 ```
 
@@ -103,3 +107,4 @@ docker compose up -d --build
 | 应用健康检查失败 | `docker compose ps` 看各服务状态；`docker compose logs loomflow` |
 | 登录失败 | 确认数据库初始化完成（postgres 日志无 ERROR） |
 | 修改了 SQL 脚本不生效 | `docker compose down -v` 后重新 up（会清空数据） |
+| 升级后 API 接口报错（表不存在） | 按「升级」章节执行对应的迁移 SQL（如 `supabase-apikeys.sql`） |

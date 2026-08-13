@@ -1,11 +1,12 @@
 import { NextRequest } from 'next/server';
-import { randomBytes } from 'crypto';
 import { supabase } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/server-auth';
 import { logAudit, getClientIp } from '@/lib/audit';
+import { ensureUserApiKey } from '@/lib/api-key';
 
-// 发布工作流：生成对外 API Key（已发布则轮换新 Key）
-// body 可选：{ api_quota: -1 不限 | 正数限制调用次数, expires_days: 有效期天数（0/缺省=永不过期） }
+// 发布工作流：标记 published=true。
+// 全局 API Key 在首次发布时自动生成，仅在生成当次响应中返回（只显示一次）；
+// 已生成过 Key 的用户再次发布不返回 Key。
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -32,30 +33,17 @@ export async function POST(
   }
 
   const body = await request.json().catch(() => null);
-  const apiQuota =
-    typeof body?.api_quota === 'number' ? Math.max(-1, Math.floor(body.api_quota)) : -1;
 
-  // Key 有效期（expires_days：0/缺省 = 永不过期）
-  const expiresDays =
-    typeof body?.expires_days === 'number' && body.expires_days > 0
-      ? Math.floor(body.expires_days)
-      : 0;
-  const apiKeyExpiresAt = expiresDays > 0
-    ? new Date(Date.now() + expiresDays * 24 * 3600 * 1000).toISOString()
-    : null;
-
-  const apiKey = `ffk_${randomBytes(24).toString('hex')}`;
+  // 确保全局 API Key 存在（有效期配置仅在首次生成时生效）
+  const { created, api_key } = await ensureUserApiKey(user.id, {
+    expires_days: typeof body?.expires_days === 'number' ? body.expires_days : undefined,
+  });
 
   const { data, error } = await supabase
     .from('workflow_history')
-    .update({
-      published: true,
-      api_key: apiKey,
-      api_quota: apiQuota,
-      api_key_expires_at: apiKeyExpiresAt,
-    })
+    .update({ published: true })
     .eq('id', id)
-    .select('id, title, published, api_key, api_quota, api_used')
+    .select('id, title, published')
     .single();
 
   if (error) {
@@ -66,9 +54,10 @@ export async function POST(
     userId: user.id,
     username: user.username,
     action: 'workflow_publish',
-    detail: { workflowId: id, title: wf.title, rotated: !!wf.api_key },
+    detail: { workflowId: id, title: wf.title, apiKeyCreated: created },
     ip: getClientIp(request),
   });
 
-  return Response.json(data);
+  // api_key 仅在首次生成时非空（只显示一次）
+  return Response.json({ ...data, api_key: created ? api_key : null });
 }

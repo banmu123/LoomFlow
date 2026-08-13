@@ -6,7 +6,8 @@ import { getClientIp, logAudit } from '@/lib/audit';
 
 export const runtime = 'nodejs';
 
-// 外部调用：配额校验 + 调用日志 + 同步/异步返回
+// 外部调用：全局 Key 鉴权（有效期校验在 publish-auth 内）+ 调用日志
+// 无调用次数限制
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -18,48 +19,6 @@ export async function POST(
   const ip = getClientIp(request);
   const body = await request.json().catch(() => null);
   const inputs = (body?.inputs ?? {}) as Record<string, unknown>;
-
-  // 查询工作流配额与 Key 有效期
-  const { data: wf } = await supabase
-    .from('workflow_history')
-    .select('api_quota, api_used, api_key_expires_at')
-    .eq('id', id)
-    .single();
-
-  // Key 过期校验（未设置有效期 = 永不过期）
-  if (
-    wf?.api_key_expires_at &&
-    new Date(wf.api_key_expires_at).getTime() < Date.now()
-  ) {
-    return Response.json(
-      { error: 'API Key 已过期，请在管理后台更新有效期或重新发布' },
-      { status: 401 },
-    );
-  }
-
-  const apiQuota = wf?.api_quota ?? -1;
-  const apiUsed = wf?.api_used ?? 0;
-
-  // 配额校验（-1 不限）
-  if (apiQuota !== -1 && apiUsed >= apiQuota) {
-    await logAudit({
-      action: 'api_call',
-      detail: { workflowId: id, status: 'quota_exceeded', used: apiUsed, quota: apiQuota },
-      ip,
-    });
-    return Response.json(
-      { error: `API 调用次数已达上限（${apiQuota} 次），请联系管理员` },
-      { status: 429 },
-    );
-  }
-
-  // 扣减配额（-1 不限时不扣）
-  if (apiQuota !== -1) {
-    await supabase
-      .from('workflow_history')
-      .update({ api_used: apiUsed + 1 })
-      .eq('id', id);
-  }
 
   const startTime = Date.now();
 

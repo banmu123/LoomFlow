@@ -23,7 +23,7 @@
 Tinyflow 画布编辑器：拖拽节点、连接流程、配置参数，支持 10 种节点（LLM / HTTP / 代码 / 模板 / 循环 / 人工确认等）。
 
 ### 🚀 工作流即 API
-一键发布工作流为 HTTP 接口（API Key 鉴权 + 调用配额 + 调用日志），外部系统直接对接：
+一键发布工作流为 HTTP 接口（**一个全局 API Key 调用你所有已发布工作流**，不限调用次数，含调用日志），外部系统直接对接：
 
 ```bash
 curl -X POST https://your-host/api/publish/{workflowId}/execute \
@@ -32,12 +32,14 @@ curl -X POST https://your-host/api/publish/{workflowId}/execute \
   -d '{"inputs": {"query": "..."}}'
 ```
 
+> API Key 首次发布时自动生成、只显示一次；过期后在「API 管理」页重新生成即可恢复。
+
 ### 🔗 工作流分享页
 生成公开链接，对方无需登录即可查看流程节点、填写输入、试运行——演示/交付利器。
 
 ### 🏢 团队与权限
 - 用户隔离（数据完全互相不可见，含 admin）
-- 对话配额 / API 配额双重控制
+- 对话配额控制（API 调用不限次数）
 - 审计日志（登录、操作全记录）
 
 ### 📊 管理后台
@@ -102,6 +104,7 @@ cp .env.example .env.local
 #    ① scripts/supabase-init.sql
 #    ② scripts/supabase-users.sql   ← ⚠️ 执行前先把默认 admin 密码改成你自己的
 #    ③ scripts/supabase-updates.sql
+#    ④ scripts/supabase-apikeys.sql  ← 全局 API Key 表（可重复执行）
 #    验证表：conversations / messages / workflow_history / users / ai_models ...
 
 # 4. 启动

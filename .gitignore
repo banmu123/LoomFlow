@@ -166,6 +166,8 @@ Desktop.ini
 
 # 内部文档（不公开）
 docs/*
+!docs/config/
+docs/config/*
 !docs/config/Deployment-Manual.md
 !docs/config/architecture.md
 !docs/config/security.md

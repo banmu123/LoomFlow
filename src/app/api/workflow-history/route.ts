@@ -29,9 +29,12 @@ export async function GET() {
   }
 
   // 完全隔离：所有用户（含 admin）只能看到自己的工作流
+  // 不返回 api_key（安全：全局 Key 仅在生成/重新生成响应中显示一次）
   const { data, error } = await supabase
     .from('workflow_history')
-    .select('*')
+    .select(
+      'id, title, description, data, created_at, updated_at, published, share_token',
+    )
     .eq('saved', true)
     .eq('user_id', user.id)
     .order('updated_at', { ascending: false });
