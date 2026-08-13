@@ -47,11 +47,16 @@ const CHAT_RULES = `你是一个AI助手，可以进行正常对话，也可以�
 - JSON 要放在 \`\`\`json 代码块中`;
 
 // 完整系统提示词（对话规则 + 工作流生成规则）
-const FULL_SYSTEM_PROMPT = `${CHAT_RULES}
+// 动态构建：注入当前模型配置列表，防止 AI 幻觉出未配置的模型 id
+function buildFullSystemPrompt(
+  availableModels: Array<{ id: string; label?: string | null }>,
+): string {
+  return `${CHAT_RULES}
 
 ---
 
-${buildSystemPrompt()}`;
+${buildSystemPrompt(availableModels)}`;
+}
 
 // 解析响应中的 JSON
 function extractJSON(text: string): unknown {
@@ -101,19 +106,18 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const messages = body?.messages as ChatMessage[] | undefined;
   const images = (body?.images as string[] | undefined) || [];
-  // 模型选择：从模型注册表校验（未配置模型时给出明确引导）
+  // 模型选择：严格来自模型配置（未配置时给出明确引导；请求的模型不存在时用第一个配置的模型）
   const allModels = await getAllModels();
-  const requestedModel = (body?.model as string | undefined) || 'deepseek-v4-flash';
-  const modelId = allModels.some((m) => m.id === requestedModel)
-    ? requestedModel
-    : 'deepseek-v4-flash';
-
-  if (!allModels.some((m) => m.id === modelId)) {
+  if (allModels.length === 0) {
     return Response.json(
       { error: '尚未配置模型，请先在「模型配置」中添加（管理后台 → 模型配置 → 添加模型）' },
       { status: 400 },
     );
   }
+  const requestedModel = body?.model as string | undefined;
+  const modelId = requestedModel && allModels.some((m) => m.id === requestedModel)
+    ? requestedModel
+    : allModels[0].id;
 
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     return Response.json({ error: 'messages 参数缺失' }, { status: 400 });
@@ -152,10 +156,15 @@ export async function POST(request: NextRequest) {
   const provider = await getProviderForModel(modelId);
   console.log('[chat-ai] Using model:', modelId);
 
+  // 动态注入模型配置列表（防止 AI 生成工作流时幻觉出未配置的模型 id）
+  const systemPrompt = buildFullSystemPrompt(
+    allModels.map((m) => ({ id: m.id, label: m.label })),
+  );
+
   // 使用 streamText 流式调用
   const result = streamText({
     model: provider(modelId),
-    system: FULL_SYSTEM_PROMPT,
+    system: systemPrompt,
     messages: promptMessages,
     temperature: 0.7,
     maxOutputTokens: 8192,

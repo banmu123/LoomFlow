@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Plus, RefreshCw, Trash2, Pencil, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useT } from '@/lib/i18n';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
@@ -223,8 +224,10 @@ export default function AdminUsersPage() {
     }
   };
 
+  // 统一确认弹窗（替代原生 confirm）
+  const [deleteTarget, setDeleteTarget] = useState<UserRecord | null>(null);
+
   const handleDelete = async (u: UserRecord) => {
-    if (!confirm(`确定要删除用户「${u.username}」吗？此操作不可撤销。`)) return;
     try {
       const res = await fetch(`/api/admin/users/${u.id}`, { method: 'DELETE' });
       const data = await res.json();
@@ -236,6 +239,8 @@ export default function AdminUsersPage() {
       }
     } catch {
       toast.error('删除失败');
+    } finally {
+      setDeleteTarget(null);
     }
   };
 
@@ -359,7 +364,7 @@ export default function AdminUsersPage() {
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 hover:text-destructive"
-                        onClick={() => handleDelete(u)}
+                        onClick={() => setDeleteTarget(u)}
                         title={t('common.delete')}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -520,6 +525,15 @@ export default function AdminUsersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 统一确认弹窗（替代原生 confirm） */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        destructive
+        title={t('admin.deleteUserConfirm', { username: deleteTarget?.username ?? '' })}
+        onConfirm={() => deleteTarget && handleDelete(deleteTarget)}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

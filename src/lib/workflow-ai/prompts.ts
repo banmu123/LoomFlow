@@ -381,7 +381,16 @@ export const SELF_CHECK = `
 `;
 
 // 组装完整系统提示词
-export function buildSystemPrompt(): string {
+// availableModels：当前模型配置中的可用模型（id 列表），动态注入防止 AI 幻觉出不存在的模型 id
+export function buildSystemPrompt(
+  availableModels?: Array<{ id: string; label?: string | null }>,
+): string {
+  const modelHint =
+    availableModels && availableModels.length > 0
+      ? `只能从以下已配置的模型 ID 中选择（严禁使用列表之外的模型 ID）：
+${availableModels.map((m) => `- ${m.id}（${m.label || m.id}）`).join('\n')}`
+      : '当前没有已配置的模型：llmId 留空，并提醒用户先在「模型配置」中添加模型';
+
   return `你是一个工作流设计专家，根据用户需求生成 Tinyflow 工作流 JSON。
 
 ${NODE_TYPES}
@@ -399,6 +408,10 @@ ${COMMON_PATTERNS}
 ${ID_NAMING}
 
 ${SELF_CHECK}
+
+## 模型使用规则
+
+${modelHint}
 
 ## 输出要求
 

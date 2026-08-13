@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Plus, RefreshCw, Trash2, Pencil, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useT } from '@/lib/i18n';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -145,8 +146,10 @@ export default function AdminModelsPage() {
     }
   };
 
+  // 统一确认弹窗（替代原生 confirm）
+  const [deleteTarget, setDeleteTarget] = useState<AiModel | null>(null);
+
   const handleDelete = async (m: AiModel) => {
-    if (!confirm(`确定删除模型「${m.id}」吗？`)) return;
     try {
       const res = await fetch(`/api/ai/models/${m.id}`, { method: 'DELETE' });
       if (res.ok) {
@@ -157,6 +160,8 @@ export default function AdminModelsPage() {
       }
     } catch {
       toast.error('删除失败');
+    } finally {
+      setDeleteTarget(null);
     }
   };
 
@@ -234,7 +239,7 @@ export default function AdminModelsPage() {
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 hover:text-destructive"
-                        onClick={() => handleDelete(m)}
+                        onClick={() => setDeleteTarget(m)}
                         title="删除"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -345,6 +350,15 @@ export default function AdminModelsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 统一确认弹窗（替代原生 confirm） */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        destructive
+        title={deleteTarget ? `确定删除模型「${deleteTarget.id}」吗？` : ''}
+        onConfirm={() => deleteTarget && handleDelete(deleteTarget)}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

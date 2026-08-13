@@ -38,6 +38,29 @@ import { uploadFileToOSS } from '@/lib/oss-upload-client';
 import { useT } from '@/lib/i18n';
 import { ChevronsLeft } from 'lucide-react';
 import { validateWorkflow } from '@/lib/tinyflow/schema';
+
+// 防御：AI 生成的工作流可能幻觉出未配置的模型 id（如 doubao-seed-2-0-pro-260215），
+// 把 LLM 节点中不存在的 llmId 替换为模型配置里的第一个可用模型
+async function normalizeWorkflowModels(workflow: unknown): Promise<void> {
+  const wf = workflow as { nodes?: Array<{ type?: string; data?: Record<string, unknown> }> };
+  if (!wf?.nodes?.length) return;
+  try {
+    const res = await fetch('/api/ai/models');
+    const models = await res.json();
+    if (!Array.isArray(models) || models.length === 0) return; // 未配置模型，保留原样（画布会提示）
+    const ids = new Set(models.map((m) => m.id));
+    const fallbackId = models[0].id;
+    for (const node of wf.nodes) {
+      const data = node.data;
+      if (node.type === 'llmNode' && data?.llmId && !ids.has(String(data.llmId))) {
+        console.warn(`[workflow-ai] 模型「${data.llmId}」未配置，已替换为「${fallbackId}」`);
+        data.llmId = fallbackId;
+      }
+    }
+  } catch {
+    // 拉取模型失败时不做规范化，保持原样
+  }
+}
 import { LocaleSwitcher } from './LocaleSwitcher';
 
 const CHAT_PANEL_WIDTH = 440;
@@ -620,6 +643,8 @@ export function ChatPanel({
               }
             }
             if (workflowData) {
+              // 防御：AI 可能幻觉出未配置的模型 id，统一替换为第一个可用模型
+              await normalizeWorkflowModels(workflowData);
               // 是工作流 JSON，更新消息内容
               assistantContent = '已为你生成工作流，已加载到画布';
               updateConversation(convId, (c) => ({

@@ -23,6 +23,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useT } from '@/lib/i18n';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 interface ApiKeyStatus {
   api_key_expires_days: number | null;
@@ -60,6 +61,12 @@ export default function WorkflowApiKeysPage() {
   const [expiresInput, setExpiresInput] = useState('0');
   const [saving, setSaving] = useState(false);
 
+  // 统一确认弹窗（替代原生 confirm）
+  const [confirmState, setConfirmState] = useState<{
+    action: 'generate' | 'regenerate' | 'unpublish';
+    wf?: ApiWorkflow;
+  } | null>(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -87,7 +94,6 @@ export default function WorkflowApiKeysPage() {
 
   // 生成全局 Key（Key 只显示一次）
   const handleGenerate = async () => {
-    if (!confirm(t('apiKeys.generateConfirm'))) return;
     try {
       const res = await fetch('/api/api-key', {
         method: 'POST',
@@ -104,12 +110,13 @@ export default function WorkflowApiKeysPage() {
       }
     } catch {
       toast.error(t('apiKeys.generateFailed'));
+    } finally {
+      setConfirmState(null);
     }
   };
 
   // 重新生成全局 Key（旧 Key 立即失效，有效期配置保留）
   const handleRegenerate = async () => {
-    if (!confirm(t('apiKeys.regenerateConfirm'))) return;
     try {
       const res = await fetch('/api/api-key/regenerate', { method: 'POST' });
       const data = await res.json();
@@ -122,6 +129,8 @@ export default function WorkflowApiKeysPage() {
       }
     } catch {
       toast.error(t('apiKeys.generateFailed'));
+    } finally {
+      setConfirmState(null);
     }
   };
 
@@ -160,7 +169,6 @@ export default function WorkflowApiKeysPage() {
   };
 
   const handleUnpublish = async (wf: ApiWorkflow) => {
-    if (!confirm(t('apiKeys.unpublishConfirm', { title: wf.title }))) return;
     try {
       const res = await fetch(`/api/workflow-history/${wf.id}/unpublish`, { method: 'POST' });
       if (res.ok) {
@@ -172,6 +180,8 @@ export default function WorkflowApiKeysPage() {
       }
     } catch {
       toast.error(t('apiKeys.opFailed'));
+    } finally {
+      setConfirmState(null);
     }
   };
 
@@ -225,7 +235,7 @@ export default function WorkflowApiKeysPage() {
           </div>
           <div className="flex items-center gap-2">
             {!keyStatus ? (
-              <Button size="sm" onClick={handleGenerate}>
+              <Button size="sm" onClick={() => setConfirmState({ action: 'generate' })}>
                 <Plus className="mr-1 h-3.5 w-3.5" />
                 {t('apiKeys.generate')}
               </Button>
@@ -235,7 +245,7 @@ export default function WorkflowApiKeysPage() {
                   <Pencil className="mr-1 h-3.5 w-3.5" />
                   {t('apiKeys.config')}
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleRegenerate}>
+                <Button variant="outline" size="sm" onClick={() => setConfirmState({ action: 'regenerate' })}>
                   <KeyRound className="mr-1 h-3.5 w-3.5" />
                   {t('apiKeys.regenerate')}
                 </Button>
@@ -289,7 +299,7 @@ export default function WorkflowApiKeysPage() {
                       variant="ghost"
                       size="sm"
                       className="h-7 px-2 text-xs hover:text-destructive"
-                      onClick={() => handleUnpublish(wf)}
+                      onClick={() => setConfirmState({ action: 'unpublish', wf })}
                     >
                       <Ban className="mr-1 h-3 w-3" />
                       {t('apiKeys.unpublish')}
@@ -360,6 +370,26 @@ export default function WorkflowApiKeysPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 统一确认弹窗（替代原生 confirm） */}
+      <ConfirmDialog
+        open={!!confirmState}
+        destructive={confirmState?.action === 'unpublish'}
+        title={
+          confirmState?.action === 'generate'
+            ? t('apiKeys.generateConfirm')
+            : confirmState?.action === 'regenerate'
+              ? t('apiKeys.regenerateConfirm')
+              : t('apiKeys.unpublishConfirm', { title: confirmState?.wf?.title ?? '' })
+        }
+        onConfirm={() => {
+          if (!confirmState) return;
+          if (confirmState.action === 'generate') handleGenerate();
+          else if (confirmState.action === 'regenerate') handleRegenerate();
+          else if (confirmState.action === 'unpublish' && confirmState.wf) handleUnpublish(confirmState.wf);
+        }}
+        onCancel={() => setConfirmState(null)}
+      />
     </div>
   );
 }

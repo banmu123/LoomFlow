@@ -159,31 +159,6 @@ export default function TinyflowWrapper() {
     custom: '自定义',
   };
 
-  // 动态模型列表（从模型注册表加载）
-  const [modelOptions, setModelOptions] = useState([
-    { value: 'deepseek-v4-flash', label: 'DeepSeek Flash' },
-    { value: 'deepseek-v4-pro', label: 'DeepSeek Pro' },
-  ]);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch('/api/ai/models');
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setModelOptions(
-            data.map((m: { id: string; label: string | null }) => ({
-              value: m.id,
-              label: m.label || m.id,
-            })),
-          );
-        }
-      } catch {
-        // 保留默认模型
-      }
-    })();
-  }, []);
-
   // Panel state
   const [panelOpen, setPanelOpen] = useState(false);
   const [inputMode, setInputMode] = useState<InputMode>('form');
@@ -196,13 +171,30 @@ export default function TinyflowWrapper() {
   useEffect(() => {
     let destroyed = false;
     (async () => {
+      // 模型列表严格来自模型配置（/api/ai/models），实例化前先拉取：
+      // provider.llm 闭包持有局部变量（每次渲染/打开面板都能拿到最新配置，未配置时为空）
+      let llmOptions: { value: string; label: string }[] = [];
+      try {
+        const res = await fetch('/api/ai/models');
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          llmOptions = data.map((m: { id: string; label: string | null }) => ({
+            value: m.id,
+            label: m.label || m.id,
+          }));
+        }
+      } catch {
+        // 拉取失败保持空列表（画布会提示先配置模型）
+      }
+      if (destroyed || !containerRef.current) return;
+
       const { Tinyflow } = await import('@tinyflow-ai/ui');
       if (destroyed || !containerRef.current) return;
       instanceRef.current = new Tinyflow({
         element: containerRef.current,
         defaultTheme: 'light',
         provider: {
-          llm: () => modelOptions,
+          llm: () => llmOptions,
         },
         onDataChange: (data) => {
           // 数据变化时触发重新计算 startParams

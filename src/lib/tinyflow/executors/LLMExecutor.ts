@@ -22,11 +22,11 @@ export class LLMExecutor extends BaseExecutor {
 
   async execute(node: FlowNode, context: FlowContext): Promise<Record<string, unknown>> {
     const data = node.data;
-    const rawModelId = String(
-      data.llmId || process.env.DEEPSEEK_MODEL_ID || 'deepseek-v4-flash',
-    );
+    // llmId 由 validate() 保证非空；必须来自「模型配置」，不做默认值兜底
+    const rawModelId = String(data.llmId);
 
     // 模型合法性完全交给 Model Registry（动态注册），不做硬编码白名单/静默回退
+    // 节点 llmId 必须来自「模型配置」，未配置则明确报错（由前端下拉 / AI 生成注入保证一致性）
     const models = await getAllModels();
     const model = models.find((m) => m.id === rawModelId);
     if (!model) {

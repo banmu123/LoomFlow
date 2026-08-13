@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Clock, Plus, RefreshCw, Trash2, Loader2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { useT } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -64,6 +66,7 @@ function formatTime(iso: string | null): string {
 }
 
 export default function WorkflowSchedulesPage() {
+  const t = useT();
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [workflows, setWorkflows] = useState<WorkflowOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -179,8 +182,10 @@ export default function WorkflowSchedulesPage() {
     }
   };
 
+  // 统一确认弹窗（替代原生 confirm）
+  const [deleteTarget, setDeleteTarget] = useState<Schedule | null>(null);
+
   const handleDelete = async (s: Schedule) => {
-    if (!confirm(`确定删除定时任务（${s.cron_expr}）吗？`)) return;
     try {
       const res = await fetch(`/api/schedules/${s.id}`, { method: 'DELETE' });
       if (res.ok) {
@@ -191,6 +196,8 @@ export default function WorkflowSchedulesPage() {
       }
     } catch {
       toast.error('删除失败');
+    } finally {
+      setDeleteTarget(null);
     }
   };
 
@@ -291,7 +298,7 @@ export default function WorkflowSchedulesPage() {
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7 hover:text-destructive"
-                          onClick={() => handleDelete(s)}
+                          onClick={() => setDeleteTarget(s)}
                           title="删除"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -381,6 +388,19 @@ export default function WorkflowSchedulesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 统一确认弹窗（替代原生 confirm） */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        destructive
+        title={
+          deleteTarget
+            ? t('schedules.deleteConfirm', { expr: deleteTarget.cron_expr })
+            : ''
+        }
+        onConfirm={() => deleteTarget && handleDelete(deleteTarget)}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

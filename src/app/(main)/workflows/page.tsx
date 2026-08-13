@@ -21,6 +21,7 @@ import {
 import { setPendingWorkflow } from '@/lib/pending-workflow';
 import { toast } from 'sonner';
 import { useT } from '@/lib/i18n';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -90,7 +91,6 @@ export default function WorkflowsPage() {
 
   const handleDelete = useCallback(
     async (wf: WorkflowRecord) => {
-      if (!confirm(`确定要删除「${wf.title}」吗？此操作不可撤销。`)) return;
       setDeletingId(wf.id);
       try {
         const res = await fetch(`/api/workflow-history/${wf.id}`, {
@@ -106,6 +106,7 @@ export default function WorkflowsPage() {
         toast.error('删除失败');
       } finally {
         setDeletingId(null);
+        setConfirmState(null);
       }
     },
     [],
@@ -144,7 +145,6 @@ export default function WorkflowsPage() {
 
   const handleUnpublish = useCallback(
     async (wf: WorkflowRecord) => {
-      if (!confirm(`确定要取消发布「${wf.title}」吗？API Key 将立即失效。`)) return;
       setPublishingId(wf.id);
       try {
         const res = await fetch(`/api/workflow-history/${wf.id}/unpublish`, {
@@ -162,6 +162,7 @@ export default function WorkflowsPage() {
         toast.error('操作失败');
       } finally {
         setPublishingId(null);
+        setConfirmState(null);
       }
     },
     [loadWorkflows],
@@ -169,6 +170,19 @@ export default function WorkflowsPage() {
 
   // 分享信息对话框
   const [shareInfo, setShareInfo] = useState<WorkflowRecord | null>(null);
+
+  // 统一确认弹窗（替代原生 confirm）
+  const [confirmState, setConfirmState] = useState<{
+    action: 'delete' | 'unpublish' | 'unshare';
+    wf: WorkflowRecord | null;
+  } | null>(null);
+  const confirmTitle = confirmState
+    ? confirmState.action === 'delete'
+      ? t('workflows.deleteConfirm', { title: confirmState.wf?.title ?? '' })
+      : confirmState.action === 'unpublish'
+        ? `确定要取消发布「${confirmState.wf?.title}」吗？API Key 将立即失效。`
+        : t('workflows.unshareConfirm')
+    : '';
 
   const handleShare = useCallback(
     async (wf: WorkflowRecord) => {
@@ -196,7 +210,6 @@ export default function WorkflowsPage() {
 
   const handleUnshare = useCallback(
     async (wf: WorkflowRecord) => {
-      if (!confirm('确定取消分享吗？链接将立即失效。')) return;
       setPublishingId(wf.id);
       try {
         const res = await fetch(`/api/workflow-history/${wf.id}/share`, {
@@ -213,6 +226,7 @@ export default function WorkflowsPage() {
         toast.error('操作失败');
       } finally {
         setPublishingId(null);
+        setConfirmState(null);
       }
     },
     [loadWorkflows],
@@ -447,7 +461,7 @@ export default function WorkflowsPage() {
                               {t('workflows.apiInfo')}
                             </button>
                             <button
-                              onClick={() => handleUnpublish(wf)}
+                              onClick={() => setConfirmState({ action: 'unpublish', wf })}
                               disabled={publishingId === wf.id}
                               className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-amber-600"
                             >
@@ -474,7 +488,7 @@ export default function WorkflowsPage() {
                           </button>
                         )}
                         <button
-                          onClick={() => handleDelete(wf)}
+                          onClick={() => setConfirmState({ action: 'delete', wf })}
                           disabled={deletingId === wf.id}
                           className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive"
                         >
@@ -529,7 +543,7 @@ export default function WorkflowsPage() {
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => handleUnshare(shareInfo!)}
+              onClick={() => setConfirmState({ action: 'unshare', wf: shareInfo })}
               disabled={publishingId === shareInfo?.id}
             >
               取消{t('workflows.share')}
@@ -619,7 +633,7 @@ export default function WorkflowsPage() {
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => handleUnpublish(publishInfo!)}
+              onClick={() => setConfirmState({ action: 'unpublish', wf: publishInfo })}
               disabled={publishingId === publishInfo?.id}
             >
               {t('workflows.unpublish')}
@@ -628,6 +642,21 @@ export default function WorkflowsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 统一确认弹窗（替代原生 confirm） */}
+      <ConfirmDialog
+        open={!!confirmState}
+        destructive={confirmState?.action !== 'unshare'}
+        title={confirmTitle}
+        loading={!!deletingId || !!publishingId}
+        onConfirm={() => {
+          if (!confirmState?.wf) return;
+          if (confirmState.action === 'delete') handleDelete(confirmState.wf);
+          else if (confirmState.action === 'unpublish') handleUnpublish(confirmState.wf);
+          else if (confirmState.action === 'unshare') handleUnshare(confirmState.wf);
+        }}
+        onCancel={() => setConfirmState(null)}
+      />
     </div>
   );
 }
