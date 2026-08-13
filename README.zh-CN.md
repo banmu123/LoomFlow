@@ -61,6 +61,8 @@ curl -X POST https://your-host/api/publish/{workflowId}/execute \
 
 ### 🐳 Docker 部署（推荐，一键自托管）
 
+**内置 PostgreSQL + PostgREST + Nginx**——完全自包含，**无需 Supabase 云**。
+
 ```bash
 git clone https://github.com/banmu123/LoomFlow.git
 cd LoomFlow

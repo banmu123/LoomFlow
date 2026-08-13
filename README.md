@@ -74,6 +74,27 @@ Admin → Model Settings → Add Model
 
 ## 🚀 Quick Start
 
+### 🐳 Docker (recommended, one-click self-hosted)
+
+Includes **PostgreSQL + PostgREST + Nginx** — fully self-contained, no Supabase cloud required.
+
+```bash
+git clone https://github.com/banmu123/LoomFlow.git
+cd LoomFlow
+cp .env.example .env
+# Required env setup:
+#   POSTGRES_PASSWORD  → your strong password (openssl rand -hex 12)
+#   PGRST_JWT_SECRET   → random string (openssl rand -hex 32)
+#   COZE_SUPABASE_SERVICE_ROLE_KEY → generated via:
+#     node docker/generate-service-role-key.mjs $PGRST_JWT_SECRET
+docker compose up -d   # auto-initializes database (tables + default admin)
+```
+
+- Access: http://localhost:5000
+- Default admin: `admin` / `123456`（⚠️ change after first login）
+- Data persists in Docker volume; logs: `docker compose logs -f loomflow`
+- Stop: `docker compose down` — full guide: [docs/docker-deploy.md](docs/docker-deploy.md)
+
 ### 🧑‍💻 Local Development
 
 Requirements: Node.js ≥ 20.9, pnpm 9+, a Supabase project.
