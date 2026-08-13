@@ -33,6 +33,7 @@ docker compose up -d
 |------|------|
 | http://localhost:5000 | LoomFlow 应用（可用 `PORT=xxx` 改端口） |
 | admin 账号 | `admin` / `123456`（⚠️ 首次登录后立即修改） |
+| 首次使用 | 管理后台 → 模型配置 → **添加模型**（如 deepseek-v4-flash + 你的 API Key），否则对话/LLM 节点会提示先配置模型 |
 
 ## 常用命令
 

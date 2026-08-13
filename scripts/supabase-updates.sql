@@ -104,7 +104,7 @@ CREATE TABLE IF NOT EXISTS scheduled_runs (
 );
 CREATE INDEX IF NOT EXISTS idx_scheduled_runs_workflow ON scheduled_runs(workflow_id);
 
--- 10. 模型配置表（含默认种子）
+-- 10. 模型配置表（初始为空，由用户在管理后台 → 模型配置添加）
 CREATE TABLE IF NOT EXISTS ai_models (
   id TEXT PRIMARY KEY,
   provider TEXT NOT NULL,
@@ -115,10 +115,6 @@ CREATE TABLE IF NOT EXISTS ai_models (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-INSERT INTO ai_models (id, provider, capabilities, label) VALUES
-('deepseek-v4-flash', 'deepseek', '["text"]', 'DeepSeek Flash'),
-('deepseek-v4-pro', 'deepseek', '["text"]', 'DeepSeek Pro')
-ON CONFLICT (id) DO NOTHING;
 
 -- 11. RLS（与现有表一致，宽松策略）
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
