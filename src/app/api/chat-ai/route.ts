@@ -2,8 +2,7 @@ import { NextRequest } from 'next/server';
 import { streamText } from 'ai';
 import type { ModelMessage } from 'ai';
 import { buildSystemPrompt } from '@/lib/workflow-ai/prompts';
-import { getCurrentUser, hasChatQuota } from '@/lib/server-auth';
-import { supabase } from '@/lib/supabase/server';
+import { getCurrentUser } from '@/lib/server-auth';
 
 export const runtime = 'nodejs';
 
@@ -96,12 +95,6 @@ export async function POST(request: NextRequest) {
   if (user.status !== 'active') {
     return Response.json({ error: '账号已被禁用，请联系管理员' }, { status: 403 });
   }
-  if (!hasChatQuota(user)) {
-    return Response.json(
-      { error: '对话次数已用完，请联系管理员充值' },
-      { status: 403 },
-    );
-  }
 
   const body = await request.json().catch(() => null);
   const messages = body?.messages as ChatMessage[] | undefined;
@@ -121,14 +114,6 @@ export async function POST(request: NextRequest) {
 
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     return Response.json({ error: 'messages 参数缺失' }, { status: 400 });
-  }
-
-  // 扣减配额（-1 不限次数时不扣）
-  if (user.chat_quota !== -1) {
-    await supabase
-      .from('users')
-      .update({ chat_used: user.chat_used + 1 })
-      .eq('id', user.id);
   }
 
   const lastMessages = messages.slice(-MAX_MESSAGES);

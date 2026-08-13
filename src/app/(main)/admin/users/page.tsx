@@ -39,8 +39,6 @@ interface UserRecord {
   username: string;
   display_name: string | null;
   role: string;
-  chat_quota: number;
-  chat_used: number;
   status: string;
   failed_attempts: number;
   locked_until: string | null;
@@ -56,7 +54,6 @@ const EMPTY_FORM = {
   password: '',
   display_name: '',
   role: 'user',
-  chat_quota: '10',
 };
 
 function formatTime(iso: string): string {
@@ -78,7 +75,6 @@ export default function AdminUsersPage() {
   const [editForm, setEditForm] = useState({
     display_name: '',
     role: 'user',
-    chat_quota: '10',
     status: 'active',
     password: '',
   });
@@ -122,7 +118,6 @@ export default function AdminUsersPage() {
           password: createForm.password,
           display_name: createForm.display_name.trim() || undefined,
           role: createForm.role,
-          chat_quota: Number(createForm.chat_quota),
         }),
       });
       const data = await res.json();
@@ -146,7 +141,6 @@ export default function AdminUsersPage() {
     setEditForm({
       display_name: u.display_name || '',
       role: u.role,
-      chat_quota: String(u.chat_quota),
       status: u.status,
       password: '',
     });
@@ -162,7 +156,6 @@ export default function AdminUsersPage() {
         body: JSON.stringify({
           display_name: editForm.display_name.trim() || undefined,
           role: editForm.role,
-          chat_quota: Number(editForm.chat_quota),
           status: editForm.status,
           password: editForm.password || undefined,
         }),
@@ -198,27 +191,6 @@ export default function AdminUsersPage() {
       }
     } catch {
       toast.error('解锁失败');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleResetUsed = async (u: UserRecord) => {
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/admin/users/${u.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_used: 0 }),
-      });
-      if (res.ok) {
-        toast.success(`${u.username} 的已用次数已重置`);
-        loadUsers();
-      } else {
-        toast.error('重置失败');
-      }
-    } catch {
-      toast.error('重置失败');
     } finally {
       setSaving(false);
     }
@@ -272,7 +244,6 @@ export default function AdminUsersPage() {
               <TableHead>{t('admin.username')}</TableHead>
               <TableHead>{t('admin.displayName')}</TableHead>
               <TableHead>{t('admin.role')}</TableHead>
-              <TableHead>{t('admin.chatQuota')}</TableHead>
               <TableHead>{t('admin.status')}</TableHead>
               <TableHead>{t('admin.createdAt')}</TableHead>
               <TableHead className="text-right">{t('workflows.actions')}</TableHead>
@@ -281,7 +252,7 @@ export default function AdminUsersPage() {
           <TableBody>
             {loading && (
               <TableRow>
-                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                   <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
                   {t('common.loading')}
                 </TableCell>
@@ -289,7 +260,7 @@ export default function AdminUsersPage() {
             )}
             {!loading && users.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                   {t('admin.noUsers')}
                 </TableCell>
               </TableRow>
@@ -303,15 +274,6 @@ export default function AdminUsersPage() {
                     <Badge variant={u.role === 'admin' ? 'default' : 'secondary'}>
                       {u.role === 'admin' ? t('admin.admin') : t('admin.user')}
                     </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {u.chat_quota === -1 ? (
-                      <span className="text-muted-foreground">{t('admin.unlimited')}</span>
-                    ) : (
-                      <span className={u.chat_used >= u.chat_quota ? 'text-destructive' : ''}>
-                        {u.chat_used} / {u.chat_quota}
-                      </span>
-                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5">
@@ -348,18 +310,6 @@ export default function AdminUsersPage() {
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(u)} title={t('common.edit')}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
-                      {u.chat_quota !== -1 && u.chat_used > 0 && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => handleResetUsed(u)}
-                          disabled={saving}
-                          title="重置已用次数"
-                        >
-                          {t('admin.resetUsed')}
-                        </Button>
-                      )}
                       <Button
                         variant="ghost"
                         size="icon"
@@ -425,15 +375,6 @@ export default function AdminUsersPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
-                <Label>{t('admin.quotaLabel')}</Label>
-                <Input
-                  type="number"
-                  value={createForm.chat_quota}
-                  onChange={(e) => setCreateForm((f) => ({ ...f, chat_quota: e.target.value }))}
-                  placeholder="-1 {t('admin.unlimited')}"
-                />
-              </div>
             </div>
           </div>
           <DialogFooter>
@@ -453,7 +394,7 @@ export default function AdminUsersPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('common.edit')}用户：{editTarget?.username}</DialogTitle>
-            <DialogDescription>修改{t('admin.role')}、配额、{t('admin.status')}或{t('admin.resetPassword')}</DialogDescription>
+            <DialogDescription>修改{t('admin.role')}、{t('admin.status')}或{t('admin.resetPassword')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
@@ -478,14 +419,6 @@ export default function AdminUsersPage() {
                     <SelectItem value="admin">{t('admin.admin')}</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>{t('admin.quotaLabel')}（-1 {t('admin.unlimited')}）</Label>
-                <Input
-                  type="number"
-                  value={editForm.chat_quota}
-                  onChange={(e) => setEditForm((f) => ({ ...f, chat_quota: e.target.value }))}
-                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">

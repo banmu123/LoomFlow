@@ -7,8 +7,6 @@ export interface AuthUser {
   username: string;
   display_name: string | null;
   role: string;
-  chat_quota: number;
-  chat_used: number;
   status: string;
 }
 
@@ -43,14 +41,4 @@ export async function requireAdmin(): Promise<
     return Response.json({ error: '无权限，仅管理员可操作' }, { status: 403 });
   }
   return { user };
-}
-
-// 是否拥有对话权限（-1 表示不限次数，跳过校验）
-export function hasChatQuota(user: AuthUser): boolean {
-  return user.chat_quota === -1 || user.chat_used < user.chat_quota;
-}
-
-export function getRemainingQuota(user: AuthUser): number {
-  if (user.chat_quota === -1) return Infinity;
-  return Math.max(0, user.chat_quota - user.chat_used);
 }

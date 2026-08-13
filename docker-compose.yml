@@ -52,8 +52,8 @@ services:
       PGRST_JWT_SECRET: ${PGRST_JWT_SECRET:?PGRST_JWT_SECRET is required}
       PGRST_SERVER_PORT: "3000"
     healthcheck:
-      # 容器内无 wget/nc，用 bash /dev/tcp 做端口探测
-      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/3000' 2>/dev/null || exit 1"]
+      # distroless 镜像无 shell/wget/nc：用 postgrest 二进制自身做进程级检查
+      test: ["CMD", "postgrest", "--version"]
       interval: 10s
       timeout: 5s
       retries: 6
@@ -82,6 +82,7 @@ services:
 
   # ---- LoomFlow 应用 ----
   loomflow:
+    image: loomflow:latest   # 显式镜像名：可预构建导出/推送，服务器免构建部署
     build: .
     container_name: loomflow-app
     restart: unless-stopped

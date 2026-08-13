@@ -12,6 +12,7 @@
 ### 变更
 
 - 移除按工作流的 API Key 与调用配额（`api_quota`/`api_used`），API 调用不限次数
+- **移除对话配额**（`chat_quota`/`chat_used` 校验与扣减、用户管理页配额 UI、相关文案），对话与 API 均不限次数
 - 发布对话框：Key 仅首次生成时显示，其余情况引导至 API 管理页
 - `api_call_logs` / 审计保留；`/api/workflow-history` 不再返回任何 Key 字段
 

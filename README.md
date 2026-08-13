@@ -37,7 +37,7 @@ Generate a public link — recipients can view nodes, fill inputs, and run the w
 
 ### 🏢 Team & Permissions
 - Full data isolation (including admin)
-- Chat quota control (API calls are unlimited)
+- No call limits — chat & API calls are unlimited
 - Audit logs for all critical operations
 
 ### 📊 Admin Dashboard

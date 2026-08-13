@@ -39,7 +39,7 @@ curl -X POST https://your-host/api/publish/{workflowId}/execute \
 
 ### 🏢 团队与权限
 - 用户隔离（数据完全互相不可见，含 admin）
-- 对话配额控制（API 调用不限次数）
+- 无次数限制（对话与 API 调用均不限次数）
 - 审计日志（登录、操作全记录）
 
 ### 📊 管理后台

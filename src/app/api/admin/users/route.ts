@@ -13,7 +13,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from('users')
     .select(
-      'id, username, display_name, role, chat_quota, chat_used, status, failed_attempts, locked_until, created_at',
+      'id, username, display_name, role, status, failed_attempts, locked_until, created_at',
     )
     .order('created_at', { ascending: false });
 
@@ -41,9 +41,6 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: passwordError }, { status: 400 });
   }
 
-  const chatQuota =
-    typeof body?.chat_quota === 'number' ? Math.max(-1, Math.floor(body.chat_quota)) : 10;
-
   const passwordHash = await hash(password, 10);
 
   const { data, error } = await supabase
@@ -53,11 +50,9 @@ export async function POST(request: NextRequest) {
       password_hash: passwordHash,
       display_name: body?.display_name?.trim() || username,
       role: body?.role === 'admin' ? 'admin' : 'user',
-      chat_quota: chatQuota,
-      chat_used: 0,
       status: 'active',
     })
-    .select('id, username, display_name, role, chat_quota, chat_used, status, created_at')
+    .select('id, username, display_name, role, status, created_at')
     .single();
 
   if (error) {
@@ -71,7 +66,7 @@ export async function POST(request: NextRequest) {
     userId: auth.user.id,
     username: auth.user.username,
     action: 'user_create',
-    detail: { targetUser: username, role: data.role, chatQuota },
+    detail: { targetUser: username, role: data.role },
     ip: getClientIp(request),
   });
 

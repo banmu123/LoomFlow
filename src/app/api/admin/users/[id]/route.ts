@@ -35,14 +35,6 @@ export async function PATCH(
     updates.status = body.status;
     changed.push('status');
   }
-  if (typeof body.chat_quota === 'number') {
-    updates.chat_quota = Math.max(-1, Math.floor(body.chat_quota));
-    changed.push('chat_quota');
-  }
-  if (typeof body.chat_used === 'number') {
-    updates.chat_used = Math.max(0, Math.floor(body.chat_used));
-    changed.push('chat_used');
-  }
   if (typeof body.password === 'string' && body.password) {
     const passwordError = validatePassword(body.password);
     if (passwordError) {
@@ -67,7 +59,7 @@ export async function PATCH(
     .update(updates)
     .eq('id', id)
     .select(
-      'id, username, display_name, role, chat_quota, chat_used, status, failed_attempts, locked_until, created_at',
+      'id, username, display_name, role, status, failed_attempts, locked_until, created_at',
     )
     .single();
 
