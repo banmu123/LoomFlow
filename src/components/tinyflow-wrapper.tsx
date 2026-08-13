@@ -327,8 +327,11 @@ export default function TinyflowWrapper() {
   // ===== Save Workflow =====
   const [savingWorkflow, setSavingWorkflow] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [saveTitle, setSaveTitle] = useState('');
+  const [saveDescription, setSaveDescription] = useState('');
 
-  const handleSaveWorkflow = useCallback(async () => {
+  const handleSaveWorkflow = useCallback(async (title: string, description?: string) => {
     if (!instanceRef.current || savingWorkflow) return;
     setSavingWorkflow(true);
     setSavedFlash(false);
@@ -338,7 +341,8 @@ export default function TinyflowWrapper() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: `工作流 ${new Date().toLocaleString('zh-CN')}`,
+          title: title || `工作流 ${new Date().toLocaleString('zh-CN')}`,
+          description: description || undefined,
           data,
         }),
       });
@@ -892,11 +896,31 @@ export default function TinyflowWrapper() {
 
         <Button
           size="sm"
-          onClick={handleSaveWorkflow}
+          variant={savedFlash ? 'outline' : 'default'}
+          className={savedFlash ? 'border-green-500 text-green-600' : undefined}
+          onClick={() => {
+            setSaveTitle('');
+            setSaveDescription('');
+            setSaveDialogOpen(true);
+          }}
           disabled={savingWorkflow}
         >
-          <Save className="mr-1 h-4 w-4" />
-          {savingWorkflow ? t('workflows.saving') : t('workflows.saveToHistory')}
+          {savingWorkflow ? (
+            <>
+              <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              {t('workflows.saving')}
+            </>
+          ) : savedFlash ? (
+            <>
+              <CheckCircle2 className="mr-1 h-4 w-4 text-green-500" />
+              已保存
+            </>
+          ) : (
+            <>
+              <Save className="mr-1 h-4 w-4" />
+              {t('workflows.saveToHistory')}
+            </>
+          )}
         </Button>
 
         {showResults ? (

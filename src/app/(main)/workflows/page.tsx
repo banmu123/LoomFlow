@@ -35,6 +35,7 @@ import {
 interface WorkflowRecord {
   id: string;
   title: string;
+  description: string | null;
   data: {
     nodes?: Array<{ id: string; type?: string }>;
     edges?: unknown[];
@@ -368,8 +369,13 @@ export default function WorkflowsPage() {
               {!loading &&
                 workflows.map((wf) => (
                   <tr key={wf.id} className="hover:bg-muted/30">
-                    <td className="px-4 py-2.5 font-medium text-foreground">
-                      {wf.title}
+                    <td className="px-4 py-2.5">
+                      <div className="font-medium text-foreground">{wf.title}</div>
+                      {wf.description && (
+                        <div className="mt-0.5 max-w-[200px] truncate text-xs text-muted-foreground">
+                          {wf.description}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-2.5 text-muted-foreground">
                       {wf.data?.nodes?.length ?? 0}

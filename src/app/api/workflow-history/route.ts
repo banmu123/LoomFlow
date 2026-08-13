@@ -63,6 +63,7 @@ export async function POST(request: NextRequest) {
     .upsert(
       {
         title: body.title?.trim() || '未命名工作流',
+        description: body.description?.trim() || null,
         data: body.data,
         data_hash: dataHash,
         conversation_id: body.conversation_id || null,
