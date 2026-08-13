@@ -17,3 +17,7 @@ BEGIN
     CREATE ROLE service_role NOLOGIN;
   END IF;
 END $$;
+
+-- 与 Supabase 云一致：service_role 绕过 RLS（应用侧以 service_role JWT 访问）
+-- 幂等：已存在的角色重复执行 ALTER 无副作用
+ALTER ROLE service_role BYPASSRLS;
