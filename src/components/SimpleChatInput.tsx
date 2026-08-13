@@ -2,6 +2,13 @@
 
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { useT } from '@/lib/i18n';
@@ -27,6 +34,12 @@ export interface SimpleChatInputProps {
   onAttachImage?: (file: File) => void;
   /** 是否有图片上传中 */
   uploading?: boolean;
+  /** 可选模型列表（来自模型配置） */
+  modelOptions?: Array<{ value: string; label: string }>;
+  /** 当前选中模型 */
+  model?: string;
+  /** 切换模型 */
+  onModelChange?: (value: string) => void;
 }
 
 const MAX_HEIGHT = 120;
@@ -43,6 +56,9 @@ export function SimpleChatInput({
   onRemoveImage,
   onAttachImage,
   uploading = false,
+  modelOptions = [],
+  model,
+  onModelChange,
 }: SimpleChatInputProps) {
   const t = useT();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -164,6 +180,20 @@ export function SimpleChatInput({
           </div>
 
           <div className="flex items-center gap-2">
+            {modelOptions.length > 0 && onModelChange && (
+              <Select value={model} onValueChange={onModelChange}>
+                <SelectTrigger className="h-6 w-[110px] text-[11px]">
+                  <SelectValue placeholder="选择模型" />
+                </SelectTrigger>
+                <SelectContent>
+                  {modelOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             {showPlaceholder && value.length === 0 && (
               <span className="text-[11px] text-muted-foreground">
                 {t('chat.enterToSend')}

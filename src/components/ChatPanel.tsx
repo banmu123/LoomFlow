@@ -92,9 +92,29 @@ export function ChatPanel({
   const [error, setError] = useState<string | null>(null);
   const [images, setImages] = useState<Array<{ url: string; name: string }>>([]);
   const [uploading, setUploading] = useState(false);
-  const [model, setModel] = useState<'deepseek-v4-flash' | 'deepseek-v4-pro'>(
-    'deepseek-v4-flash',
-  );
+  const [model, setModel] = useState('');
+  const [modelOptions, setModelOptions] = useState<Array<{ value: string; label: string }>>([]);
+
+  // 加载已配置模型（模型配置页添加后此处自动出现）
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/ai/models');
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          const options = data.map((m: { id: string; label: string | null }) => ({
+            value: m.id,
+            label: m.label || m.id,
+          }));
+          setModelOptions(options);
+          // 默认选中第一个
+          setModel((prev) => prev || options[0]?.value || '');
+        }
+      } catch {
+        // ignore
+      }
+    })();
+  }, []);
   const dragRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -1102,32 +1122,6 @@ export function ChatPanel({
               </Button>
             )}
             <div className="flex items-center gap-1.5">
-              <div className="flex items-center overflow-hidden rounded-md border border-border">
-                <button
-                  className={cn(
-                    'px-1.5 py-0.5 text-[10px] transition-colors',
-                    model === 'deepseek-v4-flash'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:text-foreground',
-                  )}
-                  onClick={() => setModel('deepseek-v4-flash')}
-                  title="DeepSeek Flash（快速）"
-                >
-                  Flash
-                </button>
-                <button
-                  className={cn(
-                    'px-1.5 py-0.5 text-[10px] transition-colors',
-                    model === 'deepseek-v4-pro'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:text-foreground',
-                  )}
-                  onClick={() => setModel('deepseek-v4-pro')}
-                  title="DeepSeek Pro（更强）"
-                >
-                  Pro
-                </button>
-              </div>
             </div>
             {onCollapse && (
               <Button
@@ -1205,6 +1199,9 @@ export function ChatPanel({
           }
           onAttachImage={handleAttachImage}
           uploading={uploading}
+          modelOptions={modelOptions}
+          model={model}
+          onModelChange={setModel}
         />
       </div>
 
