@@ -1,13 +1,19 @@
-let pendingWorkflowData: unknown = null;
-
-export function setPendingWorkflow(data: unknown): void {
-  pendingWorkflowData = data;
+export interface PendingWorkflow {
+  data: unknown;
+  /** 已有工作流 id（从列表打开画布时携带；AI 生成的新工作流无 id） */
+  id?: string;
 }
 
-export function getPendingWorkflow(): unknown {
-  return pendingWorkflowData;
+let pendingWorkflow: PendingWorkflow | null = null;
+
+export function setPendingWorkflow(data: unknown, id?: string): void {
+  pendingWorkflow = { data, id };
+}
+
+export function getPendingWorkflow(): PendingWorkflow | null {
+  return pendingWorkflow;
 }
 
 export function clearPendingWorkflow(): void {
-  pendingWorkflowData = null;
+  pendingWorkflow = null;
 }

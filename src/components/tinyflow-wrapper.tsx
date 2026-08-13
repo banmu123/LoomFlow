@@ -37,11 +37,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Play, Square, Loader2, CheckCircle2, XCircle, Clock, Settings2, ArrowLeft, Braces, Upload, Save, Boxes } from 'lucide-react';
+import { Play, Square, Loader2, CheckCircle2, XCircle, Clock, Settings2, ArrowLeft, Braces, Upload, Save, Boxes, History, RotateCcw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useT } from '@/lib/i18n';
 import { toast } from 'sonner';
 import { getPendingWorkflow, clearPendingWorkflow } from '@/lib/pending-workflow';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { uploadFileToOSS } from '@/lib/oss-upload-client';
 
 // ===== Types =====
@@ -107,8 +108,8 @@ function buildDefaultValues(params: Parameter[]): Record<string, unknown> {
   return values;
 }
 
-/** Format timestamp to HH:MM:SS */
-function formatTime(ts: number): string {
+/** Format timestamp (number 毫秒或 ISO 字符串) to HH:MM:SS */
+function formatTime(ts: number | string): string {
   return new Date(ts).toLocaleTimeString('zh-CN', { hour12: false });
 }
 
@@ -202,12 +203,14 @@ export default function TinyflowWrapper() {
         },
       });
 
-      // check for pending workflow data (e.g. from AI chat navigation)
+      // check for pending workflow data (e.g. from AI chat navigation / 工作流列表打开)
       const pending = getPendingWorkflow();
       if (pending) {
         clearPendingWorkflow();
         try {
-          instanceRef.current.setData(pending);
+          instanceRef.current.setData(pending.data as TinyflowData);
+          // 从列表打开时携带工作流 id：后续保存=更新当前记录并记录版本
+          setCurrentWorkflowId(pending.id);
           toast.success('工作流已加载到画布');
         } catch {
           toast.error('工作流数据格式无效');
@@ -322,8 +325,27 @@ export default function TinyflowWrapper() {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveTitle, setSaveTitle] = useState('');
   const [saveDescription, setSaveDescription] = useState('');
+  // 当前工作流 id：从列表打开时携带；首次保存后记住（后续保存=更新当前记录，不新增列表条目）
+  const [currentWorkflowId, setCurrentWorkflowId] = useState<string | undefined>(undefined);
+  // 历史修改面板
+  const [showVersions, setShowVersions] = useState(false);
+  const [versions, setVersions] = useState<
+    {
+      id: string;
+      version: number;
+      title: string;
+      description: string | null;
+      data: TinyflowData;
+      created_at: string;
+      is_current: boolean;
+      published: boolean;
+    }[]
+  >([]);
+  const [versionsLoading, setVersionsLoading] = useState(false);
+  // 待还原的版本（ConfirmDialog 确认后加载到画布）
+  const [versionToRestore, setVersionToRestore] = useState<{ version: number; title: string } | null>(null);
 
-  const handleSaveWorkflow = useCallback(async (title: string, description?: string) => {
+  const handleSaveWorkflow = useCallback(async (title?: string, description?: string) => {
     if (!instanceRef.current || savingWorkflow) return;
     setSavingWorkflow(true);
     setSavedFlash(false);
@@ -333,32 +355,97 @@ export default function TinyflowWrapper() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: title || `工作流 ${new Date().toLocaleString('zh-CN')}`,
-          description: description || undefined,
+          // 已有工作流：更新当前记录并记录版本；首次：创建记录
+          id: currentWorkflowId,
+          title: title || undefined,
+          description: description ?? undefined,
           data,
         }),
       });
+      const result = await res.json();
       if (res.ok) {
         setSavedFlash(true);
-        toast.success('工作流已保存到历史记录', {
-          duration: 4000,
-          action: {
-            label: '查看历史',
-            onClick: () => router.push('/workflows/history'),
+        // 首次保存后记住工作流 id：后续保存都是更新当前记录
+        if (result?.id) setCurrentWorkflowId(result.id);
+        toast.success(
+          currentWorkflowId
+            ? `工作流已更新（版本 ${result?.version ?? '?'}）`
+            : '工作流已保存到历史记录',
+          {
+            duration: 4000,
+            action: {
+              label: '查看历史',
+              onClick: () => router.push('/workflows/history'),
+            },
           },
-        });
+        );
         // 1.5s 后恢复按钮状态
         setTimeout(() => setSavedFlash(false), 1500);
       } else {
-        const err = await res.json().catch(() => null);
-        toast.error(err?.error || '保存失败');
+        toast.error(result?.error || '保存失败');
       }
     } catch {
       toast.error('保存失败');
     } finally {
       setSavingWorkflow(false);
     }
-  }, [savingWorkflow, router]);
+  }, [savingWorkflow, router, currentWorkflowId]);
+
+  // 保存入口：已有工作流直接保存（不弹窗）；首次创建弹窗填名称
+  const handleSaveClick = useCallback(() => {
+    if (currentWorkflowId) {
+      handleSaveWorkflow();
+    } else {
+      setSaveTitle('');
+      setSaveDescription('');
+      setSaveDialogOpen(true);
+    }
+  }, [currentWorkflowId, handleSaveWorkflow]);
+
+  // 加载版本历史
+  const loadVersions = useCallback(async () => {
+    if (!currentWorkflowId) return;
+    setVersionsLoading(true);
+    try {
+      const res = await fetch(`/api/workflow-history/${currentWorkflowId}/versions`);
+      const data = await res.json();
+      if (Array.isArray(data)) setVersions(data);
+      else toast.error(data?.error || '加载版本历史失败');
+    } catch {
+      toast.error('加载版本历史失败');
+    } finally {
+      setVersionsLoading(false);
+    }
+  }, [currentWorkflowId]);
+
+  // 预览版本：点击版本条目直接把该版本加载到画布（不弹确认）
+  const handlePreviewVersion = useCallback((v: { version: number; title: string; data: TinyflowData }) => {
+    if (!instanceRef.current) return;
+    try {
+      instanceRef.current.setData(v.data);
+      toast.success(t('workflows.versionPreviewed', { version: v.version, title: v.title }));
+    } catch {
+      toast.error('预览失败：版本数据格式无效');
+    }
+  }, [t]);
+
+  // 还原版本到画布（弹确认，提示覆盖当前）
+  const handleRestoreVersion = useCallback((v: { version: number; title: string }) => {
+    setVersionToRestore(v);
+  }, []);
+
+  const confirmRestore = useCallback(() => {
+    if (!versionToRestore || !instanceRef.current) return;
+    const target = versions.find((v) => v.version === versionToRestore.version);
+    if (!target) return;
+    try {
+      instanceRef.current.setData(target.data);
+      toast.success(`已还原到版本 ${target.version}「${target.title}」（如需保留，请再次保存）`);
+    } catch {
+      toast.error('还原失败：版本数据格式无效');
+    }
+    setVersionToRestore(null);
+  }, [versionToRestore, versions]);
 
   // ===== Build inputs object =====
   const buildInputs = useCallback((): Record<string, unknown> => {
@@ -886,15 +973,25 @@ export default function TinyflowWrapper() {
           {t('workflows.viewJson')}
         </Button>
 
+        {currentWorkflowId && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setShowVersions(true);
+              loadVersions();
+            }}
+          >
+            <History className="mr-1 h-4 w-4" />
+            {t('workflows.viewHistory')}
+          </Button>
+        )}
+
         <Button
           size="sm"
           variant={savedFlash ? 'outline' : 'default'}
           className={savedFlash ? 'border-green-500 text-green-600' : undefined}
-          onClick={() => {
-            setSaveTitle('');
-            setSaveDescription('');
-            setSaveDialogOpen(true);
-          }}
+          onClick={handleSaveClick}
           disabled={savingWorkflow}
         >
           {savingWorkflow ? (
@@ -1012,6 +1109,94 @@ export default function TinyflowWrapper() {
             </ScrollArea>
           </div>
         )}
+
+        {/* 历史修改面板（样式同执行日志） */}
+        {showVersions && (
+          <div className="h-full min-h-0 w-80 shrink-0 border-l border-border bg-background xl:w-96">
+            <ScrollArea className="h-full">
+              <div className="space-y-3 p-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold">{t('workflows.viewHistory')}</h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs"
+                    onClick={() => setShowVersions(false)}
+                  >
+                    {t('common.close')}
+                  </Button>
+                </div>
+
+                {!versionsLoading && versions.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {t('workflows.versionPanelHint')}
+                  </p>
+                )}
+
+                {versionsLoading && (
+                  <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    {t('common.loading')}
+                  </p>
+                )}
+
+                {!versionsLoading && versions.length === 0 && (
+                  <p className="py-4 text-center text-sm text-muted-foreground">
+                    {t('workflows.noVersions')}
+                  </p>
+                )}
+
+                {versions.map((v) => (
+                  <div
+                    key={v.id}
+                    className={`min-w-0 cursor-pointer rounded-md border p-3 text-sm transition-colors hover:bg-muted/50 ${
+                      v.is_current ? 'border-green-500/60' : 'border-border'
+                    }`}
+                    onClick={() => handlePreviewVersion(v)}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="font-medium">v{v.version}</span>
+                        {v.is_current && (
+                          <Badge variant="outline" className="shrink-0 border-green-500/60 text-green-600">
+                            {v.published
+                              ? t('workflows.currentPublished')
+                              : t('workflows.currentVersion')}
+                          </Badge>
+                        )}
+                        <span className="truncate text-xs text-muted-foreground">
+                          {v.title}
+                        </span>
+                      </div>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {formatTime(v.created_at)}
+                      </span>
+                    </div>
+                    {v.description && (
+                      <p className="mt-1 break-all text-xs text-muted-foreground">
+                        {v.description}
+                      </p>
+                    )}
+                    <div className="mt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 px-2 text-xs"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRestoreVersion(v);
+                        }}
+                      >
+                        <RotateCcw className="mr-1 h-3 w-3" />
+                        {t('workflows.restore')}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        )}
       </div>
 
       {/* Confirm dialog */}
@@ -1055,6 +1240,21 @@ export default function TinyflowWrapper() {
               {savingWorkflow && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
               保存
             </Button>
+
+            {/* 还原版本确认（还原会替换画布当前内容） */}
+            <ConfirmDialog
+              open={!!versionToRestore}
+              title={
+                versionToRestore
+                  ? t('workflows.restoreConfirm', {
+                      version: versionToRestore.version,
+                      title: versionToRestore.title,
+                    })
+                  : ''
+              }
+              onConfirm={confirmRestore}
+              onCancel={() => setVersionToRestore(null)}
+            />
           </DialogFooter>
         </DialogContent>
       </Dialog>

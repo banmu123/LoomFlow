@@ -167,6 +167,14 @@ export const en: ZhMessages = {
     shareHint:
       'Recipients can view nodes, fill inputs and run the workflow without signing in (consumes model quota).',
     unshareConfirm: 'Cancel sharing? The link will expire immediately.',
+    viewHistory: 'History',
+    noVersions: 'No history yet — every save will be recorded here',
+    restore: 'Restore',
+    restoreConfirm: 'Restore to version v{version} "{title}"? Unsaved changes on the canvas will be replaced; save first if you want to keep them.',
+    currentVersion: 'Current',
+    currentPublished: 'Published',
+    versionPreviewed: 'Previewed version v{version} "{title}" — click "Restore" to apply it',
+    versionPanelHint: 'Click a version to preview it on the canvas; "Restore" replaces the current canvas content',
   },
   history: {
     title: 'Execution History',

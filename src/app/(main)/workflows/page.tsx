@@ -83,7 +83,8 @@ export default function WorkflowsPage() {
 
   const handleOpen = useCallback(
     (wf: WorkflowRecord) => {
-      setPendingWorkflow(wf.data);
+      // 携带工作流 id：画布后续保存=更新当前记录并记录版本（不新增列表条目）
+      setPendingWorkflow(wf.data, wf.id);
       router.push('/workflows/editor');
     },
     [router],
