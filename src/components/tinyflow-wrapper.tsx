@@ -43,6 +43,7 @@ import { useT } from '@/lib/i18n';
 import { toast } from 'sonner';
 import { getPendingWorkflow, clearPendingWorkflow } from '@/lib/pending-workflow';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { formatVersion } from '@/lib/version';
 import { uploadFileToOSS } from '@/lib/oss-upload-client';
 
 // ===== Types =====
@@ -339,11 +340,14 @@ export default function TinyflowWrapper() {
       created_at: string;
       is_current: boolean;
       published: boolean;
+      published_version: number | null;
     }[]
   >([]);
   const [versionsLoading, setVersionsLoading] = useState(false);
   // 待还原的版本（ConfirmDialog 确认后加载到画布）
   const [versionToRestore, setVersionToRestore] = useState<{ version: number; title: string } | null>(null);
+  // 待发布的版本（ConfirmDialog 确认后发布该版本）
+  const [publishTarget, setPublishTarget] = useState<{ version: number; title: string } | null>(null);
 
   const handleSaveWorkflow = useCallback(async (title?: string, description?: string) => {
     if (!instanceRef.current || savingWorkflow) return;
@@ -369,7 +373,7 @@ export default function TinyflowWrapper() {
         if (result?.id) setCurrentWorkflowId(result.id);
         toast.success(
           currentWorkflowId
-            ? `工作流已更新（版本 ${result?.version ?? '?'}）`
+            ? `工作流已更新（版本 v${formatVersion(result?.version ?? 0)}）`
             : '工作流已保存到历史记录',
           {
             duration: 4000,
@@ -423,7 +427,7 @@ export default function TinyflowWrapper() {
     if (!instanceRef.current) return;
     try {
       instanceRef.current.setData(v.data);
-      toast.success(t('workflows.versionPreviewed', { version: v.version, title: v.title }));
+      toast.success(t('workflows.versionPreviewed', { version: formatVersion(v.version), title: v.title }));
     } catch {
       toast.error('预览失败：版本数据格式无效');
     }
@@ -440,12 +444,35 @@ export default function TinyflowWrapper() {
     if (!target) return;
     try {
       instanceRef.current.setData(target.data);
-      toast.success(`已还原到版本 ${target.version}「${target.title}」（如需保留，请再次保存）`);
+      toast.success(`已还原到版本 v${formatVersion(target.version)}「${target.title}」（如需保留，请再次保存）`);
     } catch {
       toast.error('还原失败：版本数据格式无效');
     }
     setVersionToRestore(null);
   }, [versionToRestore, versions]);
+
+  // 发布指定版本（外部 API 立即切换到该版本内容）
+  const confirmPublishVersion = useCallback(async () => {
+    if (!publishTarget || !currentWorkflowId) return;
+    try {
+      const res = await fetch(`/api/workflow-history/${currentWorkflowId}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ version: publishTarget.version }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(t('workflows.versionPublished', { version: publishTarget.version }));
+        loadVersions();
+      } else {
+        toast.error(data?.error || '发布失败');
+      }
+    } catch {
+      toast.error('发布失败');
+    } finally {
+      setPublishTarget(null);
+    }
+  }, [publishTarget, currentWorkflowId, loadVersions, t]);
 
   // ===== Build inputs object =====
   const buildInputs = useCallback((): Record<string, unknown> => {
@@ -1156,12 +1183,15 @@ export default function TinyflowWrapper() {
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex min-w-0 items-center gap-2">
-                        <span className="font-medium">v{v.version}</span>
+                        <span className="font-medium">v{formatVersion(v.version)}</span>
                         {v.is_current && (
                           <Badge variant="outline" className="shrink-0 border-green-500/60 text-green-600">
-                            {v.published
-                              ? t('workflows.currentPublished')
-                              : t('workflows.currentVersion')}
+                            {t('workflows.currentVersion')}
+                          </Badge>
+                        )}
+                        {v.published && v.published_version === v.version && (
+                          <Badge className="shrink-0">
+                            {t('workflows.currentPublished')} v{formatVersion(v.version)}
                           </Badge>
                         )}
                         <span className="truncate text-xs text-muted-foreground">
@@ -1177,7 +1207,7 @@ export default function TinyflowWrapper() {
                         {v.description}
                       </p>
                     )}
-                    <div className="mt-2">
+                    <div className="mt-2 flex items-center gap-2">
                       <Button
                         variant="outline"
                         size="sm"
@@ -1189,6 +1219,17 @@ export default function TinyflowWrapper() {
                       >
                         <RotateCcw className="mr-1 h-3 w-3" />
                         {t('workflows.restore')}
+                      </Button>
+                      <Button
+                        variant={v.published && v.published_version === v.version ? 'ghost' : 'default'}
+                        size="sm"
+                        className="h-6 px-2 text-xs"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPublishTarget(v);
+                        }}
+                      >
+                        {t('workflows.publishThisVersion')}
                       </Button>
                     </div>
                   </div>
@@ -1240,21 +1281,6 @@ export default function TinyflowWrapper() {
               {savingWorkflow && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
               保存
             </Button>
-
-            {/* 还原版本确认（还原会替换画布当前内容） */}
-            <ConfirmDialog
-              open={!!versionToRestore}
-              title={
-                versionToRestore
-                  ? t('workflows.restoreConfirm', {
-                      version: versionToRestore.version,
-                      title: versionToRestore.title,
-                    })
-                  : ''
-              }
-              onConfirm={confirmRestore}
-              onCancel={() => setVersionToRestore(null)}
-            />
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1360,6 +1386,37 @@ export default function TinyflowWrapper() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 还原版本确认（还原会替换画布当前内容）——必须放在 Dialog 外层，否则不挂载 */}
+      <ConfirmDialog
+        open={!!versionToRestore}
+        title={
+          versionToRestore
+            ? t('workflows.restoreConfirm', {
+                version: formatVersion(versionToRestore.version),
+                title: versionToRestore.title,
+              })
+            : ''
+        }
+        onConfirm={confirmRestore}
+        onCancel={() => setVersionToRestore(null)}
+      />
+
+      {/* 发布版本确认（外部 API 立即切换到该版本） */}
+      <ConfirmDialog
+        open={!!publishTarget}
+        title={
+          publishTarget
+            ? t('workflows.publishVersionConfirm', {
+                version: formatVersion(publishTarget.version),
+                title: publishTarget.title,
+              })
+            : ''
+        }
+        confirmText={t('workflows.publish')}
+        onConfirm={confirmPublishVersion}
+        onCancel={() => setPublishTarget(null)}
+      />
     </div>
   );
 }

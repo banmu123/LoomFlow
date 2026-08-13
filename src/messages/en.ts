@@ -175,6 +175,11 @@ export const en: ZhMessages = {
     currentPublished: 'Published',
     versionPreviewed: 'Previewed version v{version} "{title}" — click "Restore" to apply it',
     versionPanelHint: 'Click a version to preview it on the canvas; "Restore" replaces the current canvas content',
+    publishVersion: 'Publish Version',
+    publishVersionDesc: 'Choose the version to publish — external APIs will switch to it immediately',
+    publishThisVersion: 'Publish',
+    publishVersionConfirm: 'Publish version v{version} "{title}"? External APIs will switch to this version immediately.',
+    versionPublished: 'Version v{version} published',
   },
   history: {
     title: 'Execution History',

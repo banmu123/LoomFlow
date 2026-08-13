@@ -50,7 +50,7 @@ export async function getWorkflowByApiKey(
   }
   const { data: wf } = await supabase
     .from('workflow_history')
-    .select('id, title, data')
+    .select('id, title, data, published_data')
     .eq('id', expectedId)
     .eq('published', true)
     .eq('user_id', keyRow.user_id)
@@ -60,5 +60,12 @@ export async function getWorkflowByApiKey(
     return Response.json({ error: '工作流不存在、未发布或无权访问' }, { status: 404 });
   }
 
-  return { workflow: wf as PublishedWorkflow, userId: keyRow.user_id };
+  // 外部 API 执行「发布时快照」（published_data）：发布后继续编辑保存不影响已发布内容
+  const workflow: PublishedWorkflow = {
+    id: wf.id,
+    title: wf.title,
+    data: (wf.published_data ?? wf.data) as TinyflowData,
+  };
+
+  return { workflow, userId: keyRow.user_id };
 }

@@ -170,6 +170,11 @@ export const zh = {
     currentPublished: '当前发布',
     versionPreviewed: '已预览版本 v{version}「{title}」，点击「还原」可正式应用',
     versionPanelHint: '点击版本可在画布预览；「还原」会用该版本替换画布当前内容',
+    publishVersion: '发布版本',
+    publishVersionDesc: '选择要发布的版本，外部 API 将立即切换到该版本内容',
+    publishThisVersion: '发布此版本',
+    publishVersionConfirm: '发布版本 v{version}「{title}」？外部 API 将立即切换到该版本内容。',
+    versionPublished: '已发布版本 v{version}',
   },
   history: {
     title: '执行历史',

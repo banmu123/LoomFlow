@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/server-auth';
 import { logAudit, getClientIp } from '@/lib/audit';
 import { ensureUserApiKey } from '@/lib/api-key';
+import { formatVersion } from '@/lib/version';
 
 // 发布工作流：标记 published=true。
 // 全局 API Key 在首次发布时自动生成，仅在生成当次响应中返回（只显示一次）；
@@ -39,11 +40,48 @@ export async function POST(
     expires_days: typeof body?.expires_days === 'number' ? body.expires_days : undefined,
   });
 
+  // 发布指定版本：body.version 存在时，用该版本的快照作为发布内容（published_version 记录版本号）
+  // 不传 version = 发布当前内容（published_version 置空）
+  // 发布内容写入 published_data 快照：后续保存不覆盖，外部 API 始终执行发布的那份
+  let publishedData: unknown;
+  const updates: Record<string, unknown> = {
+    published: true,
+    published_version: null,
+  };
+  if (typeof body?.version === 'number') {
+    const { data: ver } = await supabase
+      .from('workflow_versions')
+      .select('data')
+      .eq('workflow_id', id)
+      .eq('version', body.version)
+      .single();
+
+    if (!ver) {
+      return Response.json(
+        { error: `版本 v${formatVersion(body.version)} 不存在` },
+        { status: 400 },
+      );
+    }
+    publishedData = ver.data;
+    updates.published_version = body.version;
+  }
+
+  if (publishedData === undefined) {
+    // 发布当前内容：读当前 workflow_history.data 作为快照
+    const { data: cur } = await supabase
+      .from('workflow_history')
+      .select('data')
+      .eq('id', id)
+      .single();
+    publishedData = cur?.data ?? null;
+  }
+  updates.published_data = publishedData;
+
   const { data, error } = await supabase
     .from('workflow_history')
-    .update({ published: true })
+    .update(updates)
     .eq('id', id)
-    .select('id, title, published')
+    .select('id, title, published, published_version')
     .single();
 
   if (error) {
@@ -54,7 +92,12 @@ export async function POST(
     userId: user.id,
     username: user.username,
     action: 'workflow_publish',
-    detail: { workflowId: id, title: wf.title, apiKeyCreated: created },
+    detail: {
+      workflowId: id,
+      title: wf.title,
+      apiKeyCreated: created,
+      publishedVersion: updates.published_version ?? null,
+    },
     ip: getClientIp(request),
   });
 

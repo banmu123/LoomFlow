@@ -30,7 +30,7 @@ export async function POST(
 
   const { data, error } = await supabase
     .from('workflow_history')
-    .update({ published: false })
+    .update({ published: false, published_version: null, published_data: null })
     .eq('id', id)
     .select('id, title, published')
     .single();

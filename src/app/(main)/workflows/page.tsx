@@ -22,6 +22,7 @@ import { setPendingWorkflow } from '@/lib/pending-workflow';
 import { toast } from 'sonner';
 import { useT } from '@/lib/i18n';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { formatVersion } from '@/lib/version';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -47,6 +48,16 @@ interface WorkflowRecord {
   share_token: string | null;
   // 仅发布响应中返回（首次生成时显示一次），列表接口不返回
   api_key?: string | null;
+}
+
+interface VersionItem {
+  version: number;
+  title: string;
+  description: string | null;
+  created_at: string;
+  is_current: boolean;
+  published: boolean;
+  published_version: number | null;
 }
 
 function formatTime(iso: string): string {
@@ -113,36 +124,59 @@ export default function WorkflowsPage() {
     [],
   );
 
-  const handlePublish = useCallback(
-    async (wf: WorkflowRecord) => {
-      setPublishingId(wf.id);
-      try {
-        const res = await fetch(`/api/workflow-history/${wf.id}/publish`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
-        });
-        const data = await res.json();
-        if (res.ok) {
-          // 首次发布自动生成全局 API Key，仅在本次响应显示一次
-          toast.success(
-            data?.api_key
-              ? '工作流已发布，全局 API Key 已生成（仅显示一次）'
-              : '工作流已发布',
-          );
-          setPublishInfo(data);
-          loadWorkflows();
-        } else {
-          toast.error(data?.error || '发布失败');
-        }
-      } catch {
-        toast.error('发布失败');
-      } finally {
-        setPublishingId(null);
+  // 发布版本选择对话框：发布 = 选择版本（默认当前版本）
+  const [publishDialog, setPublishDialog] = useState<{
+    wf: WorkflowRecord;
+    versions: VersionItem[];
+    selected: number | null;
+  } | null>(null);
+
+  const openPublishDialog = useCallback(async (wf: WorkflowRecord) => {
+    try {
+      const res = await fetch(`/api/workflow-history/${wf.id}/versions`);
+      const versions = await res.json();
+      if (!Array.isArray(versions) || versions.length === 0) {
+        toast.error('该工作流暂无版本记录，请先在画布保存');
+        return;
       }
-    },
-    [loadWorkflows],
-  );
+      // 默认选中当前版本（is_current），无则最新
+      const current = versions.find((v: VersionItem) => v.is_current) ?? versions[0];
+      setPublishDialog({ wf, versions, selected: current?.version ?? null });
+    } catch {
+      toast.error('加载版本列表失败');
+    }
+  }, []);
+
+  const handlePublish = useCallback(async () => {
+    if (!publishDialog || publishDialog.selected == null) return;
+    const { wf, selected } = publishDialog;
+    setPublishingId(wf.id);
+    try {
+      const res = await fetch(`/api/workflow-history/${wf.id}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ version: selected }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        // 首次发布自动生成全局 API Key，仅在本次响应显示一次
+        toast.success(
+          data?.api_key
+            ? `已发布版本 v${formatVersion(selected)}，全局 API Key 已生成（仅显示一次）`
+            : `已发布版本 v${formatVersion(selected)}`,
+        );
+        setPublishInfo(data);
+        setPublishDialog(null);
+        loadWorkflows();
+      } else {
+        toast.error(data?.error || '发布失败');
+      }
+    } catch {
+      toast.error('发布失败');
+    } finally {
+      setPublishingId(null);
+    }
+  }, [publishDialog, loadWorkflows]);
 
   const handleUnpublish = useCallback(
     async (wf: WorkflowRecord) => {
@@ -476,7 +510,7 @@ export default function WorkflowsPage() {
                           </>
                         ) : (
                           <button
-                            onClick={() => handlePublish(wf)}
+                            onClick={() => openPublishDialog(wf)}
                             disabled={publishingId === wf.id}
                             className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                           >
@@ -550,6 +584,65 @@ export default function WorkflowsPage() {
               取消{t('workflows.share')}
             </Button>
             <Button onClick={() => setShareInfo(null)}>关闭</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 发布版本选择对话框 */}
+      <Dialog
+        open={!!publishDialog}
+        onOpenChange={(open) => !open && setPublishDialog(null)}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t('workflows.publishVersion')}</DialogTitle>
+            <DialogDescription>
+              {t('workflows.publishVersionDesc')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[320px] space-y-2 overflow-y-auto py-2">
+            {publishDialog?.versions.map((v) => {
+              const isSelected = publishDialog.selected === v.version;
+              return (
+                <div
+                  key={v.version}
+                  onClick={() =>
+                    setPublishDialog((d) => (d ? { ...d, selected: v.version } : d))
+                  }
+                  className={`flex cursor-pointer items-center justify-between gap-2 rounded-md border p-3 text-sm transition-colors ${
+                    isSelected
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:bg-muted/50'
+                  }`}
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="font-medium">v{formatVersion(v.version)}</span>
+                    {v.is_current && (
+                      <Badge variant="outline" className="shrink-0 text-green-600">
+                        {t('workflows.currentVersion')}
+                      </Badge>
+                    )}
+                    <span className="truncate text-xs text-muted-foreground">
+                      {v.title}
+                    </span>
+                  </div>
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {formatTime(v.created_at)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPublishDialog(null)}>
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={handlePublish} disabled={publishingId !== null}>
+              {publishingId !== null && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
+              {publishDialog?.selected != null
+                ? `${t('workflows.publish')} v${formatVersion(publishDialog.selected)}`
+                : t('workflows.publish')}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

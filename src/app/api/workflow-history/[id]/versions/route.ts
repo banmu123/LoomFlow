@@ -19,7 +19,7 @@ export async function GET(
   // 校验归属：仅工作流主人可查看版本
   const { data: wf } = await supabase
     .from('workflow_history')
-    .select('id, user_id, data, published')
+    .select('id, user_id, data, published, published_version')
     .eq('id', id)
     .single();
 
@@ -50,12 +50,14 @@ export async function GET(
     );
   }
 
-  // 对比内容：与当前工作流 data 一致的版本标记为 is_current（"当前保存/发布的版本"）
+  // 对比内容：与当前工作流 data 一致的版本标记为 is_current（"当前画布保存的内容"）
+  // published_version：发布时指定的版本号（NULL = 未发布或未指定版本）
   const currentHash = computeHash(wf.data);
   const enriched = (data ?? []).map((v: { data: unknown; version: number }) => ({
     ...v,
     is_current: computeHash(v.data) === currentHash,
     published: !!wf.published,
+    published_version: wf.published_version ?? null,
   }));
 
   return Response.json(enriched);
