@@ -1023,6 +1023,107 @@ export default function TinyflowWrapper() {
       </div>
 
       {/* Confirm dialog */}
+      {/* 保存工作流对话框 */}
+      <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+        <DialogContent className="z-[1200] max-w-md">
+          <DialogHeader>
+            <DialogTitle>保存到历史</DialogTitle>
+            <DialogDescription>为工作流命名并添加备注（可选）</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>工作流名称 *</Label>
+              <Input
+                value={saveTitle}
+                onChange={(e) => setSaveTitle(e.target.value)}
+                placeholder={`工作流 ${new Date().toLocaleString('zh-CN')}`}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>备注</Label>
+              <Textarea
+                value={saveDescription}
+                onChange={(e) => setSaveDescription(e.target.value)}
+                placeholder="描述这个工作流的用途（可选）"
+                className="min-h-[80px]"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>
+              取消
+            </Button>
+            <Button
+              onClick={() => {
+                setSaveDialogOpen(false);
+                handleSaveWorkflow(saveTitle, saveDescription);
+              }}
+              disabled={savingWorkflow}
+            >
+              {savingWorkflow && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+              保存
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 节点库对话框 */}
+      <Dialog open={nodesOpen} onOpenChange={setNodesOpen}>
+        <DialogContent className="z-[1200] max-w-md">
+          <DialogHeader>
+            <DialogTitle>节点库</DialogTitle>
+            <DialogDescription>由 NodeRegistry 提供的内置节点（{nodeLibrary.length} 个）</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[50vh] space-y-4 overflow-y-auto py-2">
+            {(['ai', 'logic', 'integration', 'core', 'data', 'custom'] as const)
+              .map((cat) => ({ cat, nodes: nodeLibrary.filter((n) => n.category === cat) }))
+              .filter((g) => g.nodes.length > 0)
+              .map((group) => (
+                <div key={group.cat}>
+                  <h4 className="mb-2 text-sm font-semibold text-muted-foreground">
+                    {CATEGORY_LABELS[group.cat] || group.cat}
+                  </h4>
+                  <div className="space-y-1.5">
+                    {group.nodes.map((node) => (
+                      <div
+                        key={node.type}
+                        className="flex items-start justify-between rounded-md border border-border bg-card p-2.5"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">{node.label}</span>
+                            <code className="rounded bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">
+                              {node.type}
+                            </code>
+                          </div>
+                          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                            {node.description}
+                          </p>
+                        </div>
+                        {node.capabilities.length > 0 && (
+                          <div className="ml-2 flex shrink-0 gap-1">
+                            {node.capabilities.map((cap) => (
+                              <span
+                                key={cap}
+                                className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary"
+                              >
+                                {cap}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            {nodeLibrary.length === 0 && (
+              <p className="py-8 text-center text-sm text-muted-foreground">节点库为空</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!confirmReq} onOpenChange={(open) => !open && !running && setConfirmReq(null)}>
         <DialogContent className="z-[1200]">
           <DialogHeader>
