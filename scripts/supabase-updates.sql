@@ -4,10 +4,9 @@
 -- 覆盖：数据隔离 / 配额 / 去重 / 审计 / API 日志 / 执行历史 / 模型配置 / 定时任务
 -- =====================================================
 
--- 1. 工作流去重：data_hash 列 + 每用户唯一索引
+-- 1. 工作流去重：data_hash 列（唯一索引在 user_id 列添加后创建，见第 3 节）
 ALTER TABLE workflow_history ADD COLUMN IF NOT EXISTS data_hash TEXT;
 DROP INDEX IF EXISTS idx_workflow_history_data_hash;  -- 移除旧的全局限索引
-CREATE UNIQUE INDEX IF NOT EXISTS idx_workflow_history_user_hash ON workflow_history(user_id, data_hash);
 
 -- 2. 用户配额与状态
 ALTER TABLE users ADD COLUMN IF NOT EXISTS chat_quota INTEGER NOT NULL DEFAULT 0;
@@ -30,6 +29,8 @@ UPDATE workflow_history SET user_id = (SELECT id FROM users WHERE username = 'ad
 CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id);
 CREATE INDEX IF NOT EXISTS idx_messages_user ON messages(user_id);
 CREATE INDEX IF NOT EXISTS idx_workflow_history_user ON workflow_history(user_id);
+-- 每用户去重唯一索引（依赖上面的 user_id 列）
+CREATE UNIQUE INDEX IF NOT EXISTS idx_workflow_history_user_hash ON workflow_history(user_id, data_hash);
 
 -- 4. 工作流：发布 / 分享 / API 配额
 ALTER TABLE workflow_history ADD COLUMN IF NOT EXISTS published BOOLEAN NOT NULL DEFAULT false;
@@ -37,6 +38,7 @@ ALTER TABLE workflow_history ADD COLUMN IF NOT EXISTS api_key TEXT;
 ALTER TABLE workflow_history ADD COLUMN IF NOT EXISTS api_quota INTEGER NOT NULL DEFAULT -1;
 ALTER TABLE workflow_history ADD COLUMN IF NOT EXISTS api_used INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE workflow_history ADD COLUMN IF NOT EXISTS share_token TEXT;
+ALTER TABLE workflow_history ADD COLUMN IF NOT EXISTS description TEXT;
 CREATE INDEX IF NOT EXISTS idx_workflow_history_share ON workflow_history(share_token);
 
 -- 5. 消息：图片附件
@@ -124,8 +126,33 @@ ALTER TABLE api_call_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE flow_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE scheduled_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_models ENABLE ROW LEVEL SECURITY;
-CREATE POLICY IF NOT EXISTS "Allow all on audit_logs" ON audit_logs FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "Allow all on api_call_logs" ON api_call_logs FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "Allow all on flow_runs" ON flow_runs FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "Allow all on scheduled_runs" ON scheduled_runs FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "Allow all on ai_models" ON ai_models FOR ALL USING (true) WITH CHECK (true);
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_policies WHERE policyname = 'Allow all on audit_logs' AND tablename = 'audit_logs') THEN
+    CREATE POLICY "Allow all on audit_logs" ON audit_logs FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_policies WHERE policyname = 'Allow all on api_call_logs' AND tablename = 'api_call_logs') THEN
+    CREATE POLICY "Allow all on api_call_logs" ON api_call_logs FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_policies WHERE policyname = 'Allow all on flow_runs' AND tablename = 'flow_runs') THEN
+    CREATE POLICY "Allow all on flow_runs" ON flow_runs FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_policies WHERE policyname = 'Allow all on scheduled_runs' AND tablename = 'scheduled_runs') THEN
+    CREATE POLICY "Allow all on scheduled_runs" ON scheduled_runs FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_policies WHERE policyname = 'Allow all on ai_models' AND tablename = 'ai_models') THEN
+    CREATE POLICY "Allow all on ai_models" ON ai_models FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;

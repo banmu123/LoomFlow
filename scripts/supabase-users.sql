@@ -40,8 +40,8 @@ CREATE POLICY "Allow all on users"
   USING (true)
   WITH CHECK (true);
 
--- 4. 创建 admin 用户（⚠️ 请先修改为你的强密码，然后执行）
+-- 4. 创建 admin 用户（默认密码 123456，⚠️ 首次登录后请立即修改）
 --    使用 pgcrypto 的 crypt/gen_salt（Supabase 已内置启用）
 INSERT INTO users (username, password_hash, display_name, role)
-VALUES ('admin', crypt('CHANGE_ME_STRONG_PASSWORD', gen_salt('bf', 10)), '管理员', 'admin')
+VALUES ('admin', crypt('123456', gen_salt('bf', 10)), '管理员', 'admin')
 ON CONFLICT (username) DO NOTHING;

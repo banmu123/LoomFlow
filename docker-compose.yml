@@ -1,0 +1,113 @@
+# =====================================================
+# LoomFlow 自托管一键部署
+# 用法：
+#   1. cp .env.example .env
+#   2. 填写 .env（必填：POSTGRES_PASSWORD / PGRST_JWT_SECRET / COZE_SUPABASE_SERVICE_ROLE_KEY）
+#   3. docker compose up -d
+# 首次启动自动初始化数据库（postgres 容器 initdb 脚本）
+# =====================================================
+
+services:
+  # ---- PostgreSQL（数据持久化）----
+  postgres:
+    image: postgres:16
+    container_name: loomflow-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: loomflow
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # 首次启动自动执行数据库初始化（按文件名顺序）
+      - ./docker/postgres/00-extensions.sql:/docker-entrypoint-initdb.d/00-extensions.sql:ro
+      - ./scripts/supabase-init.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
+      - ./scripts/supabase-users.sql:/docker-entrypoint-initdb.d/20-users.sql:ro
+      - ./scripts/supabase-updates.sql:/docker-entrypoint-initdb.d/30-updates.sql:ro
+      - ./docker/postgres/40-grants.sql:/docker-entrypoint-initdb.d/40-grants.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d loomflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks:
+      - loomflow-net
+
+  # ---- PostgREST（supabase-js 的 REST 层）----
+  postgrest:
+    image: postgrest/postgrest:v12.2.3
+    container_name: loomflow-postgrest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/loomflow
+      PGRST_DB_SCHEMA: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_DB_EXTRA_SEARCH_PATH: public
+      PGRST_JWT_SECRET: ${PGRST_JWT_SECRET:?PGRST_JWT_SECRET is required}
+      PGRST_SERVER_PORT: "3000"
+    healthcheck:
+      # 容器内无 wget/nc，用 bash /dev/tcp 做端口探测
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/3000' 2>/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    networks:
+      - loomflow-net
+
+  # ---- Nginx 反代（/rest/v1 → PostgREST，supabase-js 兼容）----
+  nginx:
+    image: nginx:alpine
+    container_name: loomflow-nginx
+    restart: unless-stopped
+    depends_on:
+      postgrest:
+        condition: service_healthy
+    volumes:
+      - ./docker/nginx/rest.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
+    networks:
+      - loomflow-net
+
+  # ---- LoomFlow 应用 ----
+  loomflow:
+    build: .
+    container_name: loomflow-app
+    restart: unless-stopped
+    depends_on:
+      nginx:
+        condition: service_healthy
+    ports:
+      - "${PORT:-5000}:5000"
+    env_file: .env
+    environment:
+      COZE_PROJECT_ENV: PROD
+      PORT: "5000"
+      NODE_OPTIONS: "--max-old-space-size=2048"
+      # 自托管环境：应用经 Nginx 访问 PostgREST（覆盖 .env 中的云地址）
+      COZE_SUPABASE_URL: http://nginx:80
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:5000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - loomflow-net
+
+volumes:
+  pgdata:
+    name: loomflow-pgdata
+
+networks:
+  loomflow-net:
+    name: loomflow-net
+    driver: bridge

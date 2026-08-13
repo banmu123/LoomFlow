@@ -53,6 +53,20 @@ curl -X POST https://your-host/api/publish/{workflowId}/execute \
 
 ## 🚀 快速开始
 
+### 🐳 Docker 部署（推荐，一键自托管）
+
+```bash
+git clone https://github.com/banmu123/LoomFlow.git
+cd LoomFlow
+cp .env.example .env      # 填 POSTGRES_PASSWORD / PGRST_JWT_SECRET，生成 SERVICE_ROLE_KEY
+docker compose up -d      # 自动初始化数据库（含默认 admin 账号）
+```
+
+- 访问：http://localhost:5000
+- 默认账号：`admin` / `123456`（⚠️ 首次登录后请立即修改）
+- 数据持久化在 Docker 卷；日志：`docker compose logs -f loomflow`
+- 停止：`docker compose down` —— 完整指南：[docs/docker-deploy.md](docs/docker-deploy.md)
+
 ### 🧑‍💻 本地开发
 
 环境要求：Node.js ≥ 20.9、pnpm 9+、一个 Supabase 项目。

@@ -170,6 +170,7 @@ docs/*
 !docs/config/architecture.md
 !docs/config/security.md
 !docs/config/custom-node-guide.md
+!docs/docker-deploy.md
 # 内部开发记录（不公开）
 devlopRecprd/
 # 本地工具目录
