@@ -74,6 +74,56 @@ Admin → Model Settings → Add Model
 |---------|-----------------|
 | ![Chat](public/screenshots/chat.png) | ![Canvas](public/screenshots/canvas.png) |
 
+## 🏗️ Architecture
+
+```mermaid
+flowchart TB
+    subgraph Client["Clients"]
+        Browser["Browser — Next.js frontend<br/>AI Chat / Canvas / Admin / Share"]
+        External["External systems<br/>curl / API consumers"]
+    end
+
+    subgraph App["LoomFlow App (Next.js)"]
+        UI["App Router pages<br/>Chat / Workflows / Admin / Share"]
+        API["API Routes<br/>auth / chat-ai / workflow-history / publish / api-key"]
+        Engine["Workflow engine<br/>FlowEngine + NodeRegistry + Executors"]
+        Registry["Model Registry<br/>model config / providers"]
+    end
+
+    subgraph Data["Data layer"]
+        PostgREST["PostgREST"]
+        PG[("PostgreSQL<br/>conversations / workflow_history / workflow_versions<br/>user_api_keys / ai_models / audit_logs ···")]
+    end
+
+    subgraph ExternalSvc["External services"]
+        LLM["LLM Providers<br/>DeepSeek / any OpenAI-compatible endpoint"]
+        OSS["Object storage<br/>Aliyun OSS / S3-compatible"]
+        Search["Search API"]
+    end
+
+    Browser --> UI
+    External -->|"Authorization: Bearer API Key"| API
+    UI --> API
+    API --> Engine
+    API --> Registry
+    API --> PostgREST --> PG
+    Engine --> LLM
+    Engine --> Search
+    API --> OSS
+```
+
+**How it flows**: describe a process in natural language → AI generates a workflow (validated & auto-repaired) → edit on the visual canvas → save as versioned history → publish a chosen version as a secured HTTP API (one global API key per user) → external systems call it with `Authorization: Bearer <key>`.
+
+**Docker self-hosted deployment**:
+
+```mermaid
+flowchart LR
+    User["User"] -->|":5000"| App["loomflow app"]
+    App -->|"http://nginx:80/rest/v1"| Nginx["Nginx reverse proxy"]
+    Nginx --> PostgREST["PostgREST"]
+    PostgREST --> PG[("PostgreSQL 16<br/>volume: loomflow-pgdata")]
+```
+
 ## 🚀 Quick Start
 
 ### 🐳 Docker (recommended, one-click self-hosted)

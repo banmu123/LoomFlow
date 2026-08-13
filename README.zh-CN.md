@@ -59,6 +59,56 @@ curl -X POST https://your-host/api/publish/{workflowId}/execute \
 |---------|-----------|
 | ![对话](public/screenshots/chat.png) | ![画布](public/screenshots/canvas.png) |
 
+## 🏗️ 架构图
+
+```mermaid
+flowchart TB
+    subgraph Client["客户端"]
+        Browser["浏览器 — Next.js 前端<br/>AI 对话 / 画布 / 管理后台 / 分享页"]
+        External["外部系统<br/>curl / API 调用方"]
+    end
+
+    subgraph App["LoomFlow 应用（Next.js）"]
+        UI["App Router 页面<br/>对话 / 工作流 / 管理 / 分享"]
+        API["API Routes<br/>auth / chat-ai / workflow-history / publish / api-key"]
+        Engine["工作流执行引擎<br/>FlowEngine + NodeRegistry + Executors"]
+        Registry["Model Registry<br/>模型配置 / Provider"]
+    end
+
+    subgraph Data["数据层"]
+        PostgREST["PostgREST"]
+        PG[("PostgreSQL<br/>conversations / workflow_history / workflow_versions<br/>user_api_keys / ai_models / audit_logs ···")]
+    end
+
+    subgraph ExternalSvc["外部服务"]
+        LLM["LLM 服务<br/>DeepSeek / 任意 OpenAI 兼容接口"]
+        OSS["对象存储<br/>阿里云 OSS / S3 兼容"]
+        Search["搜索 API"]
+    end
+
+    Browser --> UI
+    External -->|"Authorization: Bearer API Key"| API
+    UI --> API
+    API --> Engine
+    API --> Registry
+    API --> PostgREST --> PG
+    Engine --> LLM
+    Engine --> Search
+    API --> OSS
+```
+
+**核心流程**：自然语言描述流程 → AI 生成工作流（Schema 校验 + 失败自动修复）→ 画布可视化微调 → 保存为版本历史 → 发布指定版本为带鉴权的 HTTP API（每用户一个全局 API Key）→ 外部系统凭 `Authorization: Bearer <key>` 调用。
+
+**Docker 自托管部署**：
+
+```mermaid
+flowchart LR
+    User["用户"] -->|":5000"| App["loomflow 应用"]
+    App -->|"http://nginx:80/rest/v1"| Nginx["Nginx 反向代理"]
+    Nginx --> PostgREST["PostgREST"]
+    PostgREST --> PG[("PostgreSQL 16<br/>数据卷：loomflow-pgdata")]
+```
+
 ## 🚀 快速开始
 
 ### 🐳 Docker 部署（推荐，一键自托管）
