@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { setPendingWorkflow } from '@/lib/pending-workflow';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -75,6 +75,7 @@ export function ChatPanel({
   onCollapse?: () => void;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const t = useT();
   const [conversations, setConversations] = useState<Conversation[]>([
     { id: nextId(), title: '新建对话', messages: [] },
@@ -95,26 +96,36 @@ export function ChatPanel({
   const [model, setModel] = useState('');
   const [modelOptions, setModelOptions] = useState<Array<{ value: string; label: string }>>([]);
 
-  // 加载已配置模型（模型配置页添加后此处自动出现）
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch('/api/ai/models');
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          const options = data.map((m: { id: string; label: string | null }) => ({
-            value: m.id,
-            label: m.label || m.id,
-          }));
-          setModelOptions(options);
-          // 默认选中第一个
-          setModel((prev) => prev || options[0]?.value || '');
-        }
-      } catch {
-        // ignore
+  // 加载已配置模型（从模型配置页返回或切回标签页时自动刷新）
+  const loadModels = useCallback(async () => {
+    try {
+      const res = await fetch('/api/ai/models');
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        const options = data.map((m: { id: string; label: string | null }) => ({
+          value: m.id,
+          label: m.label || m.id,
+        }));
+        setModelOptions(options);
+        // 默认选中第一个
+        setModel((prev) => (options.some((o) => o.value === prev) ? prev : options[0]?.value || ''));
       }
-    })();
+    } catch {
+      // ignore
+    }
   }, []);
+
+  useEffect(() => {
+    loadModels();
+  }, [loadModels, pathname]); // 路由变化（如从模型配置返回）时刷新
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') loadModels();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [loadModels]);
   const dragRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
