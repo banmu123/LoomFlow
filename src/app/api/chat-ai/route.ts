@@ -101,12 +101,19 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const messages = body?.messages as ChatMessage[] | undefined;
   const images = (body?.images as string[] | undefined) || [];
-  // 模型选择：从模型注册表校验，默认 flash
+  // 模型选择：从模型注册表校验（未配置模型时给出明确引导）
   const allModels = await getAllModels();
   const requestedModel = (body?.model as string | undefined) || 'deepseek-v4-flash';
   const modelId = allModels.some((m) => m.id === requestedModel)
     ? requestedModel
     : 'deepseek-v4-flash';
+
+  if (!allModels.some((m) => m.id === modelId)) {
+    return Response.json(
+      { error: '尚未配置模型，请先在「模型配置」中添加（管理后台 → 模型配置 → 添加模型）' },
+      { status: 400 },
+    );
+  }
 
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     return Response.json({ error: 'messages 参数缺失' }, { status: 400 });

@@ -38,24 +38,16 @@ async function loadFromDb(): Promise<ModelDefinition[]> {
   }));
 }
 
-// 获取全部可用模型（DB 配置优先，覆盖内置同名模型）
+// 获取全部可用模型（仅来自数据库——用户必须在「模型配置」中添加）
+// 初始为空时，对话/LLM 节点会提示先配置模型（引导式体验）
 export async function getAllModels(): Promise<ModelDefinition[]> {
   const now = Date.now();
   if (cache && now - cacheTime < CACHE_TTL_MS) {
     return cache;
   }
 
-  const [dbModels, builtin] = await Promise.all([
-    loadFromDb(),
-    import('./models').then((m) => m.BUILTIN_MODELS),
-  ]);
-
-  // 合并：DB 优先（同名覆盖内置）
-  const merged = new Map<string, ModelDefinition>();
-  for (const m of builtin) merged.set(m.id, m);
-  for (const m of dbModels) merged.set(m.id, m);
-
-  cache = [...merged.values()];
+  const dbModels = await loadFromDb();
+  cache = dbModels;
   cacheTime = now;
   return cache;
 }
