@@ -19,12 +19,23 @@ export async function POST(
   const body = await request.json().catch(() => null);
   const inputs = (body?.inputs ?? {}) as Record<string, unknown>;
 
-  // 查询工作流配额信息
+  // 查询工作流配额与 Key 有效期
   const { data: wf } = await supabase
     .from('workflow_history')
-    .select('api_quota, api_used')
+    .select('api_quota, api_used, api_key_expires_at')
     .eq('id', id)
     .single();
+
+  // Key 过期校验（未设置有效期 = 永不过期）
+  if (
+    wf?.api_key_expires_at &&
+    new Date(wf.api_key_expires_at).getTime() < Date.now()
+  ) {
+    return Response.json(
+      { error: 'API Key 已过期，请在管理后台更新有效期或重新发布' },
+      { status: 401 },
+    );
+  }
 
   const apiQuota = wf?.api_quota ?? -1;
   const apiUsed = wf?.api_used ?? 0;

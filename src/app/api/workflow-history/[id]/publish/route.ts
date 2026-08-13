@@ -5,7 +5,7 @@ import { getCurrentUser } from '@/lib/server-auth';
 import { logAudit, getClientIp } from '@/lib/audit';
 
 // 发布工作流：生成对外 API Key（已发布则轮换新 Key）
-// body 可选：{ api_quota: -1 不限 | 正数限制调用次数 }
+// body 可选：{ api_quota: -1 不限 | 正数限制调用次数, expires_days: 有效期天数（0/缺省=永不过期） }
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -35,11 +35,25 @@ export async function POST(
   const apiQuota =
     typeof body?.api_quota === 'number' ? Math.max(-1, Math.floor(body.api_quota)) : -1;
 
+  // Key 有效期（expires_days：0/缺省 = 永不过期）
+  const expiresDays =
+    typeof body?.expires_days === 'number' && body.expires_days > 0
+      ? Math.floor(body.expires_days)
+      : 0;
+  const apiKeyExpiresAt = expiresDays > 0
+    ? new Date(Date.now() + expiresDays * 24 * 3600 * 1000).toISOString()
+    : null;
+
   const apiKey = `ffk_${randomBytes(24).toString('hex')}`;
 
   const { data, error } = await supabase
     .from('workflow_history')
-    .update({ published: true, api_key: apiKey, api_quota: apiQuota })
+    .update({
+      published: true,
+      api_key: apiKey,
+      api_quota: apiQuota,
+      api_key_expires_at: apiKeyExpiresAt,
+    })
     .eq('id', id)
     .select('id, title, published, api_key, api_quota, api_used')
     .single();
