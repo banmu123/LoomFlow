@@ -111,6 +111,13 @@ export const zh = {
     contactAdmin: '模型尚未配置，请联系管理员',
     stopped: '已停止生成',
     networkError: '网络错误',
+    voiceInput: '语音输入',
+    voiceStop: '停止聆听',
+    voiceListening: '正在聆听…',
+    voiceUnsupported: '当前浏览器不支持语音输入（推荐 Chrome / Edge）',
+    voicePermission: '麦克风权限被拒绝，请在浏览器设置中允许',
+    voiceNetwork: '语音识别服务不可用（可能需要网络代理）',
+    voiceError: '语音识别出错，请重试',
   },
   knowledge: {
     title: '知识库',

@@ -115,6 +115,13 @@ export const en: ZhMessages = {
     contactAdmin: 'No model configured — please contact your admin',
     stopped: 'Generation stopped',
     networkError: 'Network error',
+    voiceInput: 'Voice input',
+    voiceStop: 'Stop listening',
+    voiceListening: 'Listening…',
+    voiceUnsupported: 'Voice input is not supported in this browser (use Chrome / Edge)',
+    voicePermission: 'Microphone permission denied — please allow it in browser settings',
+    voiceNetwork: 'Speech recognition service unavailable (a proxy may be needed)',
+    voiceError: 'Speech recognition failed, please retry',
   },
   knowledge: {
     title: 'Knowledge Base',

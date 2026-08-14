@@ -362,8 +362,9 @@ export function ChatPanel({
     [],
   );
 
-  const handleSend = async () => {
-    const text = input.trim();
+  const handleSend = async (overrideText?: string) => {
+    // 语音输入：识别文本直接传入（避免 React 状态异步导致读旧值）
+    const text = (overrideText ?? input).trim();
     if (!text || isGenerating) return;
 
     setError(null);

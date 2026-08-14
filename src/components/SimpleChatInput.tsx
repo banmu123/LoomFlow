@@ -12,14 +12,15 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { useT } from '@/lib/i18n';
-import { ArrowUp, Square, Paperclip, AtSign, X, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { ArrowUp, Square, Paperclip, AtSign, X, Loader2, Mic } from 'lucide-react';
 
 export interface SimpleChatInputProps {
   /** controlled value */
   value: string;
   onChange: (value: string) => void;
   /** submit callback */
-  onSubmit: () => void;
+  onSubmit: (text?: string) => void;
   /** is AI generating now */
   isGenerating: boolean;
   /** stop generation */
@@ -98,6 +99,86 @@ export function SimpleChatInput({
 
   const canSend = value.trim().length > 0 && !isGenerating;
 
+  // ===== 语音输入（浏览器原生 Web Speech API）=====
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef<{ stop: () => void } | null>(null);
+  const baselineRef = useRef('');
+  const finalTextRef = useRef('');
+  // 手动停止 vs 说完自动结束：手动停止只填输入框，自动结束则直接发送
+  const manualStopRef = useRef(false);
+
+  const toggleListening = () => {
+    if (listening) {
+      manualStopRef.current = true;
+      recognitionRef.current?.stop();
+      return;
+    }
+    const SR =
+      (window as unknown as Record<string, unknown>).SpeechRecognition ||
+      (window as unknown as Record<string, unknown>).webkitSpeechRecognition;
+    if (!SR) {
+      toast.error(t('chat.voiceUnsupported'));
+      return;
+    }
+    try {
+      const rec = new (SR as new () => {
+        lang: string;
+        continuous: boolean;
+        interimResults: boolean;
+        start: () => void;
+        stop: () => void;
+        onresult: ((e: unknown) => void) | null;
+        onerror: ((e: unknown) => void) | null;
+        onend: (() => void) | null;
+      })();
+      rec.lang = 'zh-CN';
+      // 单次识别：说完停顿自动结束（onend 触发自动发送）；手动停止则不发送
+      rec.continuous = false;
+      rec.interimResults = true;
+      baselineRef.current = value;
+      finalTextRef.current = '';
+      manualStopRef.current = false;
+      rec.onresult = (e) => {
+        const ev = e as {
+          resultIndex: number;
+          results: Array<Array<{ transcript: string }> & { isFinal: boolean }>;
+        };
+        let interim = '';
+        for (let i = ev.resultIndex; i < ev.results.length; i++) {
+          const t = ev.results[i][0].transcript;
+          if (ev.results[i].isFinal) finalTextRef.current += t;
+          else interim += t;
+        }
+        onChange(baselineRef.current + finalTextRef.current + interim);
+      };
+      rec.onerror = (e) => {
+        setListening(false);
+        const err = (e as { error?: string }).error;
+        if (err === 'not-allowed') toast.error(t('chat.voicePermission'));
+        else if (err === 'network') toast.error(t('chat.voiceNetwork'));
+        else toast.error(t('chat.voiceError'));
+      };
+      rec.onend = () => {
+        setListening(false);
+        const final = finalTextRef.current;
+        if (final) {
+          const full = baselineRef.current + final;
+          onChange(full);
+          // 说完自动结束 → 直接发送；手动停止 → 只填输入框供确认
+          if (!manualStopRef.current) {
+            onSubmit(full);
+          }
+        }
+        manualStopRef.current = false;
+      };
+      rec.start();
+      recognitionRef.current = rec;
+      setListening(true);
+    } catch {
+      toast.error(t('chat.voiceError'));
+    }
+  };
+
   return (
     <div className="border-t border-border bg-background p-3">
       <div className="flex flex-col rounded-lg border border-border bg-background focus-within:border-primary/40 focus-within:ring-1 focus-within:ring-primary/20">
@@ -142,6 +223,18 @@ export function SimpleChatInput({
         {/* bottom bar */}
         <div className="flex items-center justify-between px-2 pb-2">
           <div className="flex items-center gap-0.5">
+            {/* 语音输入（浏览器原生 Web Speech API） */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`h-7 w-7 ${
+                listening ? 'animate-pulse text-destructive' : 'text-muted-foreground'
+              }`}
+              onClick={toggleListening}
+              title={listening ? t('chat.voiceStop') : t('chat.voiceInput')}
+            >
+              <Mic className="h-3.5 w-3.5" />
+            </Button>
             <label className="inline-flex">
               <Button
                 variant="ghost"
