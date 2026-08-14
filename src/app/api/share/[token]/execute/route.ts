@@ -27,6 +27,8 @@ export async function POST(
     const result = await runFlow(auth.workflow.data, inputs, {
       source: 'api',
       workflowId: auth.workflow.id,
+      // 分享执行以工作流主人的身份检索（知识库按主人隔离）
+      userId: auth.workflow.user_id,
     });
 
     if (result.status === 'failed') {

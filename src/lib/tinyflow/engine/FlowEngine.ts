@@ -40,6 +40,7 @@ export class FlowEngine {
       nodeOutputs: new Map(),
       nodeStatuses: new Map(),
       variables: new Map(),
+      userId: options.userId ?? null,
     };
   }
 

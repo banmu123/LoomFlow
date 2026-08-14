@@ -124,11 +124,14 @@ export interface FlowContext {
   nodeOutputs: Map<string, Record<string, unknown>>;
   nodeStatuses: Map<string, NodeStatus>;
   variables: Map<string, unknown>;
+  /** 执行者用户 id（数据隔离：知识库检索等按用户过滤） */
+  userId?: string | null;
 }
 
 export interface ExecuteOptions {
   flowData: TinyflowData;
   inputs: Record<string, unknown>;
+  userId?: string | null;
   signal?: AbortSignal;
   onNodeStart?: (nodeId: string) => void;
   onNodeComplete?: (nodeId: string, result: NodeResult) => void;

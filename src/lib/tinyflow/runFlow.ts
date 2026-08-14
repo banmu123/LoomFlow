@@ -95,6 +95,7 @@ export async function runFlow(
   const engine = new FlowEngine(flowData, {
     flowData,
     inputs,
+    userId: options.userId,
     onNodeStart: (nodeId: string) => {
       events.push({ type: 'node_start', data: { nodeId }, timestamp: Date.now() });
     },

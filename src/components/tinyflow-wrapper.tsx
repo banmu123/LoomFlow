@@ -188,6 +188,20 @@ export default function TinyflowWrapper() {
       } catch {
         // 拉取失败保持空列表（画布会提示先配置模型）
       }
+      // 知识库列表（画布知识库节点下拉选择，同模型选择模式）
+      let knowledgeOptions: { value: string; label: string }[] = [];
+      try {
+        const res = await fetch('/api/knowledge-bases');
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          knowledgeOptions = data.map((k: { id: string; name: string }) => ({
+            value: k.id,
+            label: k.name,
+          }));
+        }
+      } catch {
+        // 拉取失败保持空列表
+      }
       if (destroyed || !containerRef.current) return;
 
       const { Tinyflow } = await import('@tinyflow-ai/ui');
@@ -197,6 +211,7 @@ export default function TinyflowWrapper() {
         defaultTheme: 'light',
         provider: {
           llm: () => llmOptions,
+          knowledge: () => knowledgeOptions,
         },
         onDataChange: (data) => {
           // 数据变化时触发重新计算 startParams

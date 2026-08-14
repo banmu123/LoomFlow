@@ -6,6 +6,7 @@ export interface SharedWorkflow {
   title: string;
   data: TinyflowData;
   share_token: string;
+  user_id: string;
 }
 
 // 通过分享 token 获取工作流（无需登录）
@@ -18,7 +19,7 @@ export async function getWorkflowByShareToken(
 
   const { data, error } = await supabase
     .from('workflow_history')
-    .select('id, title, data, share_token')
+    .select('id, title, data, share_token, user_id')
     .eq('share_token', token)
     .single();
 

@@ -26,6 +26,7 @@ export async function POST(
     const result = await runFlow(auth.workflow.data, inputs, {
       source: 'api',
       workflowId: id,
+      userId: auth.userId,
     });
 
     // 记录调用日志

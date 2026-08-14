@@ -297,6 +297,7 @@ export const systemNavPrompt = `## 系统页面导航（给用户的操作指引
 - 工作流列表：/workflows
 - 模型配置：/admin/models（添加/管理模型，仅管理员）
 - API 管理：/workflows/api-keys（全局 API Key、有效期、重新生成）
+- 知识库：/knowledge（创建知识库、上传文档；工作流中的「知识库」节点从这里选）
 - 执行历史：/workflows/history
 - 定时任务：/workflows/schedules
 
