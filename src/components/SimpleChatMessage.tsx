@@ -2,8 +2,9 @@
 
 import { cn } from '@/lib/utils';
 import { useT } from '@/lib/i18n';
+import { useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { AlertTriangle, CheckCircle2, Loader2, Sparkles, ChevronDown, ChevronUp, Copy, RefreshCw } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Loader2, Sparkles, ChevronDown, ChevronUp, Copy, RefreshCw, ArrowRight } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
 export type ChatMessageRole = 'user' | 'assistant';
@@ -44,6 +45,32 @@ function StreamingDots() {
       <span className="h-1 w-1 animate-bounce rounded-full bg-muted-foreground/40 [animation-delay:-0.15s]" />
       <span className="h-1 w-1 animate-bounce rounded-full bg-muted-foreground/40" />
     </span>
+  );
+}
+
+// 渲染 AI 回复中的 [去往：页面名](/路径) 导航链接为可点击跳转按钮
+function NavLinkRenderer({ text }: { text: string }) {
+  const router = useRouter();
+  const parts = text.split(/(\[[^\]]+\]\([^)]+\))/g);
+  return (
+    <>
+      {parts.map((part, i) => {
+        const m = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+        if (m && m[2].startsWith('/')) {
+          return (
+            <button
+              key={i}
+              onClick={() => router.push(m[2])}
+              className="mx-1 inline-flex items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary transition-colors hover:bg-primary/20"
+            >
+              {m[1]}
+              <ArrowRight className="h-3 w-3" />
+            </button>
+          );
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </>
   );
 }
 
@@ -130,14 +157,14 @@ export function SimpleChatMessage({
                 </div>
               )}
 
-              {/* 正式回答 */}
+              {/* 正式回答（支持 [去往：xxx](/path) 导航链接） */}
               <div
                 className={cn(
-                  'max-w-[320px] rounded-lg rounded-tl-sm bg-muted px-3 py-2 text-sm text-foreground',
+                  'max-w-[320px] whitespace-pre-wrap rounded-lg rounded-tl-sm bg-muted px-3 py-2 text-sm text-foreground',
                   status === 'streaming' && 'min-h-[36px]',
                 )}
               >
-                {content}
+                <NavLinkRenderer text={content} />
                 {status === 'streaming' && !reasoning && <StreamingDots />}
                 {children}
               </div>

@@ -9,8 +9,8 @@ export const runtime = 'nodejs';
 // 从 Model Registry（内置 + 用户配置合并）获取模型对应的 provider 客户端
 import { getProviderClientForModel, hasCapability } from '@/lib/ai';
 import { getAllModels } from '@/lib/ai/db-models';
-// Agent 只读工具集（查询系统状态/排错）
-import { agentTools, agentToolsPrompt } from '@/lib/agent/tools';
+// Agent 只读工具集（查询系统状态/排错）+ 系统导航知识
+import { agentTools, agentToolsPrompt, systemNavPrompt } from '@/lib/agent/tools';
 // 确定性意图预分流（query=查询带工具 / generate=生成不带工具 / chat=闲聊）
 import { detectIntentFromMessages } from '@/lib/agent/intent';
 
@@ -151,19 +151,19 @@ export async function POST(request: NextRequest) {
   );
 
   // 确定性意图预分流：query=带工具查询/排错；generate、chat=不带工具（杜绝生成时误调工具）
+  // 导航知识始终注入（所有模式都能引导用户去正确页面）
   const intent = detectIntentFromMessages(messages);
   const useTools = intent === 'query';
 
   // 使用 streamText 流式调用
   const result = streamText({
     model: provider(modelId),
-    system: useTools
-      ? `${systemPrompt}
+    system: `${systemPrompt}
 
 ---
 
-${agentToolsPrompt}`
-      : systemPrompt,
+${systemNavPrompt}
+${useTools ? `\n\n${agentToolsPrompt}` : ''}`,
     messages: promptMessages,
     temperature: 0.7,
     maxOutputTokens: 8192,
