@@ -1,8 +1,32 @@
-# LoomFlow — AI-Native Workflow Platform
+# LoomFlow
 
 > English | [中文](README.zh-CN.md)
 
-Describe a process in plain language → get a runnable workflow on a visual canvas → publish it as a secured HTTP API. Self-hosted, team-ready, i18n.
+**A lightweight AI workflow builder for individuals and small teams.**
+
+Describe your idea in natural language → generate a runnable workflow → customize it on a visual canvas → publish it as an API.
+
+让每个人都能创建自己的 AI 自动化流程。
+
+---
+
+## 🎯 Who is it for?
+
+- ✅ **Indie developers** — ship an AI feature without building an orchestration platform
+- ✅ **Content creators** — turn recurring production steps into one-click automated flows
+- ✅ **Small studios** — deliver demos and client work faster with shareable, runnable flows
+- ✅ **AI automation enthusiasts** — prototype your idea in minutes, then deploy it for real
+
+## 🤔 Why LoomFlow instead of Dify / n8n?
+
+| | **LoomFlow** | Dify | n8n |
+|---|---|---|---|
+| 起步方式 | **自然语言直接生成工作流**，秒级开始 | 模板/手动搭建，偏企业级 LLM 应用平台 | 手动拖节点，AI 只是众多节点之一 |
+| 定位 | 轻量 · 个人/小团队 · **AI 优先** | 重：RAG/知识库/团队协作/复杂部署 | 通用自动化，节点多而杂 |
+| 部署 | **一条命令 Docker 自托管**（1GB 内存即可） | 较重 | 中等 |
+| 对外提供 | 一键发布为带鉴权的 HTTP API + 分享页 | 应用/工作流为主 | Webhook/API |
+
+**一句话**：Dify 是给团队造 LLM 应用平台的，n8n 是给所有人做通用自动化的——**LoomFlow 是给个人和小团队"用一句话把想法变成可运行、可发布的工作流"**。不追求大而全，追求 30 秒上手、一分钟部署。
 
 ---
 
