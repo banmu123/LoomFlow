@@ -9,10 +9,11 @@ export class EndExecutor extends BaseExecutor {
   }
 
   async execute(node: FlowNode, context: FlowContext): Promise<Record<string, unknown>> {
-    const params = node.data.parameters || [];
+    // 输出定义：优先 outputDefs（AI 生成规范），兼容 parameters（早期工作流）
+    const defs = node.data.outputDefs || node.data.parameters || [];
     const outputs: Record<string, unknown> = {};
 
-    for (const param of params) {
+    for (const param of defs) {
       const key = param.name || param.id || 'output';
       if (param.ref) {
         outputs[key] = this.paramResolver.resolve(param, context);
