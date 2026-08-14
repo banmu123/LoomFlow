@@ -17,12 +17,8 @@ export interface RunFlowOptions {
   userId?: string | null;
 }
 
-// 提取最终输出（整理好的结果，外部可直接取用）：
-// 1. endNode 配置了输出引用 → 返回 endNode 定义的结果
-// 2. 否则 → 智能提取最终结果，统一返回 { result: <最终输出> }：
-//    - 优先取最后一个 LLM 节点的输出（outType=json 时直接给解析后的对象）
-//    - 无 LLM 节点时取最后一个有输出的业务节点
-// 完整节点输出保留在执行事件（events）中，不影响调试
+// 提取最终输出：endNode 配置了输出引用时用 endNode 结果；
+// 否则回退汇总所有已完成节点的输出（保证外部调用总能拿到结果）
 export function extractFinalOutputs(
   flowData: TinyflowData,
   engine: FlowEngine,
@@ -35,18 +31,7 @@ export function extractFinalOutputs(
     }
   }
 
-  // 回退 1：最后一个 LLM 节点 → { result: 输出 }
-  const llmNodes = flowData.nodes.filter((n) => n.type === 'llmNode');
-  const lastLlm = llmNodes[llmNodes.length - 1];
-  if (lastLlm) {
-    const out = engine.getContext().nodeOutputs.get(lastLlm.id);
-    if (out && out.output != null) {
-      // outType=json 时 output 是 JSON 字符串，直接给解析后的对象（root）
-      return { result: out.root ?? out.output };
-    }
-  }
-
-  // 回退 2：最后一个有输出的业务节点 → { result: 主要输出 }
+  // 回退：汇总所有有输出的节点（跳过 start/end 的空输出）
   const summary: Record<string, unknown> = {};
   for (const [nodeId, outputs] of engine.getContext().nodeOutputs) {
     if (outputs && typeof outputs === 'object' && Object.keys(outputs).length > 0) {
@@ -54,14 +39,6 @@ export function extractFinalOutputs(
       if (nodeType === 'startNode' || nodeType === 'endNode') continue;
       summary[nodeId] = outputs;
     }
-  }
-  const keys = Object.keys(summary);
-  if (keys.length === 1) {
-    const v = summary[keys[0]];
-    if (v && typeof v === 'object' && 'output' in (v as Record<string, unknown>)) {
-      return { result: (v as Record<string, unknown>).output };
-    }
-    return { result: v };
   }
   return summary;
 }
