@@ -31,6 +31,7 @@ export const zh = {
     apiLogs: 'API 调用',
     apiKeys: 'API 管理',
     knowledge: '知识库',
+    oss: '存储设置',
     admin: '管理后台',
   },
   app: {
@@ -326,6 +327,16 @@ export const zh = {
     inputOutput: '输入/输出',
     noApiLogs: '暂无外部调用记录',
     deletedWorkflow: '（已删除）',
+    // 存储设置（OSS）
+    ossTitle: '存储设置（OSS）',
+    ossSubtitle: '配置对象存储，知识库可选择 OSS 存储方式',
+    ossEndpoint: 'Endpoint（可选）',
+    ossEndpointPlaceholder: '留空自动生成（如 https://oss-cn-shenzhen.aliyuncs.com）',
+    ossClear: '清除配置',
+    ossClearConfirm: '确定清除 OSS 配置吗？已用 OSS 存储的知识库上传新文档将失败（可改用数据库存储）。',
+    ossNoteTitle: '说明',
+    ossNote1: '· 保存后立即生效，无需重启或修改环境变量',
+    ossNote2: '· 建议使用 RAM 子账号（最小权限：仅目标 bucket 读写）',
   },
   share: {
     nodeCount: '工作流分享 · {count} 个节点',

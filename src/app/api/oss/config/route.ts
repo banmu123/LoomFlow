@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getOSSConfigFromEnv } from '@/lib/oss-config';
+import { getOSSConfig } from '@/lib/oss-config';
 import { getCurrentUser } from '@/lib/server-auth';
 
 /**
  * GET /api/oss/config
- * 获取 OSS 配置（运行时，从环境变量读取）
+ * 获取 OSS 配置（数据库「存储设置」优先，其次环境变量）
  * 仅登录用户可访问（避免密钥明文泄露给未授权方）
  */
 export async function GET() {
@@ -14,7 +14,7 @@ export async function GET() {
   }
 
   try {
-    const config = getOSSConfigFromEnv();
+    const config = await getOSSConfig();
 
     if (!config) {
       return NextResponse.json(

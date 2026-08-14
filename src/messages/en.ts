@@ -33,6 +33,7 @@ export const en: ZhMessages = {
     apiLogs: 'API Calls',
     apiKeys: 'API Keys',
     knowledge: 'Knowledge Base',
+    oss: 'Storage Settings',
     admin: 'Admin',
   },
   app: {
@@ -329,6 +330,16 @@ export const en: ZhMessages = {
     inputOutput: 'Input/Output',
     noApiLogs: 'No API call records',
     deletedWorkflow: '(deleted)',
+    // Storage settings (OSS)
+    ossTitle: 'Storage Settings (OSS)',
+    ossSubtitle: 'Configure object storage; knowledge bases can choose OSS storage',
+    ossEndpoint: 'Endpoint (optional)',
+    ossEndpointPlaceholder: 'Leave blank to auto-generate (e.g. https://oss-cn-shenzhen.aliyuncs.com)',
+    ossClear: 'Clear config',
+    ossClearConfirm: 'Clear the OSS config? Knowledge bases using OSS storage will fail to upload new documents (you can switch them to database storage).',
+    ossNoteTitle: 'Notes',
+    ossNote1: '· Takes effect immediately after saving — no restart or env changes needed',
+    ossNote2: '· Use a RAM sub-account with least privilege (bucket read/write only)',
   },
   share: {
     nodeCount: 'Shared workflow · {count} nodes',

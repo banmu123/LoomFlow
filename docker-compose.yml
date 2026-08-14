@@ -27,6 +27,7 @@ services:
       - ./scripts/supabase-versions.sql:/docker-entrypoint-initdb.d/36-versions.sql:ro
       - ./scripts/supabase-publish-version.sql:/docker-entrypoint-initdb.d/37-publish-version.sql:ro
       - ./scripts/supabase-knowledge.sql:/docker-entrypoint-initdb.d/38-knowledge.sql:ro
+      - ./scripts/supabase-settings.sql:/docker-entrypoint-initdb.d/39-settings.sql:ro
       - ./docker/postgres/40-grants.sql:/docker-entrypoint-initdb.d/40-grants.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d loomflow"]

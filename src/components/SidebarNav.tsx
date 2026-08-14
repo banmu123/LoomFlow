@@ -16,6 +16,7 @@ import {
   Workflow,
   KeyRound,
   Library,
+  CloudCog,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useT } from '@/lib/i18n';
@@ -44,6 +45,7 @@ const ADMIN_ITEMS: NavItem[] = [
   { href: '/admin/stats', labelKey: 'sidebar.stats', icon: BarChart3 },
   { href: '/admin/logs', labelKey: 'sidebar.logs', icon: FileClock },
   { href: '/admin/api-logs', labelKey: 'sidebar.apiLogs', icon: Activity },
+  { href: '/admin/oss', labelKey: 'sidebar.oss', icon: CloudCog },
 ];
 
 export function SidebarNav() {

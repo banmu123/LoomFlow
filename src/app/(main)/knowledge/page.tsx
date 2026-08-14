@@ -350,7 +350,7 @@ export default function KnowledgePage() {
 
         {/* 粘贴文本对话框 */}
         <Dialog open={pasteOpen} onOpenChange={setPasteOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-h-[85vh] max-w-md overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{t('knowledge.pasteText')}</DialogTitle>
               <DialogDescription>{t('knowledge.pasteHint')}</DialogDescription>
@@ -369,7 +369,7 @@ export default function KnowledgePage() {
                 <Textarea
                   value={pasteForm.content}
                   onChange={(e) => setPasteForm((f) => ({ ...f, content: e.target.value }))}
-                  className="min-h-[160px]"
+                  className="max-h-[40vh] min-h-[160px] overflow-y-auto"
                   placeholder={t('knowledge.pastePlaceholder')}
                 />
               </div>

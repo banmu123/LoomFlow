@@ -9,6 +9,9 @@ export interface OSSConfig {
 
 // 缓存配置
 let cachedConfig: OSSConfig | null = null;
+let dbConfigCache: OSSConfig | null = null;
+let dbConfigCacheTime = 0;
+const DB_CACHE_TTL_MS = 30_000;
 
 /**
  * 生成默认 Endpoint（区域端点，SDK 虚拟主机模式会自动加 bucket 前缀）
@@ -34,6 +37,52 @@ export function getOSSConfigFromEnv(): OSSConfig | null {
   const endpoint = process.env.OSS_ENDPOINT || generateEndpoint(bucket, region);
 
   return { accessKeyId, accessKeySecret, bucket, region, endpoint };
+}
+
+/**
+ * 从数据库读取 OSS 配置（管理后台「存储设置」写入，优先于环境变量）
+ * 缓存 30s；设置变更后调用 clearOSSConfigCache 立即生效
+ */
+export async function getOSSConfigFromDb(): Promise<OSSConfig | null> {
+  const now = Date.now();
+  if (dbConfigCache && now - dbConfigCacheTime < DB_CACHE_TTL_MS) {
+    return dbConfigCache;
+  }
+  dbConfigCache = null;
+
+  try {
+    const { supabase } = await import('@/lib/supabase/server');
+    const { data } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'oss_config')
+      .maybeSingle();
+
+    const v = data?.value as
+      | { accessKeyId?: string; accessKeySecret?: string; bucket?: string; region?: string; endpoint?: string }
+      | undefined;
+    if (v && v.accessKeyId && v.accessKeySecret && v.bucket && v.region) {
+      dbConfigCache = {
+        accessKeyId: v.accessKeyId,
+        accessKeySecret: v.accessKeySecret,
+        bucket: v.bucket,
+        region: v.region,
+        endpoint: v.endpoint || undefined,
+      };
+    }
+  } catch {
+    // 数据库不可用时回退环境变量
+  }
+  dbConfigCacheTime = now;
+  return dbConfigCache;
+}
+
+/**
+ * 获取有效 OSS 配置：数据库配置优先，其次环境变量
+ */
+export async function getOSSConfig(): Promise<OSSConfig | null> {
+  const db = await getOSSConfigFromDb();
+  return db || getOSSConfigFromEnv();
 }
 
 /**
@@ -85,4 +134,6 @@ export async function fetchOSSConfig(): Promise<OSSConfig | null> {
  */
 export function clearOSSConfigCache(): void {
   cachedConfig = null;
+  dbConfigCache = null;
+  dbConfigCacheTime = 0;
 }
