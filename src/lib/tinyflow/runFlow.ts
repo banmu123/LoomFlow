@@ -61,10 +61,6 @@ export function extractFinalOutputs(
     if (v && typeof v === 'object' && 'output' in (v as Record<string, unknown>)) {
       return { result: (v as Record<string, unknown>).output };
     }
-    // 单字段对象：直接取该字段值（避免 result 嵌套 result）
-    if (v && typeof v === 'object' && Object.keys(v as Record<string, unknown>).length === 1) {
-      return { result: Object.values(v as Record<string, unknown>)[0] };
-    }
     return { result: v };
   }
   return summary;
