@@ -179,6 +179,10 @@ export const en: ZhMessages = {
     publishThisVersion: 'Publish',
     publishVersionConfirm: 'Publish version v{version} "{title}"? External APIs will switch to this version immediately.',
     versionPublished: 'Version v{version} published',
+    myWorkflows: 'My Workflows',
+    templates: 'Templates',
+    templatesHint: 'Start from a template to get on board in a minute: load one to the canvas, tweak it, then save to create your own workflow',
+    useTemplate: 'Use Template',
   },
   history: {
     title: 'Execution History',

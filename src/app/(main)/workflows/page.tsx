@@ -23,6 +23,11 @@ import { toast } from 'sonner';
 import { useT } from '@/lib/i18n';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { formatVersion } from '@/lib/version';
+import {
+  WORKFLOW_TEMPLATES,
+  normalizeWorkflowModels,
+  type WorkflowTemplate,
+} from '@/lib/workflow-templates';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -338,6 +343,24 @@ export default function WorkflowsPage() {
   -d '{"inputs": {"query": "请输入"}}'`
     : '';
 
+  // 页面 Tab：我的工作流 / 工作流模板
+  const [activeTab, setActiveTab] = useState<'list' | 'templates'>('list');
+
+  // 使用模板：加载到画布（模板模型 id 自动替换为用户配置的模型）
+  const handleUseTemplate = useCallback(
+    async (tpl: WorkflowTemplate) => {
+      try {
+        await normalizeWorkflowModels(tpl.data);
+      } catch {
+        // 规范化失败不阻断加载
+      }
+      setPendingWorkflow(tpl.data);
+      toast.success(`已加载模板「${tpl.title}」到画布，修改后点击保存即可创建`);
+      router.push('/workflows/editor');
+    },
+    [router],
+  );
+
   return (
     <div className="flex h-full flex-col overflow-y-auto">
       {/* Header */}
@@ -390,7 +413,63 @@ export default function WorkflowsPage() {
         </div>
       </div>
 
+      {/* Tab 切换：我的工作流 / 工作流模板 */}
+      <div className="flex items-center gap-1 border-b border-border px-6 pt-3">
+        <button
+          onClick={() => setActiveTab('list')}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+            activeTab === 'list'
+              ? 'bg-primary/10 text-primary'
+              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+          }`}
+        >
+          {t('workflows.myWorkflows')}
+        </button>
+        <button
+          onClick={() => setActiveTab('templates')}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+            activeTab === 'templates'
+              ? 'bg-primary/10 text-primary'
+              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+          }`}
+        >
+          {t('workflows.templates')}
+        </button>
+      </div>
+
       {/* Content */}
+      {activeTab === 'templates' ? (
+        /* 工作流模板：新用户引导 */
+        <div className="flex-1 overflow-y-auto p-6">
+          <p className="mb-4 text-sm text-muted-foreground">{t('workflows.templatesHint')}</p>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {WORKFLOW_TEMPLATES.map((tpl) => (
+              <div
+                key={tpl.id}
+                className="flex flex-col gap-3 rounded-lg border border-border p-4 transition-colors hover:border-primary/50"
+              >
+                <div className="flex items-start justify-between">
+                  <span className="text-2xl">{tpl.emoji}</span>
+                  <div className="flex gap-1">
+                    {tpl.tags.map((tag) => (
+                      <Badge key={tag} variant="secondary" className="text-xs">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-medium text-foreground">{tpl.title}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{tpl.description}</p>
+                </div>
+                <Button size="sm" className="w-full" onClick={() => handleUseTemplate(tpl)}>
+                  {t('workflows.useTemplate')}
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
       <div className="flex-1 p-6">
         <div className="overflow-hidden rounded-lg border border-border">
           <table className="w-full text-sm">
@@ -542,6 +621,7 @@ export default function WorkflowsPage() {
           </table>
         </div>
       </div>
+      )}
 
       {/* {t('workflows.share')}链接对话框 */}
       <Dialog open={!!shareInfo} onOpenChange={(open) => !open && setShareInfo(null)}>

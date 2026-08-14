@@ -174,6 +174,10 @@ export const zh = {
     publishThisVersion: '发布此版本',
     publishVersionConfirm: '发布版本 v{version}「{title}」？外部 API 将立即切换到该版本内容。',
     versionPublished: '已发布版本 v{version}',
+    myWorkflows: '我的工作流',
+    templates: '工作流模板',
+    templatesHint: '从模板开始，一分钟上手：选择一个模板加载到画布，修改后保存即可创建自己的工作流',
+    useTemplate: '使用此模板',
   },
   history: {
     title: '执行历史',
