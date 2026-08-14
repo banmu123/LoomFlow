@@ -159,7 +159,6 @@ export function SimpleChatInput({
         else toast.error(t('chat.voiceError'));
       };
       rec.onend = () => {
-        setListening(false);
         const final = finalTextRef.current;
         if (final) {
           const full = baselineRef.current + final;
@@ -167,13 +166,24 @@ export function SimpleChatInput({
           // 说完自动结束 → 直接发送；手动停止 → 只填输入框供确认
           if (!manualStopRef.current) {
             onSubmit(full);
+            // 连续聆听：发送后自动重启识别，用户可继续说下一句（再次点击麦克风才停止）
+            try {
+              rec.start();
+              baselineRef.current = '';
+              finalTextRef.current = '';
+              return;
+            } catch {
+              // 重启失败则结束聆听
+            }
           }
         }
+        setListening(false);
         manualStopRef.current = false;
       };
       rec.start();
       recognitionRef.current = rec;
       setListening(true);
+      toast.success(t('chat.voiceContinuousHint'));
     } catch {
       toast.error(t('chat.voiceError'));
     }
