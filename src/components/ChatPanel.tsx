@@ -34,6 +34,7 @@ import {
 import { cn } from '@/lib/utils';
 import { SimpleChatMessage, type ChatMessageStatus } from './SimpleChatMessage';
 import { SimpleChatInput } from './SimpleChatInput';
+import { ModelConfigDialog } from './ModelConfigDialog';
 import { uploadFileToOSS } from '@/lib/oss-upload-client';
 import { useT } from '@/lib/i18n';
 import { ChevronsLeft } from 'lucide-react';
@@ -94,6 +95,8 @@ export function ChatPanel({
   const [error, setError] = useState<string | null>(null);
   const [images, setImages] = useState<Array<{ url: string; name: string }>>([]);
   const [uploading, setUploading] = useState(false);
+  // 无模型时的配置引导弹窗
+  const [modelConfigOpen, setModelConfigOpen] = useState(false);
   const [model, setModel] = useState('');
   const [modelOptions, setModelOptions] = useState<Array<{ value: string; label: string }>>([]);
 
@@ -1201,6 +1204,21 @@ export function ChatPanel({
         )}
 
         {/* input area */}
+        {/* 无模型引导：新用户直接在这里完成模型配置 */}
+        {modelOptions.length === 0 && (
+          <div className="flex items-center justify-between gap-2 border-b border-border bg-primary/5 px-4 py-2">
+            <p className="text-xs text-muted-foreground">{t('chat.noModelHint')}</p>
+            {isAdmin ? (
+              <Button size="sm" className="h-7 px-2.5 text-xs" onClick={() => setModelConfigOpen(true)}>
+                {t('chat.configureModel')}
+              </Button>
+            ) : (
+              <span className="shrink-0 text-xs text-muted-foreground">
+                {t('chat.contactAdmin')}
+              </span>
+            )}
+          </div>
+        )}
         <SimpleChatInput
           value={input}
           onChange={setInput}
@@ -1216,6 +1234,13 @@ export function ChatPanel({
           modelOptions={modelOptions}
           model={model}
           onModelChange={setModel}
+        />
+
+        {/* 模型配置引导弹窗 */}
+        <ModelConfigDialog
+          open={modelConfigOpen}
+          onOpenChange={setModelConfigOpen}
+          onConfigured={loadModels}
         />
       </div>
 
