@@ -237,7 +237,52 @@ const getApiCallLogs = tool({
   },
 });
 
-// 8. 发布状态
+// 8. 知识库检索（RAG：让 AI 基于用户知识库回答）
+const searchKnowledge = tool({
+  description: '在用户的知识库中检索文档。当用户的问题涉及"我的资料/文档/知识库"或需要基于已有资料回答时使用，检索结果将作为回答的依据。',
+  inputSchema: z.object({
+    keyword: z.string().describe('检索关键词（如问题中的核心词）'),
+    limit: z.number().int().min(1).max(10).optional().describe('返回条数，默认 3'),
+  }),
+  execute: async ({ keyword, limit = 3 }) => {
+    const u = await getAuthUser();
+    if (!isUser(u)) return { error: u };
+
+    const { data: kbs } = await supabase
+      .from('knowledge_bases')
+      .select('id')
+      .eq('user_id', u.id);
+    const kbIds = (kbs ?? []).map((k: { id: string }) => k.id);
+    if (kbIds.length === 0) return { documents: [], note: '用户还没有创建知识库' };
+
+    // 拆词检索（复用知识库节点的检索策略）
+    const terms = (keyword || '')
+      .replace(/[，。！？、；：""''（）\s,\.!?;:\(\)\[\]「」]/g, ' ')
+      .split(/\s+/)
+      .filter((s) => s.length >= 2);
+    const orClauses = terms
+      .slice(0, 5)
+      .map((t) => `title.ilike.%${t}%,content.ilike.%${t}%`)
+      .join(',');
+
+    const { data, error } = await supabase
+      .from('knowledge_documents')
+      .select('title, content')
+      .in('knowledge_base_id', kbIds)
+      .or(orClauses || 'title.ilike.%%')
+      .limit(limit);
+
+    if (error) return { error: error.message };
+    return {
+      documents: (data ?? []).map((d: { title: string; content: string }) => ({
+        title: d.title,
+        content: d.content.slice(0, 1500),
+      })),
+    };
+  },
+});
+
+// 9. 发布状态
 const getPublishStatus = tool({
   description: '获取工作流的发布状态（是否发布/发布的版本/发布内容是否与当前一致）。回答"发布了吗""发布的是哪个版本"时使用。',
   inputSchema: z.object({ workflowId: z.string().describe('工作流 ID') }),
@@ -271,6 +316,7 @@ export const agentTools = {
   get_api_key_status: getApiKeyStatus,
   get_execution_history: getExecutionHistory,
   get_api_call_logs: getApiCallLogs,
+  search_knowledge: searchKnowledge,
   get_publish_status: getPublishStatus,
 };
 
@@ -282,6 +328,7 @@ export const agentToolsPrompt = `你有能力查询用户的系统状态来回�
 - get_api_key_status：API Key 状态
 - get_execution_history：执行记录（含错误）
 - get_api_call_logs：外部 API 调用日志（含错误）
+- search_knowledge：检索用户知识库（基于资料回答时使用）
 - get_publish_status：发布状态
 
 使用规则：

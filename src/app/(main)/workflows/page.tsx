@@ -11,12 +11,14 @@ import {
   Loader2,
   Share2,
   Copy,
+  CopyPlus,
   Ban,
   Upload,
   Download,
   History,
   Link2,
   Clock,
+  FileDown,
 } from 'lucide-react';
 import { setPendingWorkflow } from '@/lib/pending-workflow';
 import { toast } from 'sonner';
@@ -343,6 +345,106 @@ export default function WorkflowsPage() {
   -d '{"inputs": {"query": "请输入"}}'`
     : '';
 
+  // 导出 API 文档（Markdown，基于发布工作流的输入参数与输出定义）
+  const handleExportApiDoc = useCallback(() => {
+    if (!publishInfo) return;
+    const nodes = (publishInfo.data?.nodes ?? []) as Array<{
+      type?: string;
+      data?: Record<string, unknown>;
+    }>;
+    const startNode = nodes.find((n) => n.type === 'startNode');
+    const endNode = nodes.find((n) => n.type === 'endNode');
+    const params = startNode?.data?.parameters as
+      | Array<{ name?: string; dataType?: string; required?: boolean; defaultValue?: unknown }>
+      | undefined;
+    const outputs = endNode?.data?.outputDefs as
+      | Array<{ name?: string; dataType?: string }>
+      | undefined;
+
+    const lines: string[] = [];
+    lines.push(`# ${publishInfo.title} — API 文档`);
+    lines.push('');
+    lines.push('## 接口');
+    lines.push('');
+    lines.push(`- 执行：\`POST ${window.location.origin}/api/publish/${publishInfo.id}/execute\``);
+    lines.push(`- 查询：\`GET ${window.location.origin}/api/publish/${publishInfo.id}/status/[flowId]\``);
+    lines.push(`- 确认：\`POST ${window.location.origin}/api/publish/${publishInfo.id}/confirm/[flowId]\``);
+    lines.push('');
+    lines.push('## 鉴权');
+    lines.push('');
+    lines.push('所有请求需带请求头：`Authorization: Bearer <API Key>`（Key 在「API 管理」页管理）');
+    lines.push('');
+    lines.push('## 调用示例');
+    lines.push('');
+    lines.push('```bash');
+    lines.push(curlExample.replaceAll('\\\n', '\n'));
+    lines.push('```');
+    lines.push('');
+    lines.push('## 输入参数');
+    lines.push('');
+    lines.push('| 参数 | 类型 | 必填 | 默认值 |');
+    lines.push('|------|------|------|--------|');
+    if (params && params.length > 0) {
+      for (const p of params) {
+        lines.push(
+          `| ${p.name || '-'} | ${p.dataType || 'String'} | ${p.required ? '✅' : '—'} | ${String(p.defaultValue ?? '') || '—'} |`,
+        );
+      }
+    } else {
+      lines.push('| （无输入参数） | | | |');
+    }
+    lines.push('');
+    lines.push('## 输出');
+    lines.push('');
+    if (outputs && outputs.length > 0) {
+      for (const o of outputs) {
+        lines.push(`- \`outputs.${o.name || 'result'}\`：${o.dataType || 'String'}`);
+      }
+    } else {
+      lines.push('- `outputs.result`：最终输出');
+    }
+    lines.push('');
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${publishInfo.title || '工作流'}-API文档.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(t('workflows.exportApiDocDone'));
+  }, [publishInfo, curlExample, t]);
+
+  // 复制工作流（新建副本）
+  const handleDuplicate = useCallback(
+    async (wf: WorkflowRecord) => {
+      setPublishingId(wf.id);
+      try {
+        const res = await fetch('/api/workflow-history', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: `${wf.title}（副本）`,
+            description: wf.description,
+            data: wf.data,
+          }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          toast.success(`已创建副本「${data.title}」`);
+          loadWorkflows();
+        } else {
+          toast.error(data?.error || '复制失败');
+        }
+      } catch {
+        toast.error('复制失败');
+      } finally {
+        setPublishingId(null);
+      }
+    },
+    [loadWorkflows],
+  );
+
   // 页面 Tab：我的工作流 / 工作流模板
   const [activeTab, setActiveTab] = useState<'list' | 'templates'>('list');
 
@@ -602,6 +704,14 @@ export default function WorkflowsPage() {
                           </button>
                         )}
                         <button
+                          onClick={() => handleDuplicate(wf)}
+                          disabled={publishingId === wf.id}
+                          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
+                        >
+                          <CopyPlus className="h-3 w-3" />
+                          {t('workflows.duplicate')}
+                        </button>
+                        <button
                           onClick={() => setConfirmState({ action: 'delete', wf })}
                           disabled={deletingId === wf.id}
                           className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive"
@@ -805,6 +915,10 @@ export default function WorkflowsPage() {
           </div>
 
           <DialogFooter>
+            <Button variant="outline" onClick={handleExportApiDoc}>
+              <FileDown className="mr-1 h-4 w-4" />
+              {t('workflows.exportApiDoc')}
+            </Button>
             <Button
               variant="outline"
               onClick={() => setConfirmState({ action: 'unpublish', wf: publishInfo })}
