@@ -82,9 +82,7 @@ describe('extractFinalOutputs 回退汇总', () => {
     };
     const result = await runFlow(flow as never, {});
     expect(result.status).toBe('completed');
-    // endNode 无 outputDefs → 回退汇总应包含 code 节点输出
-    expect(result.outputs).toBeDefined();
-    expect(JSON.stringify(result.outputs)).toContain('code');
-    expect(JSON.stringify(result.outputs)).toContain('42');
+    // endNode 无 outputDefs → 回退：单业务节点输出整理为 { result: <输出> }（外部直接取用）
+    expect(result.outputs).toEqual({ result: { answer: 42 } });
   }, 15000);
 });
