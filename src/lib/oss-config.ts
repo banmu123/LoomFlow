@@ -86,25 +86,8 @@ export async function getOSSConfig(): Promise<OSSConfig | null> {
 }
 
 /**
- * 从 NEXT_PUBLIC 环境变量获取配置（客户端降级使用）
- */
-export function getOSSConfigFromPublicEnv(): OSSConfig | null {
-  const accessKeyId = process.env.NEXT_PUBLIC_OSS_ACCESS_KEY_ID;
-  const accessKeySecret = process.env.NEXT_PUBLIC_OSS_ACCESS_KEY_SECRET;
-  const bucket = process.env.NEXT_PUBLIC_OSS_BUCKET;
-  const region = process.env.NEXT_PUBLIC_OSS_REGION;
-
-  if (!accessKeyId || !accessKeySecret || !bucket || !region) {
-    return null;
-  }
-
-  const endpoint = process.env.NEXT_PUBLIC_OSS_ENDPOINT || generateEndpoint(bucket, region);
-
-  return { accessKeyId, accessKeySecret, bucket, region, endpoint };
-}
-
-/**
- * 客户端获取 OSS 配置（通过 API 或降级到环境变量）
+ * 客户端获取 OSS 配置（仅通过服务端 API——NEXT_PUBLIC_OSS_* 已移除：
+ * 前端 bundle 中的密钥会被任何访问者看到，属高危泄露面）
  */
 export async function fetchOSSConfig(): Promise<OSSConfig | null> {
   // 有缓存直接返回

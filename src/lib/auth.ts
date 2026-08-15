@@ -1,6 +1,8 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 
-const SECRET = process.env.AUTH_SECRET || 'forgeflow-dev-secret';
+// ⚠️ 安全：AUTH_SECRET 必须配置。缺失时拒绝签发/验证（禁止回退到硬编码默认值，
+// 否则任何人都能用公开密钥伪造管理员 token）
+const SECRET = process.env.AUTH_SECRET || '';
 const COOKIE_NAME = 'forgeflow_token';
 const TOKEN_TTL = 7 * 24 * 3600; // 7 天
 
@@ -11,11 +13,12 @@ interface AuthPayload {
   exp: number;
 }
 
-// 签发 JWT（HS256）
+// 签发 JWT（HS256）；AUTH_SECRET 未配置时抛错（登录会失败并提示服务端配置问题）
 export function signJWT(
   payload: { uid: string; username: string; role: string },
   expiresInSec = TOKEN_TTL,
 ): string {
+  if (!SECRET) throw new Error('AUTH_SECRET 未配置：请在环境变量中设置（openssl rand -hex 32）');
   const header = Buffer.from(
     JSON.stringify({ alg: 'HS256', typ: 'JWT' }),
   ).toString('base64url');
@@ -31,8 +34,9 @@ export function signJWT(
   return `${header}.${body}.${sig}`;
 }
 
-// 验证 JWT，返回 payload 或 null
+// 验证 JWT，返回 payload 或 null（AUTH_SECRET 未配置时全部视为无效）
 export function verifyJWT(token: string): AuthPayload | null {
+  if (!SECRET) return null;
   const parts = token.split('.');
   if (parts.length !== 3) return null;
   const [header, body, sig] = parts;
@@ -55,11 +59,13 @@ export function verifyJWT(token: string): AuthPayload | null {
 
 export { COOKIE_NAME, TOKEN_TTL };
 
-// 生成 Set-Cookie 头
+// 生成 Set-Cookie 头（生产环境加 Secure：仅 HTTPS 传输）
 export function authCookie(token: string, maxAgeSec = TOKEN_TTL): string {
-  return `${COOKIE_NAME}=${token}; HttpOnly; Path=/; Max-Age=${maxAgeSec}; SameSite=Lax`;
+  const secure = process.env.COZE_PROJECT_ENV === 'PROD' ? '; Secure' : '';
+  return `${COOKIE_NAME}=${token}; HttpOnly; Path=/; Max-Age=${maxAgeSec}; SameSite=Lax${secure}`;
 }
 
 export function clearAuthCookie(): string {
-  return `${COOKIE_NAME}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax`;
+  const secure = process.env.COZE_PROJECT_ENV === 'PROD' ? '; Secure' : '';
+  return `${COOKIE_NAME}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax${secure}`;
 }

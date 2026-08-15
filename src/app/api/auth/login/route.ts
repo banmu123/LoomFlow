@@ -97,11 +97,17 @@ export async function POST(request: NextRequest) {
     ip,
   });
 
-  const token = signJWT({
-    uid: user.id,
-    username: user.username,
-    role: user.role,
-  });
+  let token: string;
+  try {
+    token = signJWT({
+      uid: user.id,
+      username: user.username,
+      role: user.role,
+    });
+  } catch (err) {
+    // AUTH_SECRET 未配置：拒绝签发，明确提示服务端配置问题
+    return Response.json({ error: (err as Error).message }, { status: 500 });
+  }
 
   const res = Response.json({
     user: {

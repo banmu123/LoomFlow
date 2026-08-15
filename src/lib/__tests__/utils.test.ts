@@ -1,6 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { validatePassword } from '../password';
 import { signJWT, verifyJWT } from '../auth';
+
+// JWT 需要 AUTH_SECRET（安全要求：缺失时拒绝签发）
+beforeAll(() => {
+  process.env.AUTH_SECRET = 'test-secret-for-unit-tests';
+});
 
 describe('validatePassword', () => {
   it('长度不足 8 位拒绝', () => {
