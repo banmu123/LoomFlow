@@ -76,6 +76,7 @@ export default function KnowledgePage() {
   const [pasteForm, setPasteForm] = useState({ title: '', content: '' });
   const [uploading, setUploading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<KnowledgeDocument | null>(null);
+  const [deleteKbTarget, setDeleteKbTarget] = useState<KnowledgeBase | null>(null);
 
   const loadKbs = useCallback(async () => {
     setLoading(true);
@@ -147,7 +148,6 @@ export default function KnowledgePage() {
   };
 
   const handleDeleteKb = async (kb: KnowledgeBase) => {
-    if (!confirm(`确定删除知识库「${kb.name}」吗？其下所有文档将一并删除。`)) return;
     try {
       const res = await fetch(`/api/knowledge-bases/${kb.id}`, { method: 'DELETE' });
       if (res.ok) {
@@ -301,7 +301,7 @@ export default function KnowledgePage() {
               variant="ghost"
               size="sm"
               className="hover:text-destructive"
-              onClick={() => handleDeleteKb(currentKb)}
+              onClick={() => setDeleteKbTarget(currentKb)}
             >
               <Trash2 className="mr-1 h-4 w-4" />
               {t('common.delete')}
@@ -393,6 +393,19 @@ export default function KnowledgePage() {
           title={deleteTarget ? `确定删除文档「${deleteTarget.title}」吗？` : ''}
           onConfirm={handleDeleteDoc}
           onCancel={() => setDeleteTarget(null)}
+        />
+
+        {/* 删除知识库确认 */}
+        <ConfirmDialog
+          open={!!deleteKbTarget}
+          destructive
+          title={
+            deleteKbTarget
+              ? `确定删除知识库「${deleteKbTarget.name}」吗？其下所有文档将一并删除。`
+              : ''
+          }
+          onConfirm={() => deleteKbTarget && handleDeleteKb(deleteKbTarget)}
+          onCancel={() => setDeleteKbTarget(null)}
         />
       </div>
     );

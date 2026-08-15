@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { supabase } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/server-auth';
+import { deleteOSSObject } from '@/lib/oss-server';
 
 // 校验知识库归属：返回知识库或错误 Response
 async function getOwnedKb(id: string, userId: string) {
@@ -75,6 +76,17 @@ export async function DELETE(
   }
   if (owned === 'forbidden') {
     return Response.json({ error: '无权操作该知识库' }, { status: 403 });
+  }
+
+  // 先清理该知识库所有文档的 OSS 文件（失败不影响删除）
+  const { data: docs } = await supabase
+    .from('knowledge_documents')
+    .select('oss_key')
+    .eq('knowledge_base_id', id);
+  if (docs) {
+    for (const d of docs as Array<{ oss_key: string | null }>) {
+      if (d.oss_key) await deleteOSSObject(d.oss_key);
+    }
   }
 
   const { error } = await supabase.from('knowledge_bases').delete().eq('id', id);

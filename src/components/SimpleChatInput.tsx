@@ -106,6 +106,17 @@ export function SimpleChatInput({
   const finalTextRef = useRef('');
   // 手动停止 vs 说完自动结束：手动停止只填输入框，自动结束则直接发送
   const manualStopRef = useRef(false);
+  // AI 回复期间的语音输入暂存（回复结束后自动发送，避免连续说话丢句）
+  const pendingVoiceRef = useRef('');
+
+  // 语音暂存：isGenerating 结束（AI 回复完成）后自动补发
+  useEffect(() => {
+    if (!isGenerating && pendingVoiceRef.current) {
+      const text = pendingVoiceRef.current;
+      pendingVoiceRef.current = '';
+      onSubmit(text);
+    }
+  }, [isGenerating, onSubmit]);
 
   const toggleListening = () => {
     if (listening) {
@@ -165,7 +176,12 @@ export function SimpleChatInput({
           onChange(full);
           // 说完自动结束 → 直接发送；手动停止 → 只填输入框供确认
           if (!manualStopRef.current) {
-            onSubmit(full);
+            // AI 回复期间：暂存，回复结束后自动补发（不丢句）
+            if (isGenerating) {
+              pendingVoiceRef.current = full;
+            } else {
+              onSubmit(full);
+            }
             // 连续聆听：发送后自动重启识别，用户可继续说下一句（再次点击麦克风才停止）
             try {
               rec.start();

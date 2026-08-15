@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server';
 import { supabase } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/server-auth';
+import { deleteOSSObject } from '@/lib/oss-server';
 
-// 删除文档
+// 删除文档（OSS 模式同时清理 OSS 文件）
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; docId: string }> },
@@ -25,13 +26,16 @@ export async function DELETE(
 
   const { data: doc } = await supabase
     .from('knowledge_documents')
-    .select('id')
+    .select('id, oss_key')
     .eq('id', docId)
     .eq('knowledge_base_id', id)
     .single();
   if (!doc) {
     return Response.json({ error: '文档不存在' }, { status: 404 });
   }
+
+  // 先清理 OSS 文件（失败不影响删除）
+  if (doc.oss_key) await deleteOSSObject(doc.oss_key);
 
   const { error } = await supabase.from('knowledge_documents').delete().eq('id', docId);
   if (error) {

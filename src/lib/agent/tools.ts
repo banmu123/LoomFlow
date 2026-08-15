@@ -255,13 +255,16 @@ const searchKnowledge = tool({
     const kbIds = (kbs ?? []).map((k: { id: string }) => k.id);
     if (kbIds.length === 0) return { documents: [], note: '用户还没有创建知识库' };
 
-    // 拆词检索（复用知识库节点的检索策略）
+    // 拆词检索（复用知识库节点的检索策略）；拆不出词时返回空（避免误返回全部文档）
     const terms = (keyword || '')
       .replace(/[，。！？、；：""''（）\s,\.!?;:\(\)\[\]「」]/g, ' ')
       .split(/\s+/)
-      .filter((s) => s.length >= 2);
+      .filter((s) => s.length >= 2)
+      .slice(0, 5);
+    if (terms.length === 0) {
+      return { documents: [], note: '无法从问题中提取检索关键词' };
+    }
     const orClauses = terms
-      .slice(0, 5)
       .map((t) => `title.ilike.%${t}%,content.ilike.%${t}%`)
       .join(',');
 
@@ -269,7 +272,7 @@ const searchKnowledge = tool({
       .from('knowledge_documents')
       .select('title, content')
       .in('knowledge_base_id', kbIds)
-      .or(orClauses || 'title.ilike.%%')
+      .or(orClauses)
       .limit(limit);
 
     if (error) return { error: error.message };
