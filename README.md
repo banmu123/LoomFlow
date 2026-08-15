@@ -229,7 +229,7 @@ Switch from Supabase cloud to your own PostgreSQL via **Docker self-hosted Supab
 
 ```bash
 curl http://localhost:5000/api/health
-# {"status":"ok","service":"loomflow","version":"v0.1.0",...}
+# {"status":"ok","service":"loomflow","version":"v0.1.2",...}
 ```
 
 Checklist:
