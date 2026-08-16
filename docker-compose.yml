@@ -82,6 +82,34 @@ services:
     networks:
       - loomflow-net
 
+  # ---- 数据库迁移（每次 compose up 自动执行；SQL 全部幂等，可重复运行）----
+  # initdb 脚本只在数据卷首次初始化时执行；已有数据库的增量变更靠这个容器补齐
+  migration:
+    image: postgres:16
+    container_name: loomflow-migration
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - ./scripts/supabase-updates.sql:/migrations/updates.sql:ro
+    command:
+      - psql
+      - -h
+      - postgres
+      - -U
+      - postgres
+      - -d
+      - loomflow
+      - -v
+      - ON_ERROR_STOP=0
+      - -f
+      - /migrations/updates.sql
+    networks:
+      - loomflow-net
+
   # ---- LoomFlow 应用 ----
   loomflow:
     image: loomflow:latest   # 显式镜像名：可预构建导出/推送，服务器免构建部署
@@ -89,6 +117,8 @@ services:
     container_name: loomflow-app
     restart: unless-stopped
     depends_on:
+      migration:
+        condition: service_completed_successfully
       nginx:
         condition: service_healthy
     ports:
