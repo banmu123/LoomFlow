@@ -1,32 +1,17 @@
 'use client';
 
-import { useState } from 'react';
 import { SidebarNav } from './SidebarNav';
-import { ChatPanel } from './ChatPanel';
 import { SessionGuard } from './SessionGuard';
 import { ErrorBoundary } from './ErrorBoundary';
-import { MessageSquare } from 'lucide-react';
 
+// 布局：左侧栏（菜单 + 管理 + 对话历史，可折叠）| 主区域（当前路由页面）
+// - / 为对话页（ChatPanel 全屏）
+// - 菜单项切换显示对应页面（工作流/画布/知识库/管理…）
 export function MainLayoutClient({ children }: { children: React.ReactNode }) {
-  const [chatCollapsed, setChatCollapsed] = useState(false);
-
   return (
     <div className="flex h-screen overflow-hidden">
       <SidebarNav />
-      {chatCollapsed ? (
-        /* 收起后的窄条（点击展开） */
-        <button
-          onClick={() => setChatCollapsed(false)}
-          className="flex w-9 shrink-0 flex-col items-center gap-2 border-r border-border bg-card py-3 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          title="展开 AI 对话"
-        >
-          <MessageSquare className="h-4 w-4" />
-          <span className="text-[10px] [writing-mode:vertical-rl]">AI 对话</span>
-        </button>
-      ) : (
-        <ChatPanel onCollapse={() => setChatCollapsed(true)} />
-      )}
-      <main className="min-w-0 flex-1 overflow-x-auto overflow-y-hidden">
+      <main className="min-w-0 flex-1 overflow-hidden">
         <SessionGuard>
           <ErrorBoundary>{children}</ErrorBoundary>
         </SessionGuard>

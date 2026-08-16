@@ -33,6 +33,9 @@ import {
   Loader2,
   CheckCircle2,
   XCircle,
+  Menu,
+  PanelRightClose,
+  ArrowRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SimpleChatMessage, type ChatMessageStatus } from './SimpleChatMessage';
@@ -46,11 +49,17 @@ import { normalizeWorkflowModels } from '@/lib/workflow-templates';
 import { LocaleSwitcher } from './LocaleSwitcher';
 
 const CHAT_PANEL_WIDTH = 440;
-const HISTORY_MIN_WIDTH = 180;
-const HISTORY_MAX_WIDTH = 300;
-const HISTORY_DEFAULT_WIDTH = 240;
 
 type MessageRole = 'user' | 'assistant';
+
+// 新建对话的模板推荐
+const RECOMMENDATIONS = [
+  '📰 每日资讯助手',
+  '✍️ 内容助手',
+  '👤 客户助手',
+  '📝 周报助手',
+  '🌐 翻译助手',
+];
 
 // 工具名 → 可读标签（对话中的执行日志展示）
 const TOOL_LABELS: Record<string, string> = {
@@ -94,13 +103,7 @@ interface Conversation {
 let seq = 0;
 const nextId = () => `${Date.now()}-${seq++}`;
 
-export function ChatPanel({
-  onClose,
-  onCollapse,
-}: {
-  onClose?: () => void;
-  onCollapse?: () => void;
-}) {
+export function ChatPanel() {
   const router = useRouter();
   const pathname = usePathname();
   const t = useT();
@@ -109,12 +112,6 @@ export function ChatPanel({
   ]);
   const [activeId, setActiveId] = useState<string>('');
   const [input, setInput] = useState('');
-  const [historyWidth, setHistoryWidth] = useState(HISTORY_DEFAULT_WIDTH);
-  const [historyCollapsed, setHistoryCollapsed] = useState(true);
-  const [dragging, setDragging] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<Conversation | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -126,6 +123,8 @@ export function ChatPanel({
   const [toolLogs, setToolLogs] = useState<Array<{ toolName: string; status: 'running' | 'done' | 'error' }>>([]);
   const [model, setModel] = useState('');
   const [modelOptions, setModelOptions] = useState<Array<{ value: string; label: string }>>([]);
+  // 模型列表是否已加载完成（避免加载中误判为未配置）
+  const [modelsLoaded, setModelsLoaded] = useState(false);
 
   // 加载已配置模型（从模型配置页返回或切回标签页时自动刷新）
   const loadModels = useCallback(async () => {
@@ -143,6 +142,9 @@ export function ChatPanel({
       }
     } catch {
       // ignore
+    } finally {
+      // 模型加载完成标记（避免加载中误判为"未配置模型"）
+      setModelsLoaded(true);
     }
   }, []);
 
@@ -157,12 +159,30 @@ export function ChatPanel({
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [loadModels]);
-  const dragRef = useRef<HTMLDivElement>(null);
+
+  // 接收首页引导页的"开始"请求（chat-send 事件 → 直接发送消息）
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const text = (e as CustomEvent<{ text?: string }>).detail?.text;
+      if (text) handleSendRef.current?.(text);
+    };
+    window.addEventListener('chat-send', handler);
+    return () => window.removeEventListener('chat-send', handler);
+  }, []);
+  // 供 chat-send 事件调用的最新 handleSend（避免闭包过期）
+  const handleSendRef = useRef<(text?: string) => void>(() => {});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+
+  // 未配置模型：加载完成且为空时弹窗引导（仅 admin；避免刷新闪现）
+  useEffect(() => {
+    if (modelsLoaded && modelOptions.length === 0 && isAdmin) {
+      setModelConfigOpen(true);
+    }
+  }, [modelsLoaded, modelOptions.length, isAdmin]);
 
   // 修改密码对话框
   const [pwdOpen, setPwdOpen] = useState(false);
@@ -216,145 +236,76 @@ export function ChatPanel({
   }, []);
 
   // ===== Load conversations from Supabase on mount =====
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/api/conversations');
-        const data = await res.json();
+  // 加载全部对话（挂载与侧边栏切换时复用）
+  const loadAllConversations = useCallback(async () => {
+    try {
+      const res = await fetch('/api/conversations');
+      const data = await res.json();
 
-        // 数据库没有对话时，自动创建第一个（保证初始对话有 db id，消息才能保存）
-        if (!cancelled && (!Array.isArray(data) || data.length === 0)) {
-          try {
-            const createRes = await fetch('/api/conversations', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ title: '新建对话' }),
-            });
-            const dbConv = await createRes.json();
-            if (!cancelled && dbConv?.id) {
-              setConversations([
-                { id: dbConv.id, title: dbConv.title, messages: [] },
-              ]);
-              setActiveId(dbConv.id);
-            }
-          } catch {
-            // 创建失败则保留本地对话（handleSend 有兜底逻辑）
-          }
-          setLoadingHistory(false);
-          return;
-        }
-
-        // Load messages for each conversation
-        const convs: Conversation[] = await Promise.all(
-          data.map(async (dbConv: { id: string; title: string }) => {
-            try {
-              const msgsRes = await fetch(
-                `/api/conversations/${dbConv.id}/messages`,
-              );
-              const msgs = await msgsRes.json();
-              return {
-                id: dbConv.id,
-                title: dbConv.title,
-                messages: Array.isArray(msgs)
-                  ? msgs.map(
-                      (m: {
-                        id: string;
-                        role: MessageRole;
-                        content: string;
-                        reasoning?: string;
-                        status?: ChatMessageStatus;
-                        error?: string;
-                        images?: string[] | null;
-                        created_at: string;
-                      }) => ({
-                        id: m.id,
-                        role: m.role,
-                        content: m.content,
-                        reasoning: m.reasoning,
-                        status: m.status,
-                        error: m.error,
-                        images: m.images ?? undefined,
-                        createdAt: new Date(m.created_at).getTime(),
-                      }),
-                    )
-                  : [],
-              };
-            } catch {
-              return { id: dbConv.id, title: dbConv.title, messages: [] };
-            }
-          }),
-        );
-
-        if (!cancelled) {
-          setConversations(convs);
-          setActiveId(convs[0].id);
-          setLoadingHistory(false);
-        }
-      } catch {
-        if (!cancelled) setLoadingHistory(false);
+      // 数据库没有对话时不自动创建——只有真正发送消息才创建历史（保留本地占位会话）
+      if (!Array.isArray(data) || data.length === 0) {
+        setLoadingHistory(false);
+        return;
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
+
+      // Load messages for each conversation
+      const convs: Conversation[] = await Promise.all(
+        data.map(async (dbConv: { id: string; title: string }) => {
+          try {
+            const msgsRes = await fetch(`/api/conversations/${dbConv.id}/messages`);
+            const msgs = await msgsRes.json();
+            return {
+              id: dbConv.id,
+              title: dbConv.title,
+              messages: Array.isArray(msgs)
+                ? msgs.map(
+                    (m: {
+                      id: string;
+                      role: MessageRole;
+                      content: string;
+                      reasoning?: string;
+                      status?: ChatMessageStatus;
+                      error?: string;
+                      images?: string[] | null;
+                      created_at: string;
+                    }) => ({
+                      id: m.id,
+                      role: m.role,
+                      content: m.content,
+                      reasoning: m.reasoning,
+                      status: m.status,
+                      error: m.error,
+                      images: m.images ?? undefined,
+                      createdAt: new Date(m.created_at).getTime(),
+                    }),
+                  )
+                : [],
+            };
+          } catch {
+            return { id: dbConv.id, title: dbConv.title, messages: [] };
+          }
+        }),
+      );
+
+      setConversations(convs);
+      setActiveId((prev) => prev || convs[0]?.id || '');
+      setLoadingHistory(false);
+    } catch {
+      setLoadingHistory(false);
+    }
   }, []);
 
-  // init active conversation
   useEffect(() => {
-    if (!activeId && conversations.length > 0) {
-      setActiveId(conversations[0].id);
-    }
-  }, [activeId, conversations]);
+    loadAllConversations();
+  }, [loadAllConversations]);
 
   const activeConversation = conversations.find((c) => c.id === activeId);
   const messages = activeConversation?.messages ?? [];
-
-  const filteredConversations = searchQuery
-    ? conversations.filter((c) =>
-        c.title.toLowerCase().includes(searchQuery.toLowerCase()),
-      )
-    : conversations;
 
   // auto scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  // drag resize
-  const handleMouseMove = useCallback(
-    (e: MouseEvent) => {
-      if (!dragging) return;
-      const panelRect = dragRef.current?.getBoundingClientRect();
-      if (!panelRect) return;
-      const newWidth = panelRect.right - e.clientX;
-      const clamped = Math.min(
-        HISTORY_MAX_WIDTH,
-        Math.max(HISTORY_MIN_WIDTH, newWidth),
-      );
-      setHistoryWidth(clamped);
-    },
-    [dragging],
-  );
-
-  const handleMouseUp = useCallback(() => {
-    setDragging(false);
-    document.body.style.cursor = '';
-    document.body.style.userSelect = '';
-  }, []);
-
-  useEffect(() => {
-    if (dragging) {
-      document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none';
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-    }
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [dragging, handleMouseMove, handleMouseUp]);
 
   // cleanup abort controller on unmount
   useEffect(() => {
@@ -431,6 +382,20 @@ export function ChatPanel({
       title: isFirstMessage ? text.slice(0, 20) : c.title,
       messages: [...c.messages, userMsg, assistantMsg],
     }));
+
+    // 首条消息：以第一句话作为对话标题（持久化到数据库）
+    if (isFirstMessage) {
+      fetch(`/api/conversations/${convId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: text.slice(0, 20) }),
+      })
+        .then(() => {
+          // 标题已更新，通知侧边栏刷新显示第一句话
+          window.dispatchEvent(new Event('conversations-updated'));
+        })
+        .catch(() => {});
+    }
 
     // 保存用户消息到 Supabase
     saveMessage(convId, userMsg);
@@ -773,6 +738,47 @@ export function ChatPanel({
       setToolLogs([]);
     }
   };
+  // 同步最新 handler（供 chat-send 事件使用）
+  handleSendRef.current = handleSend;
+
+  // ===== 空状态（新建对话）：标题 + 对话输入框 + 模板推荐（一体）=====
+  const startEmptyChat = async (text?: string) => {
+    const content = (text ?? '').trim();
+    if (!content || isGenerating) return;
+    await handleNewConversation();
+    // 新会话创建后 conversations[0] 即新会话（handleSend 有兜底）
+    handleSend(content);
+  };
+
+  // 侧边栏选择/新建对话事件
+  useEffect(() => {
+    const onSelect = (e: Event) => {
+      const id = (e as CustomEvent<{ id?: string }>).detail?.id;
+      if (id) {
+        if (!conversations.some((c) => c.id === id)) {
+          // 本地没有该对话（如其它会话创建）：重新加载
+          loadAllConversations();
+        }
+        setActiveId(id);
+      }
+    };
+    const onNew = () => {
+      setActiveId('');
+    };
+    // 侧边栏删除对话请求 → 统一走 handleDeleteConversation（状态切换 + API + 通知刷新）
+    const onDeleteRequest = (e: Event) => {
+      const id = (e as CustomEvent<{ id?: string }>).detail?.id;
+      if (id) handleDeleteConversation(id);
+    };
+    window.addEventListener('chat-select', onSelect);
+    window.addEventListener('chat-new', onNew);
+    window.addEventListener('chat-delete-request', onDeleteRequest);
+    return () => {
+      window.removeEventListener('chat-select', onSelect);
+      window.removeEventListener('chat-new', onNew);
+      window.removeEventListener('chat-delete-request', onDeleteRequest);
+    };
+  }, [conversations]);
 
   const handleStop = () => {
     abortControllerRef.current?.abort();
@@ -958,6 +964,8 @@ export function ChatPanel({
         prev.map((c) => (c.id === localId ? { ...c, id: db.id } : c)),
       );
       setActiveId((prev) => (prev === localId ? db.id : prev));
+      // 通知侧边栏刷新对话历史（空态首条消息创建的对话立即可见）
+      window.dispatchEvent(new Event('conversations-updated'));
       return db.id;
     },
     [conversations],
@@ -983,6 +991,8 @@ export function ChatPanel({
       };
       setConversations((prev) => [newConv, ...prev]);
       setActiveId(db.id);
+      // 通知侧边栏刷新对话历史
+      window.dispatchEvent(new Event('conversations-updated'));
     } catch {
       setError('创建对话失败，请重试');
     }
@@ -1005,205 +1015,38 @@ export function ChatPanel({
     });
     setDeleteTarget(null);
 
-    // 异步从 Supabase 删除
-    fetch(`/api/conversations/${id}`, { method: 'DELETE' }).catch(() => {});
-  };
-
-  const handleStartRename = (conv: Conversation) => {
-    setRenamingId(conv.id);
-    setRenameValue(conv.title);
-  };
-
-  const handleConfirmRename = () => {
-    if (renamingId && renameValue.trim()) {
-      updateConversation(renamingId, (c) => ({
-        ...c,
-        title: renameValue.trim(),
-      }));
-
-      // 异步保存到 Supabase
-      fetch(`/api/conversations/${renamingId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: renameValue.trim() }),
-      }).catch(() => {});
-    }
-    setRenamingId(null);
-    setRenameValue('');
+    // 异步从 Supabase 删除；删除完成后再通知侧边栏刷新（否则列表仍显示）
+    fetch(`/api/conversations/${id}`, { method: 'DELETE' })
+      .then(() => window.dispatchEvent(new Event('conversations-updated')))
+      .catch(() => window.dispatchEvent(new Event('conversations-updated')));
   };
 
   return (
-    <div
-      ref={dragRef}
-      className="flex shrink-0 border-r border-border bg-card"
-      style={{ width: CHAT_PANEL_WIDTH }}
-    >
-      {/* === Conversation History Panel === */}
-      {!historyCollapsed && (
-        <div
-          className="flex flex-col border-r border-border bg-muted/30"
-          style={{ width: historyWidth }}
-        >
-          {/* header */}
-          <div className="flex items-center justify-between border-b border-border px-2.5 py-2">
-            <span className="text-xs font-medium text-muted-foreground">
-              {t('chat.history')}
-            </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => setHistoryCollapsed(true)}
-              title="收起历史"
-            >
-              <X className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-
-          {/* search */}
-          <div className="p-2">
-            <div className="relative">
-              <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={t('chat.searchConversations')}
-                className="h-7 bg-background pl-7 text-xs"
-              />
-            </div>
-          </div>
-
-          {/* new conversation button */}
-          <div className="px-2 pb-1">
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full justify-start gap-1.5"
-              onClick={handleNewConversation}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              {t('chat.newConversation')}
-            </Button>
-          </div>
-
-          {/* conversation list */}
-          <ScrollArea className="flex-1">
-            <div className="flex flex-col gap-0.5 p-1">
-              {filteredConversations.length === 0 && (
-                <div className="px-2 py-4 text-center text-xs text-muted-foreground">
-                  {t('chat.noConversations')}
-                </div>
-              )}
-              {filteredConversations.map((conv) => (
-                <div
-                  key={conv.id}
-                  className={cn(
-                    'group relative flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm transition-colors',
-                    conv.id === activeId
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                  )}
-                  onClick={() => setActiveId(conv.id)}
-                >
-                  <MessageSquare className="h-3.5 w-3.5 shrink-0" />
-                  {renamingId === conv.id ? (
-                    <Input
-                      value={renameValue}
-                      onChange={(e) => setRenameValue(e.target.value)}
-                      onClick={(e) => e.stopPropagation()}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleConfirmRename();
-                        if (e.key === 'Escape') setRenamingId(null);
-                      }}
-                      className="h-6 flex-1 bg-background px-1 text-xs"
-                      autoFocus
-                    />
-                  ) : (
-                    <span className="flex-1 truncate">{conv.title}</span>
-                  )}
-
-                  {/* hover actions */}
-                  {renamingId === conv.id ? (
-                    <button
-                      className="shrink-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleConfirmRename();
-                      }}
-                    >
-                      <Check className="h-3.5 w-3.5" />
-                    </button>
-                  ) : (
-                    <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                      <button
-                        className="rounded p-0.5 hover:bg-background"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleStartRename(conv);
-                        }}
-                        title="重命名"
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </button>
-                      <button
-                        className="rounded p-0.5 hover:bg-background hover:text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteTarget(conv);
-                        }}
-                        title="删除"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </ScrollArea>
-        </div>
-      )}
-
-      {/* === Drag Handle === */}
-      {!historyCollapsed && (
-        <div
-          className="w-px cursor-col-resize bg-border transition-colors hover:bg-primary/30"
-          onMouseDown={() => setDragging(true)}
-        />
-      )}
-
+    <div className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-gradient-to-br from-indigo-50 via-background to-violet-50 dark:from-indigo-950/40 dark:via-background dark:to-violet-950/40">
+      {/* 品牌光晕：铺满整个对话页（空态与消息态统一背景） */}
+      <div className="pointer-events-none absolute -top-32 left-1/4 h-96 w-96 rounded-full bg-indigo-500/15 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-32 right-1/4 h-96 w-96 rounded-full bg-violet-500/15 blur-3xl" />
       {/* === Chat Main Area === */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {/* header */}
-        <div className="flex items-center justify-between border-b border-border px-3 py-2">
-          <div className="flex items-center gap-2">
-            {historyCollapsed && (
+      <div className="relative z-10 flex flex-1 flex-col overflow-hidden">
+        {/* header：仅已有对话时显示（空态不显示"新建对话"行） */}
+        {activeConversation && (
+          <div className="flex items-center justify-between border-b border-border px-4 py-2">
+            <h2 className="truncate text-sm font-medium text-foreground">
+              {activeConversation.title}
+            </h2>
+            <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7"
-                onClick={() => setHistoryCollapsed(false)}
-                title="展开历史"
+                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                onClick={() => setDeleteTarget(activeConversation)}
+                title={t('chat.deleteConversation')}
               >
-                <MessageSquare className="h-3.5 w-3.5" />
+                <Trash2 className="h-3.5 w-3.5" />
               </Button>
-            )}
-            <div className="flex items-center gap-1.5">
             </div>
-            {onCollapse && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="ml-auto h-7 w-7"
-                onClick={onCollapse}
-                title="收起对话"
-              >
-                <ChevronsLeft className="h-4 w-4" />
-              </Button>
-            )}
           </div>
-
-        </div>
+        )}
 
         {/* error alert */}
         {error && (
@@ -1214,24 +1057,56 @@ export function ChatPanel({
 
         {/* messages or empty state */}
         {messages.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
-            <Avatar className="h-12 w-12 border border-border">
-              <AvatarFallback className="bg-muted">
-                <Sparkles className="h-5 w-5 text-muted-foreground" />
-              </AvatarFallback>
-            </Avatar>
-            <div className="text-center">
-              <p className="text-sm font-medium text-foreground">
-                {t('chat.startNewChat')}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {t('chat.startNewChatHint')}
-              </p>
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto p-8">
+            <div className="w-full max-w-2xl">
+              {/* 标题 + 输入框一体（同一容器） */}
+              <div className="flex flex-col items-center gap-2">
+                <div className="bg-brand-gradient flex h-12 w-12 items-center justify-center rounded-2xl shadow-lg shadow-indigo-500/30">
+                  <Sparkles className="h-6 w-6 text-white" />
+                </div>
+                <p className="text-brand-gradient text-xl font-bold">{t('app.name')}</p>
+                <p className="text-sm text-muted-foreground">{t('home.subtitle')}</p>
+              </div>
+
+              {/* 对话输入框（直接复用，标题下方） */}
+              <div className="mx-auto mt-6 w-full max-w-2xl">
+                <SimpleChatInput
+                  value={input}
+                  onChange={setInput}
+                  onSubmit={handleSend}
+                  isGenerating={isGenerating}
+                  onStop={handleStop}
+                  images={images}
+                  onRemoveImage={(url) =>
+                    setImages((prev) => prev.filter((img) => img.url !== url))
+                  }
+                  onAttachImage={handleAttachImage}
+                  uploading={uploading}
+                  placeholder={t('home.placeholder')}
+                  modelOptions={modelOptions}
+                  model={model}
+                  onModelChange={setModel}
+                />
+              </div>
+
+              {/* 模板推荐 */}
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                <span className="text-xs text-muted-foreground">{t('home.recommend')}</span>
+                {RECOMMENDATIONS.map((rec) => (
+                  <button
+                    key={rec}
+                    onClick={() => startEmptyChat(rec.replace(/^[^\s]+\s*/, ''))}
+                    className="rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                  >
+                    {rec}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto">
-            <div className="flex flex-col gap-4 p-3">
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-6">
               {messages.map((msg) => (
                 <SimpleChatMessage
                   key={msg.id}
@@ -1277,38 +1152,27 @@ export function ChatPanel({
           </div>
         )}
 
-        {/* input area */}
-        {/* 无模型引导：新用户直接在这里完成模型配置 */}
-        {modelOptions.length === 0 && (
-          <div className="flex items-center justify-between gap-2 border-b border-border bg-primary/5 px-4 py-2">
-            <p className="text-xs text-muted-foreground">{t('chat.noModelHint')}</p>
-            {isAdmin ? (
-              <Button size="sm" className="h-7 px-2.5 text-xs" onClick={() => setModelConfigOpen(true)}>
-                {t('chat.configureModel')}
-              </Button>
-            ) : (
-              <span className="shrink-0 text-xs text-muted-foreground">
-                {t('chat.contactAdmin')}
-              </span>
-            )}
+        {/* 底部输入框：居中圆角卡片（ChatGPT 风格，非空态显示） */}
+        {messages.length > 0 && (
+          <div className="mx-auto w-full max-w-3xl px-4 pb-4">
+            <SimpleChatInput
+              value={input}
+              onChange={setInput}
+              onSubmit={handleSend}
+              isGenerating={isGenerating}
+              onStop={handleStop}
+              images={images}
+              onRemoveImage={(url) =>
+                setImages((prev) => prev.filter((img) => img.url !== url))
+              }
+              onAttachImage={handleAttachImage}
+              uploading={uploading}
+              modelOptions={modelOptions}
+              model={model}
+              onModelChange={setModel}
+            />
           </div>
         )}
-        <SimpleChatInput
-          value={input}
-          onChange={setInput}
-          onSubmit={handleSend}
-          isGenerating={isGenerating}
-          onStop={handleStop}
-          images={images}
-          onRemoveImage={(url) =>
-            setImages((prev) => prev.filter((img) => img.url !== url))
-          }
-          onAttachImage={handleAttachImage}
-          uploading={uploading}
-          modelOptions={modelOptions}
-          model={model}
-          onModelChange={setModel}
-        />
 
         {/* 模型配置引导弹窗 */}
         <ModelConfigDialog

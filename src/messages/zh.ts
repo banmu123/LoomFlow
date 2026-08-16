@@ -20,6 +20,7 @@ export const zh = {
   sidebar: {
     workspace: '工作区',
     management: '管理',
+    chat: '新聊天',
     workflows: '工作流列表',
     editor: '画布',
     history: '执行历史',
@@ -143,6 +144,12 @@ export const zh = {
     docContent: '内容',
     pastePlaceholder: '在这里粘贴文档内容…',
     noDocuments: '暂无文档，上传文件或粘贴文本',
+  },
+  home: {
+    subtitle: '今天想让 LoomFlow 帮你完成什么？',
+    placeholder: '描述你想做的事，比如：帮我每天整理 AI 行业新闻并生成日报',
+    recommend: '推荐',
+    start: '开始',
   },
   workflows: {
     title: 'Workflows 工作流',

@@ -22,6 +22,7 @@ export const en: ZhMessages = {
   sidebar: {
     workspace: 'Workspace',
     management: 'Admin',
+    chat: 'New Chat',
     workflows: 'Workflows',
     editor: 'Canvas',
     history: 'History',
@@ -147,6 +148,12 @@ export const en: ZhMessages = {
     docContent: 'Content',
     pastePlaceholder: 'Paste document content here…',
     noDocuments: 'No documents yet — upload a file or paste text',
+  },
+  home: {
+    subtitle: 'What do you want to build with LoomFlow today?',
+    placeholder: 'Describe what you want to do, e.g. collect AI industry news into a daily report',
+    recommend: 'Recommended',
+    start: 'Start',
   },
   workflows: {
     title: 'Workflows',

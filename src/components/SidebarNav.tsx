@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import {
   GitBranch,
@@ -17,11 +17,20 @@ import {
   KeyRound,
   Library,
   CloudCog,
+  MessageSquare,
+  ChevronDown,
+  ChevronRight,
+  MessagesSquare,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useT } from '@/lib/i18n';
 import { LocaleSwitcher } from './LocaleSwitcher';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 interface NavItem {
   href: string;
@@ -29,7 +38,12 @@ interface NavItem {
   icon: typeof GitBranch;
 }
 
-// 左侧菜单栏：工作区 + 管理
+interface ConversationItem {
+  id: string;
+  title: string;
+}
+
+// 左侧栏：工作区 + 管理（可展开收起）+ 对话历史；可折叠为图标条
 const NAV_ITEMS: NavItem[] = [
   { href: '/workflows', labelKey: 'sidebar.workflows', icon: Workflow },
   { href: '/workflows/editor', labelKey: 'sidebar.editor', icon: LayoutDashboard },
@@ -52,9 +66,16 @@ export function SidebarNav() {
   const router = useRouter();
   const pathname = usePathname();
   const t = useT();
+  const [collapsed, setCollapsed] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [username, setUsername] = useState('');
   const [role, setRole] = useState('');
+  // 管理菜单展开/收起
+  const [adminOpen, setAdminOpen] = useState(false);
+  // 对话历史
+  const [conversations, setConversations] = useState<ConversationItem[]>([]);
+  // 删除对话确认
+  const [deleteTarget, setDeleteTarget] = useState<ConversationItem | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -71,6 +92,35 @@ export function SidebarNav() {
       }
     })();
   }, []);
+
+  // 加载对话历史
+  const loadConversations = useCallback(async () => {
+    try {
+      const res = await fetch('/api/conversations');
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setConversations(
+          data.map((c: { id: string; title: string }) => ({
+            id: c.id,
+            title: c.title || '未命名对话',
+          })),
+        );
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    loadConversations();
+  }, [loadConversations]);
+
+  // 对话更新（新建/删除后由 ChatPanel 触发）时刷新
+  useEffect(() => {
+    const handler = () => loadConversations();
+    window.addEventListener('conversations-updated', handler);
+    return () => window.removeEventListener('conversations-updated', handler);
+  }, [loadConversations]);
 
   const handleLogout = async () => {
     try {
@@ -91,63 +141,170 @@ export function SidebarNav() {
       <button
         key={item.href}
         onClick={() => router.push(item.href)}
+        title={collapsed ? t(item.labelKey) : undefined}
         className={cn(
-          'flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm transition-colors',
+          'flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition-all',
+          collapsed && 'justify-center px-0',
           active
-            ? 'bg-primary/10 font-medium text-primary'
+            ? 'bg-primary/10 font-medium text-primary shadow-sm'
             : 'text-muted-foreground hover:bg-muted hover:text-foreground',
         )}
       >
         <Icon className="h-4 w-4 shrink-0" />
-        <span className="truncate">{t(item.labelKey)}</span>
+        {!collapsed && <span className="truncate">{t(item.labelKey)}</span>}
       </button>
     );
   };
 
+  // 打开对话（主区域显示当前对话）
+  const openConversation = (id: string) => {
+    window.dispatchEvent(new CustomEvent('chat-select', { detail: { id } }));
+    if (pathname !== '/') router.push('/');
+  };
+
+  const newConversation = () => {
+    window.dispatchEvent(new CustomEvent('chat-new'));
+    if (pathname !== '/') router.push('/');
+  };
+
   return (
-    <aside className="flex w-[190px] shrink-0 flex-col border-r border-border bg-card">
-      {/* Logo */}
-      <div className="flex items-center gap-2 border-b border-border px-3 py-3">
-        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10">
-          <GitBranch className="h-4 w-4 text-primary" />
-        </div>
-        <span className="truncate text-sm font-semibold">{t('app.name')}</span>
+    <aside
+      className={cn(
+        'flex shrink-0 flex-col border-r border-border bg-card transition-all',
+        collapsed ? 'w-[52px]' : 'w-[210px]',
+      )}
+    >
+      {/* Logo（点击回到对话）+ 折叠按钮 */}
+      <div className={cn('flex items-center border-b border-border py-3', collapsed ? 'justify-center' : 'justify-between px-3')}>
+        <button onClick={() => router.push('/')} className="flex items-center gap-2" title={t('app.name')}>
+          <div className="bg-brand-gradient flex h-7 w-7 items-center justify-center rounded-md shadow-md shadow-indigo-500/30">
+            <GitBranch className="h-4 w-4 text-white" />
+          </div>
+          {!collapsed && <span className="text-brand-gradient truncate text-sm font-bold">{t('app.name')}</span>}
+        </button>
+        <button
+          onClick={() => setCollapsed((v) => !v)}
+          className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          title={collapsed ? '展开侧边栏' : '收起侧边栏'}
+        >
+          {collapsed ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
+        </button>
       </div>
 
-      {/* 导航 */}
-      <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
-        <p className="px-2.5 pb-1 pt-2 text-[10px] font-medium uppercase text-muted-foreground/70">
-          {t('sidebar.workspace')}
-        </p>
-        {NAV_ITEMS.map(renderItem)}
+      {/* 置顶：新聊天 */}
+      <div className="border-b border-border p-2">
+        <button
+          onClick={newConversation}
+          className={cn(
+            'flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm font-medium transition-all',
+            pathname === '/'
+              ? 'bg-primary/10 text-primary'
+              : 'text-foreground hover:bg-muted',
+          )}
+        >
+          <MessageSquare className="h-4 w-4 shrink-0" />
+          <span className="truncate">{t('sidebar.chat')}</span>
+        </button>
+      </div>
 
-        {isAdmin && (
-          <>
-            <p className="px-2.5 pb-1 pt-3 text-[10px] font-medium uppercase text-muted-foreground/70">
-              {t('sidebar.management')}
+      <ScrollArea className="flex-1">
+        <nav className="space-y-0.5 p-2">
+          {/* 工作区 */}
+          {!collapsed && (
+            <p className="px-2.5 pb-1 pt-2 text-[10px] font-medium uppercase text-muted-foreground/70">
+              {t('sidebar.workspace')}
             </p>
-            {ADMIN_ITEMS.map(renderItem)}
-          </>
-        )}
-      </nav>
+          )}
+          {NAV_ITEMS.map(renderItem)}
+
+          {/* 管理（可展开/收起） */}
+          {isAdmin && !collapsed && (
+            <>
+              <button
+                onClick={() => setAdminOpen((v) => !v)}
+                className="flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <span className="flex items-center gap-2">
+                  <Cpu className="h-4 w-4" />
+                  <span className="truncate">{t('sidebar.management')}</span>
+                </span>
+                {adminOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              </button>
+              {adminOpen && <div className="space-y-0.5 pb-1 pl-2">{ADMIN_ITEMS.map(renderItem)}</div>}
+            </>
+          )}
+          {/* 折叠态：管理图标按钮（点击展开侧边栏） */}
+          {isAdmin && collapsed && (
+            <button
+              onClick={() => setCollapsed(false)}
+              className="flex w-full items-center justify-center rounded-md px-2.5 py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              title={t('sidebar.management')}
+            >
+              <Cpu className="h-4 w-4" />
+            </button>
+          )}
+
+          {/* 对话历史（管理下面） */}
+          {!collapsed && (
+            <div className="pt-3">
+              <div className="flex items-center justify-between px-2.5 pb-1">
+                <span className="flex items-center gap-1.5 text-[10px] font-medium uppercase text-muted-foreground/70">
+                  <MessagesSquare className="h-3 w-3" />
+                  {t('chat.history')}
+                </span>
+              </div>
+              <div className="space-y-0.5">
+                {conversations.length === 0 && (
+                  <p className="px-2.5 py-1 text-xs text-muted-foreground/60">
+                    {t('chat.noConversations')}
+                  </p>
+                )}
+                {conversations.map((conv) => (
+                  <div
+                    key={conv.id}
+                    className="group flex w-full items-center rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
+                    <button
+                      onClick={() => openConversation(conv.id)}
+                      className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                    >
+                      <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-60" />
+                      <span className="truncate">{conv.title}</span>
+                    </button>
+                    <button
+                      onClick={() => setDeleteTarget(conv)}
+                      className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                      title="删除对话"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </nav>
+      </ScrollArea>
 
       {/* 底部：用户信息 + 语言 + 退出 */}
-      <div className="space-y-1.5 border-t border-border p-2">
-        <div className="flex items-center gap-2 px-1 py-1.5">
+      <div className={cn('space-y-1.5 border-t border-border p-2', collapsed && 'flex flex-col items-center')}>
+        <div className={cn('flex items-center gap-2 py-1.5', collapsed ? 'px-0' : 'px-1')} title={collapsed ? username || '' : undefined}>
           <Avatar className="h-7 w-7 shrink-0 border border-border">
             <AvatarFallback className="bg-primary/10 text-xs text-primary">
               {(username || 'U').slice(0, 1).toUpperCase()}
             </AvatarFallback>
           </Avatar>
-          <div className="min-w-0">
-            <p className="truncate text-xs font-medium">{username || '...'}</p>
-            <p className="text-[10px] text-muted-foreground">
-              {role === 'admin' ? t('admin.admin') : t('admin.user')}
-            </p>
-          </div>
+          {!collapsed && (
+            <div className="min-w-0">
+              <p className="truncate text-xs font-medium">{username || '...'}</p>
+              <p className="text-[10px] text-muted-foreground">
+                {role === 'admin' ? t('admin.admin') : t('admin.user')}
+              </p>
+            </div>
+          )}
         </div>
-        <div className="flex items-center justify-between px-1">
-          <LocaleSwitcher compact />
+        <div className={cn('flex items-center px-1', collapsed ? 'justify-center' : 'justify-between')}>
+          {!collapsed && <LocaleSwitcher compact />}
           <button
             onClick={handleLogout}
             className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-destructive"
@@ -157,6 +314,22 @@ export function SidebarNav() {
           </button>
         </div>
       </div>
+
+      {/* 删除对话确认 */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        destructive
+        title={deleteTarget ? t('chat.deleteConversationConfirm', { title: deleteTarget.title }) : ''}
+        onConfirm={() => {
+          if (deleteTarget) {
+            window.dispatchEvent(
+              new CustomEvent('chat-delete-request', { detail: { id: deleteTarget.id } }),
+            );
+            setDeleteTarget(null);
+          }
+        }}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </aside>
   );
 }

@@ -206,8 +206,8 @@ export function SimpleChatInput({
   };
 
   return (
-    <div className="border-t border-border bg-background p-3">
-      <div className="flex flex-col rounded-lg border border-border bg-background focus-within:border-primary/40 focus-within:ring-1 focus-within:ring-primary/20">
+    <div className="w-full">
+      <div className="flex flex-col rounded-2xl border border-border bg-card shadow-sm focus-within:border-primary/40 focus-within:shadow-md focus-within:ring-1 focus-within:ring-primary/20">
         {/* 图片预览区 */}
         {(images.length > 0 || uploading) && (
           <div className="flex flex-wrap gap-2 border-b border-border px-3 py-2">

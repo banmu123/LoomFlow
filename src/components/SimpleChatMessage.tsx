@@ -108,7 +108,7 @@ export function SimpleChatMessage({
             {content}
           </span>
           <Avatar className="h-7 w-7 shrink-0 border border-border">
-            <AvatarFallback className="bg-primary/10 text-xs text-primary">
+            <AvatarFallback className="bg-primary/15 text-xs text-primary">
               我
             </AvatarFallback>
           </Avatar>
@@ -122,7 +122,7 @@ export function SimpleChatMessage({
     <div className="group flex flex-col items-start gap-1">
       <div className="flex items-start gap-2">
         <Avatar className="h-7 w-7 shrink-0 border border-border">
-          <AvatarFallback className="bg-muted text-muted-foreground">
+          <AvatarFallback className="bg-brand-gradient text-white">
             <Sparkles className="h-3.5 w-3.5" />
           </AvatarFallback>
         </Avatar>

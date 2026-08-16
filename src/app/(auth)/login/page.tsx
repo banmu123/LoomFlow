@@ -95,10 +95,10 @@ function LoginForm() {
   // 飞书登录中加载态（整个卡片替换）
   if (feishuLoading) {
     return (
-      <div className="w-full max-w-md space-y-6 rounded-2xl border bg-card p-8 shadow-xl">
+      <div className="w-full max-w-md space-y-6 rounded-2xl border-brand-gradient bg-card p-8 shadow-xl">
         <div className="flex flex-col items-center gap-4">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-            <Video className="h-8 w-8 text-primary" />
+          <div className="bg-brand-gradient flex h-16 w-16 items-center justify-center rounded-2xl shadow-lg shadow-indigo-500/30">
+            <Video className="h-8 w-8 text-white" />
           </div>
           <h1 className="text-2xl font-bold">{t('app.name')}</h1>
           <div className="flex flex-col items-center gap-2 text-primary">
@@ -111,13 +111,13 @@ function LoginForm() {
   }
 
   return (
-    <div className="w-full max-w-md space-y-6 rounded-2xl border bg-card p-8 shadow-xl">
+    <div className="w-full max-w-md space-y-6 rounded-2xl border-brand-gradient bg-card p-8 shadow-xl">
       {/* Logo */}
       <div className="flex flex-col items-center gap-2">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-          <Video className="h-8 w-8 text-primary" />
+        <div className="bg-brand-gradient flex h-16 w-16 items-center justify-center rounded-2xl shadow-lg shadow-indigo-500/30">
+          <Video className="h-8 w-8 text-white" />
         </div>
-        <h1 className="text-2xl font-bold">{t('app.name')}</h1>
+        <h1 className="text-brand-gradient text-2xl font-bold">{t('app.name')}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {t('app.tagline')}
         </p>
@@ -193,7 +193,10 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-muted">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-indigo-950 via-background to-background">
+      {/* 品牌光晕 */}
+      <div className="pointer-events-none absolute -top-40 -left-40 h-96 w-96 rounded-full bg-indigo-500/20 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-40 -right-40 h-96 w-96 rounded-full bg-violet-500/20 blur-3xl" />
       <Suspense
         fallback={
           <div className="flex items-center justify-center">
