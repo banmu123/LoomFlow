@@ -1,5 +1,34 @@
 # Changelog
 
+## [v0.1.3] - 2026-08-16
+
+### 新增
+
+- **AI 生成改为后端执行 + 前端轮询**：生成任务生命周期属于 conversation（数据库消息状态 `pending→streaming→done/cancelled` 为唯一事实来源），切换页面/刷新不中断生成；停止按钮保存 `cancelled` 状态与已生成内容
+- **生成幂等触发**（`ensureGeneration`）：发消息端点 + 轮询端点（GET messages 发现 pending 自动补触发）双保险，route fire-and-forget 失效时生成仍会执行
+- **工作流预览抽屉**：AI 生成工作流后右上角「预览工作流」按钮，右侧抽屉（80vw）内复用完整画布（TinyflowWrapper），可一键进入完整编辑器
+- **欢迎页/对话页拆分**：`/chat`（ChatLanding 欢迎页）与 `/chat/[id]`（ChatPanel 对话页）两个独立界面，路由区分对话
+- **对话切换由路由驱动**：移除 chat-* 自定义事件状态冲突，URL 为唯一事实来源（刷新保留当前对话、浏览器前进后退可用）
+- **migration 一次性容器**（docker-compose）：每次 `up` 自动执行幂等迁移 SQL，一键部署免手动补库；迁移后 `NOTIFY pgrst, 'reload schema'` 自动刷新 PostgREST schema 缓存
+- 对话标题 = 第一句话（截 20 字持久化）；历史标题过长显示「前 5 字 + …」
+
+### 修复
+
+- **生成中断**：切换菜单/跳转不再 abort 生成（原「已停止生成」问题）
+- **底部输入框贴齐可视底部**：根因是 `scrollIntoView` 连带滚动 overflow-hidden 根容器（scrollTop=128 内容上移）——改为只滚消息容器
+- **对话历史置底**：`space-y-*` 的 margin-top 覆盖 `mt-auto`——改用 `gap-*`
+- **自动发送失败**：欢迎页首条消息改为直接写库，ChatPanel 按「最后一条 user 无 AI 回复」自动生成（不再依赖 URL 参数）
+- **生产 AI 无内容返回**：PostgREST schema 缓存过期导致 PATCH 400（PGRST204）——重启 postgrest + NOTIFY 防复发
+- **重新生成重复插入**：改为更新原消息（DELETE 旧消息 + 重新生成）
+- 切换对话闪现欢迎页空态 → 加载占位
+
+### 变更
+
+- 移除前端流式解析（AbortController/reader，约 400 行）；AI 生成不再自动跳转画布（改为预览按钮）
+- 路由：`/` 重定向 `/chat`；`/chat` 为新聊天空态，`/chat/[id]` 为对话
+
+---
+
 ## [v0.2.0] - 2026-08-13
 
 ### 新增
