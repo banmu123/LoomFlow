@@ -155,3 +155,6 @@ END $$;
 
 -- 24. 后台生成：消息工具执行日志（后台执行器流式写入，前端轮询展示）
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS tool_logs JSONB;
+
+-- 25. 迁移完成后刷新 PostgREST schema 缓存（否则新列 PATCH 报 PGRST204）
+NOTIFY pgrst, 'reload schema';
