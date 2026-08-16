@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { supabase } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/server-auth';
+import { ensureGeneration } from '@/lib/agent/generate';
 
 // 校验对话归属：完全隔离，仅本人可操作
 async function checkConversationAccess(
@@ -43,6 +44,16 @@ export async function GET(
 
   if (error) {
     return Response.json({ error: error.message }, { status: 500 });
+  }
+
+  // 兜底触发：发现未完成的 assistant 消息（pending/streaming）且无执行者时，
+  // 启动后台生成（幂等，防重复）。保证 route 的 fire-and-forget 失效时生成仍会执行。
+  const unfinished = (data ?? []).filter(
+    (m: { role?: string; status?: string }) =>
+      m.role === 'assistant' && (m.status === 'pending' || m.status === 'streaming'),
+  );
+  for (const m of unfinished as Array<{ id: string }>) {
+    ensureGeneration({ conversationId: id, assistantMessageId: m.id });
   }
 
   return Response.json(data);

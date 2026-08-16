@@ -50,6 +50,29 @@ export interface ToolLog {
   status: 'running' | 'done' | 'error';
 }
 
+// 正在执行的后台生成任务（assistantMessageId → 防重复触发）
+// 注意：Next.js route handler 中 fire-and-forget 在部分生产环境可能不执行，
+// 因此生成由「发消息端点触发 + 轮询端点兜底触发」双保险驱动
+const runningTasks = new Set<string>();
+
+/**
+ * 幂等触发生成：同一 assistant 消息只启动一次执行器。
+ * 无论由发消息端点还是轮询端点调用，都不会重复执行。
+ */
+export function ensureGeneration(opts: {
+  conversationId: string;
+  assistantMessageId: string;
+  model?: string;
+  images?: string[];
+}): void {
+  const key = opts.assistantMessageId;
+  if (runningTasks.has(key)) return;
+  runningTasks.add(key);
+  void runAiGeneration(opts).finally(() => {
+    runningTasks.delete(key);
+  });
+}
+
 // 写数据库（后台任务专用；service role client 无请求上下文依赖）
 async function patchMessage(
   messageId: string,

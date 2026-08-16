@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { supabase } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/server-auth';
-import { runAiGeneration } from '@/lib/agent/generate';
+import { ensureGeneration } from '@/lib/agent/generate';
 
 // 校验对话归属：完全隔离，仅本人可操作
 async function checkConversationAccess(
@@ -96,8 +96,8 @@ export async function POST(
     .update({ updated_at: new Date().toISOString() })
     .eq('id', id);
 
-  // 触发后台生成（fire-and-forget：不等待生成完成，前端通过轮询观察）
-  void runAiGeneration({
+  // 触发后台生成（幂等；若此处的 fire-and-forget 未执行，轮询端点会兜底触发）
+  ensureGeneration({
     conversationId: id,
     assistantMessageId: assistantMsg.id,
     model,

@@ -384,25 +384,15 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
     }
   }, [convId, conversations]);
 
-  // 工作流提取：新完成的 assistant 消息包含工作流 JSON → 右上角出现「预览工作流」按钮。
-  // 只在"进入页面后的新消息"处理（首次挂载只记录基线，避免每次进对话重复触发）
-  const lastSeenAssistantIdRef = useRef<string | null>(null);
-  const initialScanDoneRef = useRef(false);
+  // 工作流提取：最后一条 done 的 assistant 消息包含工作流 JSON → 显示「预览工作流」按钮。
+  // 不做"仅首次"防重（不自动跳转后重复提取无副作用）；历史工作流也常驻显示按钮
   useEffect(() => {
     const cur = conversations.find((c) => c.id === convId);
-    const lastAssistant = [...(cur?.messages ?? [])]
+    if (!cur) return;
+    const lastAssistant = [...cur.messages]
       .reverse()
-      .find((m) => m.role === 'assistant');
-    if (!lastAssistant) return;
-    // 首次挂载：只记录基线 id，不处理历史消息
-    if (!initialScanDoneRef.current) {
-      initialScanDoneRef.current = true;
-      lastSeenAssistantIdRef.current = lastAssistant.id;
-      return;
-    }
-    if (lastAssistant.id === lastSeenAssistantIdRef.current) return;
-    lastSeenAssistantIdRef.current = lastAssistant.id;
-    if (lastAssistant.status !== 'done' || !lastAssistant.content) return;
+      .find((m) => m.role === 'assistant' && m.status === 'done');
+    if (!lastAssistant?.content) return;
     // 提取 ```json 代码块并判断是否为工作流结构（{ nodes, edges }）
     const jsonMatch = lastAssistant.content.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (!jsonMatch) return;

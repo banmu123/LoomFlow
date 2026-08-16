@@ -1,24 +1,23 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Drawer,
   DrawerContent,
   DrawerHeader,
   DrawerTitle,
-  DrawerFooter,
   DrawerClose,
 } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
-import type { Tinyflow as TinyflowInstance } from '@tinyflow-ai/ui';
 import type { TinyflowData } from '@/lib/tinyflow/types';
 import { setPendingWorkflow } from '@/lib/pending-workflow';
 import { useT } from '@/lib/i18n';
-import { X } from 'lucide-react';
+import { X, Maximize2 } from 'lucide-react';
+import TinyflowWrapper from './tinyflow-wrapper';
 
-// AI 对话生成工作流后的预览抽屉：右上角「预览」按钮 → 右侧抽屉内渲染画布。
-// 复用 Tinyflow 完整画布（与 /workflows/editor 同一实例能力），数据来自对话中提取的工作流 JSON
+// AI 对话生成工作流后的预览抽屉：右侧抽屉内直接复用完整画布（TinyflowWrapper，含画布菜单）。
+// 数据传递复用 pending-workflow 机制：打开时写入，wrapper 挂载时自动加载
 export function WorkflowPreviewDrawer({
   open,
   data,
@@ -30,43 +29,13 @@ export function WorkflowPreviewDrawer({
 }) {
   const t = useT();
   const router = useRouter();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const instanceRef = useRef<TinyflowInstance | null>(null);
-  const [ready, setReady] = useState(false);
 
-  // 打开后渲染画布：等抽屉动画结束（容器尺寸稳定）再实例化 Tinyflow
+  // 打开抽屉时写入 pending-workflow，TinyflowWrapper 挂载时读取加载
   useEffect(() => {
-    if (!open || !data) return;
-    let destroyed = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    (async () => {
-      const { Tinyflow } = await import('@tinyflow-ai/ui');
-      if (destroyed) return;
-      timer = setTimeout(() => {
-        if (destroyed || !containerRef.current) return;
-        const inst = new Tinyflow({
-          element: containerRef.current,
-          defaultTheme: 'light',
-        });
-        try {
-          inst.setData(data);
-        } catch {
-          // 数据格式异常：画布保持空白
-        }
-        instanceRef.current = inst;
-        setReady(true);
-      }, 300);
-    })();
-    return () => {
-      destroyed = true;
-      clearTimeout(timer);
-      instanceRef.current?.destroy();
-      instanceRef.current = null;
-      setReady(false);
-    };
+    if (open && data) setPendingWorkflow(data);
   }, [open, data]);
 
-  // 在完整编辑器中打开（复用 pending-workflow 机制，编辑器页自动加载）
+  // 全屏打开完整编辑器
   const openEditor = () => {
     if (data) setPendingWorkflow(data);
     onOpenChange(false);
@@ -75,32 +44,36 @@ export function WorkflowPreviewDrawer({
 
   return (
     <Drawer direction="right" open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="h-full w-[min(760px,92vw)]">
-        <DrawerHeader className="flex items-center justify-between border-b border-border px-4 py-3">
+      {/* 注意：drawer.tsx 对 right 方向默认 w-3/4 + sm:max-w-sm（384px），
+           utility 类特异性相同、生成顺序不定，必须内联样式覆盖（优先级最高） */}
+      <DrawerContent
+        className="h-full"
+        style={{ width: '80vw', maxWidth: 'none' }}
+      >
+        <DrawerHeader className="flex items-center justify-between border-b border-border px-4 py-2">
           <DrawerTitle className="text-sm">{t('chat.workflowPreview')}</DrawerTitle>
-          <DrawerClose asChild>
-            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground">
-              <X className="h-4 w-4" />
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 text-xs text-muted-foreground"
+              onClick={openEditor}
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+              {t('chat.workflowOpenEditor')}
             </Button>
-          </DrawerClose>
+            <DrawerClose asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground">
+                <X className="h-4 w-4" />
+              </Button>
+            </DrawerClose>
+          </div>
         </DrawerHeader>
 
-        {/* 画布容器：flex-1 铺满，min-h-0 允许内部滚动 */}
-        <div className="min-h-0 flex-1">
-          <div ref={containerRef} className="h-full w-full" />
+        {/* 复用完整画布（含画布菜单）：抽屉打开时挂载，wrapper 从 pending-workflow 加载数据 */}
+        <div className="min-h-0 flex-1 overflow-hidden">
+          {open && <TinyflowWrapper />}
         </div>
-
-        <DrawerFooter className="flex-row items-center justify-between gap-2 border-t border-border px-4 py-3">
-          <p className="text-xs text-muted-foreground">
-            {ready ? t('chat.workflowPreviewHint') : t('chat.workflowLoading')}
-          </p>
-          <div className="flex shrink-0 gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              {t('common.close')}
-            </Button>
-            <Button onClick={openEditor}>{t('chat.workflowOpenEditor')}</Button>
-          </div>
-        </DrawerFooter>
       </DrawerContent>
     </Drawer>
   );
