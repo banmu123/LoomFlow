@@ -867,6 +867,13 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
 
         {/* messages or empty state */}
         {messages.length === 0 ? (
+          loadingHistory ? (
+            /* 历史加载中：显示加载占位，避免闪现欢迎页空态 */
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <p className="mt-2 text-sm text-muted-foreground">{t('chat.loading')}</p>
+            </div>
+          ) : (
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto p-8">
             <div className="w-full max-w-2xl">
               {/* 标题 + 输入框一体（同一容器） */}
@@ -914,6 +921,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
               </div>
             </div>
           </div>
+          )
         ) : (
           <div ref={messagesScrollRef} className="min-h-0 flex-1 overflow-y-auto">
             {/* 顶部留出充足边距（首条消息不贴标题栏），底部 24px */}
