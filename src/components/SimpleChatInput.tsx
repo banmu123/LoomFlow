@@ -35,6 +35,8 @@ export interface SimpleChatInputProps {
   onAttachImage?: (file: File) => void;
   /** 是否有图片上传中 */
   uploading?: boolean;
+  /** 隐藏图片附件按钮（欢迎页不带图片） */
+  hideAttach?: boolean;
   /** 可选模型列表（来自模型配置） */
   modelOptions?: Array<{ value: string; label: string }>;
   /** 当前选中模型 */
@@ -57,6 +59,7 @@ export function SimpleChatInput({
   onRemoveImage,
   onAttachImage,
   uploading = false,
+  hideAttach = false,
   modelOptions = [],
   model,
   onModelChange,
@@ -261,6 +264,7 @@ export function SimpleChatInput({
             >
               <Mic className="h-3.5 w-3.5" />
             </Button>
+            {!hideAttach && (
             <label className="inline-flex">
               <Button
                 variant="ghost"
@@ -285,6 +289,7 @@ export function SimpleChatInput({
                 }}
               />
             </label>
+            )}
             <Button
               variant="ghost"
               size="icon"

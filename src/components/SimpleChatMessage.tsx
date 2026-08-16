@@ -8,7 +8,7 @@ import { AlertTriangle, CheckCircle2, Loader2, Sparkles, ChevronDown, ChevronUp,
 import { type ReactNode, useState } from 'react';
 
 export type ChatMessageRole = 'user' | 'assistant';
-export type ChatMessageStatus = 'pending' | 'thinking' | 'streaming' | 'done' | 'error';
+export type ChatMessageStatus = 'pending' | 'thinking' | 'streaming' | 'done' | 'error' | 'cancelled';
 
 export interface SimpleChatMessageProps {
   role: ChatMessageRole;
@@ -135,6 +135,13 @@ export function SimpleChatMessage({
             <div className="flex items-center gap-2 rounded-lg rounded-tl-sm border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
               <AlertTriangle className="h-4 w-4 shrink-0" />
               <span>{error ?? '发生错误，请重试'}</span>
+            </div>
+          ) : status === 'cancelled' ? (
+            <div className="rounded-lg rounded-tl-sm bg-muted px-3 py-2">
+              {content && (
+                <div className="whitespace-pre-wrap text-sm text-foreground">{content}</div>
+              )}
+              <div className="mt-1 text-[11px] text-muted-foreground">{t('chat.stopped')}</div>
             </div>
           ) : (
             <>

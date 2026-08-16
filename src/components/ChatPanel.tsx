@@ -52,8 +52,8 @@ const CHAT_PANEL_WIDTH = 440;
 
 type MessageRole = 'user' | 'assistant';
 
-// 新建对话的模板推荐
-const RECOMMENDATIONS = [
+// 新建对话的模板推荐（欢迎页 ChatLanding 复用）
+export const RECOMMENDATIONS = [
   '📰 每日资讯助手',
   '✍️ 内容助手',
   '👤 客户助手',
@@ -91,6 +91,8 @@ interface Message {
   status?: ChatMessageStatus;
   error?: string;
   images?: string[];
+  /** 工具执行日志（后端生成执行器写入） */
+  toolLogs?: Array<{ toolName: string; status: 'running' | 'done' | 'error' }>;
   createdAt: number;
 }
 
@@ -170,8 +172,11 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
   }, []);
   // 供 chat-send 事件调用的最新 handleSend（避免闭包过期）
   const handleSendRef = useRef<(text?: string) => void>(() => {});
+  // generate 请求在途标记（轮询跳过中间态；ref 不触发渲染，由请求完成后的 state 更新驱动）
+  const generateInFlightRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  // 消息列表滚动容器（自动滚动只操作它，避免 scrollIntoView 连带滚动上层容器）
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
 
   const [loadingHistory, setLoadingHistory] = useState(!!conversationId);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -183,7 +188,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
     }
   }, [modelsLoaded, modelOptions.length, isAdmin]);
 
-  // 修改密码对话框
+  // 修改密码对话框  
   const [pwdOpen, setPwdOpen] = useState(false);
   const [pwdForm, setPwdForm] = useState({ old_password: '', new_password: '' });
   const [pwdConfirm, setPwdConfirm] = useState('');
@@ -266,6 +271,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
                       status?: ChatMessageStatus;
                       error?: string;
                       images?: string[] | null;
+                      tool_logs?: Message['toolLogs'] | null;
                       created_at: string;
                     }) => ({
                       id: m.id,
@@ -275,6 +281,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
                       status: m.status,
                       error: m.error,
                       images: m.images ?? undefined,
+                      toolLogs: m.tool_logs ?? undefined,
                       createdAt: new Date(m.created_at).getTime(),
                     }),
                   )
@@ -296,6 +303,121 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
   useEffect(() => {
     loadAllConversations();
   }, [loadAllConversations]);
+
+  // 重新加载单个对话的消息（轮询观察生成进度）；生成状态以数据库消息状态为准
+  const loadConversationMessages = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/conversations/${id}/messages`);
+      const msgs = await res.json();
+      if (!Array.isArray(msgs)) return;
+      const parsed = msgs.map(
+        (m: {
+          id: string;
+          role: MessageRole;
+          content: string;
+          reasoning?: string;
+          status?: ChatMessageStatus;
+          error?: string;
+          images?: string[] | null;
+          tool_logs?: Array<{ toolName: string; status: 'running' | 'done' | 'error' }> | null;
+          created_at: string;
+        }) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          reasoning: m.reasoning,
+          status: m.status,
+          error: m.error,
+          images: m.images ?? undefined,
+          toolLogs: m.tool_logs ?? undefined,
+          createdAt: new Date(m.created_at).getTime(),
+        }),
+      );
+      setConversations((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, messages: parsed } : c)),
+      );
+      // 生成状态以数据库为准：有未完成消息 → 生成中；否则结束（进入页面/刷新后据此恢复）
+      const stillPending = parsed.some(
+        (m) => m.status === 'pending' || m.status === 'streaming',
+      );
+      setIsGenerating(stillPending);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // 生成状态观察（轮询）：当前对话存在 pending/streaming 消息（数据库为准）→
+  // 每 1.5s 拉取最新进度；全部完成后停止轮询并结束生成态。
+  // 页面刷新/切换菜单后重新进入也能恢复 loading。
+  useEffect(() => {
+    if (!convId) return;
+    // generate 请求在途时跳过：避免拉到"user 已插入、assistant 未插入"的中间态
+    if (generateInFlightRef.current) return;
+    const cur = conversations.find((c) => c.id === convId);
+    const hasUnfinished = cur?.messages.some(
+      (m) => m.status === 'pending' || m.status === 'streaming',
+    );
+    if (hasUnfinished) {
+      setIsGenerating(true);
+      const timer = setInterval(() => {
+        loadConversationMessages(convId);
+      }, 1500);
+      return () => clearInterval(timer);
+    }
+    setIsGenerating(false);
+  }, [convId, conversations, loadConversationMessages]);
+
+  // 工具执行日志：从当前对话最后一条 assistant 消息读取（后端执行器写入 DB tool_logs）
+  useEffect(() => {
+    const cur = conversations.find((c) => c.id === convId);
+    const lastAssistant = [...(cur?.messages ?? [])]
+      .reverse()
+      .find((m) => m.role === 'assistant');
+    if (lastAssistant?.toolLogs?.length) {
+      setToolLogs(lastAssistant.toolLogs);
+    } else {
+      setToolLogs([]);
+    }
+  }, [convId, conversations]);
+
+  // 工作流提取：新完成的 assistant 消息包含工作流 JSON → 加载到画布。
+  // 只在"进入页面后的新消息"处理（首次挂载只记录基线，避免每次进对话重复跳转画布）
+  const lastSeenAssistantIdRef = useRef<string | null>(null);
+  const initialScanDoneRef = useRef(false);
+  useEffect(() => {
+    const cur = conversations.find((c) => c.id === convId);
+    const lastAssistant = [...(cur?.messages ?? [])]
+      .reverse()
+      .find((m) => m.role === 'assistant');
+    if (!lastAssistant) return;
+    // 首次挂载：只记录基线 id，不处理历史消息
+    if (!initialScanDoneRef.current) {
+      initialScanDoneRef.current = true;
+      lastSeenAssistantIdRef.current = lastAssistant.id;
+      return;
+    }
+    if (lastAssistant.id === lastSeenAssistantIdRef.current) return;
+    lastSeenAssistantIdRef.current = lastAssistant.id;
+    if (lastAssistant.status !== 'done' || !lastAssistant.content) return;
+    // 提取 ```json 代码块并判断是否为工作流结构（{ nodes, edges }）
+    const jsonMatch = lastAssistant.content.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (!jsonMatch) return;
+    try {
+      const parsed = JSON.parse(jsonMatch[1].trim()) as {
+        nodes?: unknown;
+        edges?: unknown;
+      };
+      if (parsed && Array.isArray(parsed.nodes) && Array.isArray(parsed.edges)) {
+        setPendingWorkflow(parsed);
+        if (window.location.pathname !== '/workflows/editor') {
+          router.push('/workflows/editor');
+        }
+      }
+    } catch {
+      // 不是合法 JSON，忽略
+    }
+  }, [convId, conversations, router]);
+
 
   // 路由带对话 id：本地还没有该对话（直达/刷新/他人创建）时单独加载标题+消息
   useEffect(() => {
@@ -350,17 +472,16 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
   const activeConversation = conversations.find((c) => c.id === convId);
   const messages = activeConversation?.messages ?? [];
 
-  // auto scroll
+  // auto scroll：只滚动消息列表容器本身
+  // （scrollIntoView 会连带滚动 ChatPanel 根容器——根容器是 overflow-hidden 的可滚动元素，
+  //   被滚走后整页内容上移，底部露出空白）
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const el = messagesScrollRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, [messages]);
 
-  // cleanup abort controller on unmount
-  useEffect(() => {
-    return () => {
-      abortControllerRef.current?.abort();
-    };
-  }, []);
+  // 注意：不在卸载时 abort——切换菜单/跳转后，生成在后台继续完成并落库；
+  // 重新挂载时通过 pending 消息恢复 loading 状态
 
   const updateConversation = useCallback(
     (id: string, updater: (c: Conversation) => Conversation) => {
@@ -393,24 +514,62 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
     }
   }, []);
 
-  // 保存单条消息到 Supabase（fire-and-forget）
-  const saveMessage = useCallback(
-    (convId: string, msg: Message) => {
-      fetch(`/api/conversations/${convId}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          role: msg.role,
-          content: msg.content,
-          reasoning: msg.reasoning || null,
-          status: msg.status || 'done',
-          error: msg.error || null,
-          images: msg.images || null,
-        }),
-      }).catch(() => {});
-    },
-    [],
-  );
+  // 自动生成检测：当前对话最后一条是 user 消息且没有 AI 回复 → 触发生成。
+  // 以数据库状态驱动（欢迎页发送首条消息后跳转、或生成中断后重进），不依赖 URL 参数；
+  // 同一会话内只触发一次（刷新后组件重挂载可重试未完成的生成）
+  const autoGenerateRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!convId || isGenerating) return;
+    const cur = conversations.find((c) => c.id === convId);
+    if (!cur || cur.messages.length === 0) return;
+    const last = cur.messages[cur.messages.length - 1];
+    if (last.role !== 'user' || last.status !== 'done') return;
+    if (autoGenerateRef.current === last.id) return;
+    autoGenerateRef.current = last.id;
+
+    setIsGenerating(true);
+    generateInFlightRef.current = true;
+    fetch(`/api/conversations/${convId}/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content: last.content,
+        images: last.images ?? [],
+        model,
+        regenerate: true,
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data?.assistantMessage?.id) {
+          setError(data?.error || '自动生成失败，请重试');
+          setIsGenerating(false);
+          return;
+        }
+        // 直接追加 assistant 消息（db id，轮询更新按 id 匹配）
+        updateConversation(convId, (c) => ({
+          ...c,
+          messages: [
+            ...c.messages,
+            {
+              id: data.assistantMessage.id,
+              role: 'assistant' as const,
+              content: '',
+              status: 'pending' as const,
+              createdAt: Date.now(),
+            },
+          ],
+        }));
+      })
+      .catch(() => {
+        setError('自动生成失败，请重试');
+        setIsGenerating(false);
+      })
+      .finally(() => {
+        generateInFlightRef.current = false;
+      });
+  }, [convId, conversations, isGenerating, model, updateConversation]);
+
 
   const handleSend = async (overrideText?: string) => {
     // 语音输入：识别文本直接传入（避免 React 状态异步导致读旧值）
@@ -454,6 +613,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
       createdAt: Date.now() + 1,
     };
 
+    // 本地先显示（占位 id；后端返回 db id 后替换，轮询更新按 db id 匹配）
     updateConversation(convId, (c) => ({
       ...c,
       title: isFirstMessage ? text.slice(0, 20) : c.title,
@@ -474,349 +634,56 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
         .catch(() => {});
     }
 
-    // 保存用户消息到 Supabase
-    saveMessage(convId, userMsg);
-
+    const sentImages = images.map((img) => img.url);
     setInput('');
     setImages([]);
+    // 立即进入生成态（防连点；刷新/重进后由轮询按 DB 状态恢复）
     setIsGenerating(true);
 
-    // build message history (last 20 messages including current)
-    const currentMessages =
-      conversations.find((c) => c.id === convId)?.messages ?? [];
-    const chatHistory = [...currentMessages, { role: 'user' as const, content: text }].map(
-      (msg) => ({ role: msg.role, content: msg.content }),
-    );
-
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
-    // 提升到 try 外，供 catch 保存部分内容使用
-    let assistantContent = '';
-    let assistantReasoning = '';
-    let streamFailed = false;
-
+    // 调用后端生成端点：后端插入 user/assistant 消息并后台执行生成（不阻塞）
+    // 生成状态以数据库为准，前端轮询观察——页面刷新/切换菜单不中断生成
+    generateInFlightRef.current = true;
     try {
-      const apiUrl = '/api/chat-ai';
-      const response = await fetch(apiUrl, {
+      const res = await fetch(`/api/conversations/${convId}/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: chatHistory,
-          images: images.map((img) => img.url),
-          model,
-        }),
-        signal: controller.signal,
+        body: JSON.stringify({ content: text, images: sentImages, model }),
       });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => null);
-        throw new Error(errData?.error || `请求失败 (${response.status})`);
+      const data = await res.json();
+      if (!res.ok || !data?.assistantMessage?.id) {
+        setError(data?.error || '发送失败，请重试');
+        // 生成未开始：移除本地占位
+        updateConversation(convId, (c) => ({
+          ...c,
+          messages: c.messages.filter((m) => m.id !== assistantMsg.id),
+        }));
+        setIsGenerating(false);
+        return;
       }
-
-      // switch to streaming status
+      // 用 db id 替换本地占位 id（轮询更新按 db id 匹配）
       updateConversation(convId, (c) => ({
         ...c,
-        messages: c.messages.map((m) =>
-          m.id === assistantMsg.id ? { ...m, status: 'streaming' } : m,
-        ),
-      }));
-
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('无法读取响应流');
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let workflowData: unknown = null;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || !trimmed.startsWith('data: ')) continue;
-
-          const payload = trimmed.slice(6);
-          if (payload === '[DONE]') {
-            updateConversation(convId, (c) => ({
-              ...c,
-              messages: c.messages.map((m) =>
-                m.id === assistantMsg.id
-                  ? { ...m, status: 'done', content: assistantContent }
-                  : m,
-              ),
-            }));
-            break;
+        messages: c.messages.map((m) => {
+          if (m.id === userMsg.id && data.userMessage?.id) {
+            return { ...m, id: data.userMessage.id };
           }
-
-          try {
-            const data = JSON.parse(payload) as {
-              type?: string;
-              id?: string;
-              delta?: string;
-              content?: string;
-              error?: string;
-              errorText?: string;
-              workflow?: unknown;
-              toolName?: string;
-              toolCallId?: string;
-            };
-
-            // 处理错误（兼容 error 和 errorText 两种字段）
-            if (data.error || data.type === 'error') {
-              const errMsg = data.error || data.errorText || '请求失败';
-              setError(errMsg);
-              updateConversation(convId, (c) => ({
-                ...c,
-                messages: c.messages.map((m) =>
-                  m.id === assistantMsg.id
-                    ? { ...m, status: 'error', error: errMsg }
-                    : m,
-                ),
-              }));
-              // 保存错误消息到 Supabase（标记失败，末尾不再重复保存）
-              streamFailed = true;
-              saveMessage(convId, {
-                ...assistantMsg,
-                status: 'error',
-                content: assistantContent,
-                error: errMsg,
-              });
-              break;
-            }
-
-            // 处理工作流
-            if (data.workflow) {
-              workflowData = data.workflow;
-            }
-
-            // 处理 reasoning（思考过程）
-            if (data.type === 'reasoning-delta' && data.delta) {
-              assistantReasoning += data.delta;
-              updateConversation(convId, (c) => ({
-                ...c,
-                messages: c.messages.map((m) =>
-                  m.id === assistantMsg.id
-                    ? { ...m, reasoning: assistantReasoning }
-                    : m,
-                ),
-              }));
-            }
-
-            // 处理工具执行日志（AI 调用工具时实时显示过程）
-            if (data.type === 'tool-input-start' && data.toolName) {
-              setToolLogs((prev) => [
-                ...prev.filter((l) => l.toolName !== data.toolName),
-                { toolName: data.toolName as string, status: 'running' },
-              ]);
-            }
-            if (data.type === 'tool-output-available' && data.toolName) {
-              const output = (data as { output?: { error?: string } }).output;
-              setToolLogs((prev) => [
-                ...prev.filter((l) => l.toolName !== data.toolName),
-                {
-                  toolName: data.toolName as string,
-                  status: output?.error ? 'error' : 'done',
-                },
-              ]);
-            }
-
-            // 处理 text（正式回答）
-            if (data.type === 'text-delta' && data.delta) {
-              assistantContent += data.delta;
-              updateConversation(convId, (c) => ({
-                ...c,
-                messages: c.messages.map((m) =>
-                  m.id === assistantMsg.id
-                    ? { ...m, content: assistantContent }
-                    : m,
-                ),
-              }));
-            }
-
-            // 兼容旧格式
-            if (data.content) {
-              assistantContent += data.content;
-              updateConversation(convId, (c) => ({
-                ...c,
-                messages: c.messages.map((m) =>
-                  m.id === assistantMsg.id
-                    ? { ...m, content: assistantContent }
-                    : m,
-                ),
-              }));
-            }
-          } catch {
-            // skip non-JSON lines
-          }
-        }
-      }
-
-      // ensure final state
-      let finalAssistantMsg: Message | null = null;
-      updateConversation(convId, (c) => {
-        const updated = c.messages.map((m) => {
-          if (m.id === assistantMsg.id && m.status === 'streaming') {
-            const final = {
-              ...m,
-              status: 'done' as ChatMessageStatus,
-              content: assistantContent,
-            };
-            finalAssistantMsg = final;
-            return final;
+          if (m.id === assistantMsg.id) {
+            return { ...m, id: data.assistantMessage.id };
           }
           return m;
-        });
-        return { ...c, messages: updated };
-      });
-
-      // 如果没有直接收到 workflow 数据，尝试从文本中提取
-      if (!workflowData && assistantContent) {
-        try {
-          // 尝试提取 ```json ... ``` 中的内容
-          const jsonMatch = assistantContent.match(/```(?:json)?\s*([\s\S]*?)```/);
-          if (jsonMatch) {
-            workflowData = JSON.parse(jsonMatch[1].trim());
-          } else {
-            // 尝试找到第一个 { 和最后一个 }
-            const start = assistantContent.indexOf('{');
-            const end = assistantContent.lastIndexOf('}');
-            if (start !== -1 && end !== -1) {
-              workflowData = JSON.parse(assistantContent.slice(start, end + 1));
-            }
-          }
-          // 用 Schema 校验工作流；无效则自动调用 AI 修复一次
-          if (workflowData && typeof workflowData === 'object' && 'nodes' in workflowData && 'edges' in workflowData) {
-            const validation = validateWorkflow(workflowData);
-            if (!validation.valid) {
-              try {
-                const repairRes = await fetch('/api/workflow-ai/repair', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    workflow: workflowData,
-                    errors: validation.errors.map((e) => e.message),
-                  }),
-                });
-                const repairData = await repairRes.json();
-                if (repairRes.ok && repairData?.workflow && repairData.valid) {
-                  workflowData = repairData.workflow; // 修复成功，使用修复后的工作流
-                } else {
-                  workflowData = null; // 修复失败
-                }
-              } catch {
-                workflowData = null;
-              }
-            }
-            if (workflowData) {
-              // 防御：AI 可能幻觉出未配置的模型 id，统一替换为第一个可用模型
-              await normalizeWorkflowModels(workflowData);
-              // 是工作流 JSON，更新消息内容
-              assistantContent = '已为你生成工作流，已加载到画布';
-              updateConversation(convId, (c) => ({
-                ...c,
-                messages: c.messages.map((m) =>
-                  m.id === assistantMsg.id
-                    ? { ...m, content: assistantContent }
-                    : m,
-                ),
-              }));
-            }
-          } else {
-            workflowData = null; // 不是有效的 workflow
-          }
-        } catch {
-          // 不是 JSON，忽略
-          workflowData = null;
-        }
-      }
-
-      // load workflow data to canvas if received
-      if (workflowData) {
-        if (!assistantContent) {
-          assistantContent = '已为你生成工作流，已加载到画布';
-          updateConversation(convId, (c) => ({
-            ...c,
-            messages: c.messages.map((m) =>
-              m.id === assistantMsg.id
-                ? { ...m, content: assistantContent }
-                : m,
-            ),
-          }));
-        }
-        setPendingWorkflow(workflowData);
-        if (window.location.pathname !== '/workflows/editor') {
-          router.push('/workflows/editor');
-        }
-        window.dispatchEvent(
-          new CustomEvent('tinyflow-load-data', { detail: workflowData }),
-        );
-      }
-
-      // 统一保存助手消息（只保存一次最终内容；流中已出错则跳过）
-      if (!streamFailed) {
-        saveMessage(convId, {
-          ...assistantMsg,
-          status: 'done',
-          content: assistantContent,
-          reasoning: assistantReasoning || undefined,
-        });
-      }
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') {
-        // user cancelled — keep partial content
-        updateConversation(convId, (c) => ({
-          ...c,
-          messages: c.messages.map((m) =>
-            m.id === assistantMsg.id
-              ? {
-                  ...m,
-                  status: m.content ? 'done' : 'error',
-                  error: m.content ? undefined : '已停止生成',
-                }
-              : m,
-          ),
-        }));
-        // 保存部分内容到 Supabase
-        saveMessage(convId, {
-          ...assistantMsg,
-          status: assistantContent ? 'done' : 'error',
-          content: assistantContent,
-          error: assistantContent ? undefined : '已停止生成',
-        });
-      } else {
-        const msg = err instanceof Error ? err.message : '网络错误';
-        setError(msg);
-        updateConversation(convId, (c) => ({
-          ...c,
-          messages: c.messages.map((m) =>
-            m.id === assistantMsg.id
-              ? { ...m, status: 'error', error: msg }
-              : m,
-          ),
-        }));
-        // 保存错误消息到 Supabase
-        saveMessage(convId, {
-          ...assistantMsg,
-          status: 'error',
-          content: assistantContent,
-          error: msg,
-        });
-      }
-    } finally {
+        }),
+      }));
+    } catch {
+      setError('发送失败，请重试');
+      updateConversation(convId, (c) => ({
+        ...c,
+        messages: c.messages.filter((m) => m.id !== assistantMsg.id),
+      }));
       setIsGenerating(false);
-      abortControllerRef.current = null;
-      // 回复结束，清空工具执行日志（过程已展示完毕）
-      setToolLogs([]);
+    } finally {
+      generateInFlightRef.current = false;
     }
   };
-  // 同步最新 handler（供 chat-send 事件使用）
-  handleSendRef.current = handleSend;
 
   // ===== 空状态（新建对话）：标题 + 对话输入框 + 模板推荐（一体）=====
   const startEmptyChat = async (text?: string) => {
@@ -826,13 +693,20 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
     handleSend(content);
   };
 
+  // 用户主动停止：调用后端 cancel 端点（DB 状态置 cancelled，后台生成器停止）
   const handleStop = () => {
-    abortControllerRef.current?.abort();
-    abortControllerRef.current = null;
-    setIsGenerating(false);
+    const cur = conversations.find((c) => c.id === convId);
+    const activeMsg = cur?.messages.find(
+      (m) => m.role === 'assistant' && (m.status === 'pending' || m.status === 'streaming'),
+    );
+    if (convId && activeMsg) {
+      fetch(`/api/conversations/${convId}/messages/${activeMsg.id}/cancel`, {
+        method: 'POST',
+      }).catch(() => {});
+    }
   };
 
-  // 重新生成最后一条 AI 回复
+  // 重新生成最后一条 AI 回复：删除旧回复 → 后端重新生成（历史消息保留，只插 assistant）
   const handleRegenerate = useCallback(
     async (assistantMsgId: string) => {
       if (isGenerating) return;
@@ -841,108 +715,68 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
 
       const idx = conv.messages.findIndex((m) => m.id === assistantMsgId);
       if (idx <= 0) return;
+      const userMsg = conv.messages[idx - 1];
+      if (userMsg.role !== 'user') return;
 
-      // 截取到该回复之前（不含它）
-      const before = conv.messages.slice(0, idx);
-      const lastUser = [...before].reverse().find((m) => m.role === 'user');
-      if (!lastUser) return;
-
-      // 历史 = 该回复之前的所有消息（最后一条为 user 消息触发）
-      const chatHistory = [...before, lastUser].map((m) => ({
-        role: m.role,
-        content: m.content,
-      }));
-
+      // 本地：移除旧回复，插入新 pending 占位
+      const newAssistant: Message = {
+        id: nextId(),
+        role: 'assistant',
+        content: '',
+        status: 'pending',
+        createdAt: Date.now(),
+      };
       setError(null);
+      updateConversation(conversationId, (c) => ({
+        ...c,
+        messages: c.messages
+          .filter((m) => m.id !== assistantMsgId)
+          .concat(newAssistant),
+      }));
       setIsGenerating(true);
 
-      // 标记该消息为 pending
-      updateConversation(convId, (c) => ({
-        ...c,
-        messages: c.messages.map((m) =>
-          m.id === assistantMsgId
-            ? { ...m, status: 'pending' as ChatMessageStatus, content: '', error: undefined }
-            : m,
-        ),
-      }));
-
-      const controller = new AbortController();
-      abortControllerRef.current = controller;
-
       try {
-        const res = await fetch('/api/chat-ai', {
+        // 删除旧回复（DB），再触发重新生成
+        await fetch(
+          `/api/conversations/${conversationId}/messages/${assistantMsgId}`,
+          { method: 'DELETE' },
+        ).catch(() => {});
+        const res = await fetch(`/api/conversations/${conversationId}/generate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: chatHistory, model }),
-          signal: controller.signal,
+          body: JSON.stringify({
+            content: userMsg.content,
+            images: userMsg.images,
+            model,
+            regenerate: true,
+          }),
         });
-        if (!res.ok) {
-          const errData = await res.json().catch(() => null);
-          throw new Error(errData?.error || `请求失败 (${res.status})`);
-        }
-
-        let content = '';
-        const reader = res.body?.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        while (true) {
-          const { done, value } = await reader!.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() ?? '';
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed.startsWith('data: ')) continue;
-            const payload = trimmed.slice(6);
-            if (payload === '[DONE]') continue;
-            try {
-              const data = JSON.parse(payload) as {
-                type?: string;
-                delta?: string;
-                error?: string;
-                errorText?: string;
-              };
-              if (data.type === 'text-delta' && data.delta) content += data.delta;
-              if (data.error || data.type === 'error') {
-                const errMsg = data.error || data.errorText || '请求失败';
-                throw new Error(errMsg);
-              }
-            } catch {
-              // skip
-            }
-          }
-          updateConversation(convId, (c) => ({
+        const data = await res.json();
+        if (!res.ok || !data?.assistantMessage?.id) {
+          setError(data?.error || '重新生成失败，请重试');
+          updateConversation(conversationId, (c) => ({
             ...c,
-            messages: c.messages.map((m) =>
-              m.id === assistantMsgId ? { ...m, status: 'streaming', content } : m,
-            ),
+            messages: c.messages.filter((m) => m.id !== newAssistant.id),
           }));
+          setIsGenerating(false);
+          return;
         }
-
-        updateConversation(convId, (c) => ({
+        // 用 db id 替换占位（轮询更新按 db id 匹配）
+        updateConversation(conversationId, (c) => ({
           ...c,
           messages: c.messages.map((m) =>
-            m.id === assistantMsgId
-              ? { ...m, status: 'done' as ChatMessageStatus, content }
+            m.id === newAssistant.id
+              ? { ...m, id: data.assistantMessage.id }
               : m,
           ),
         }));
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : '网络错误';
-        setError(msg);
-        updateConversation(convId, (c) => ({
+      } catch {
+        setError('重新生成失败，请重试');
+        updateConversation(conversationId, (c) => ({
           ...c,
-          messages: c.messages.map((m) =>
-            m.id === assistantMsgId
-              ? { ...m, status: 'error' as ChatMessageStatus, error: msg }
-              : m,
-          ),
+          messages: c.messages.filter((m) => m.id !== newAssistant.id),
         }));
-      } finally {
         setIsGenerating(false);
-        abortControllerRef.current = null;
       }
     },
     [conversationId, conversations, isGenerating, model, updateConversation],
@@ -1081,8 +915,9 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
             </div>
           </div>
         ) : (
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-6">
+          <div ref={messagesScrollRef} className="min-h-0 flex-1 overflow-y-auto">
+            {/* 顶部留出充足边距（首条消息不贴标题栏），底部 24px */}
+            <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 pb-6 pt-10">
               {messages.map((msg) => (
                 <SimpleChatMessage
                   key={msg.id}
@@ -1128,7 +963,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
           </div>
         )}
 
-        {/* 底部输入框：居中圆角卡片（ChatGPT 风格，非空态显示） */}
+        {/* 底部输入框：flex 列最后一项，天然贴底；消息区 flex-1 独立滚动 */}
         {messages.length > 0 && (
           <div className="mx-auto w-full max-w-3xl px-4 pb-4">
             <SimpleChatInput

@@ -221,7 +221,8 @@ export function SidebarNav() {
       </div>
 
       <ScrollArea className="flex-1">
-        <nav className="space-y-0.5 p-2">
+        {/* 对话历史置底：flex 列 + mt-auto（注意用 gap 而非 space-y——space-y 的 margin-top 会覆盖 mt-auto） */}
+        <nav className="flex min-h-full flex-col gap-0.5 p-2">
           {/* 工作区 */}
           {!collapsed && (
             <p className="px-2.5 pb-1 pt-2 text-[10px] font-medium uppercase text-muted-foreground/70">
@@ -257,9 +258,9 @@ export function SidebarNav() {
             </button>
           )}
 
-          {/* 对话历史（管理下面） */}
+          {/* 对话历史（置底：靠 mt-auto 贴到侧边栏底部） */}
           {!collapsed && (
-            <div className="pt-3">
+            <div className="mt-auto border-t border-border/60 pt-3">
               <div className="flex items-center justify-between px-2.5 pb-1">
                 <span className="flex items-center gap-1.5 text-[10px] font-medium uppercase text-muted-foreground/70">
                   <MessagesSquare className="h-3 w-3" />

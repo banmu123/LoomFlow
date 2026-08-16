@@ -152,3 +152,6 @@ BEGIN
     CREATE POLICY "Allow all on ai_models" ON ai_models FOR ALL USING (true) WITH CHECK (true);
   END IF;
 END $$;
+
+-- 24. 后台生成：消息工具执行日志（后台执行器流式写入，前端轮询展示）
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS tool_logs JSONB;
