@@ -115,6 +115,8 @@ export const zh = {
     voiceStop: '停止聆听',
     voiceListening: '正在聆听…',
     voiceContinuousHint: '连续聆听已开启：说完自动发送，再次点击麦克风停止',
+    toolLogTitle: '执行日志',
+    toolLogRunning: '执行中…',
     voiceUnsupported: '当前浏览器不支持语音输入（推荐 Chrome / Edge）',
     voicePermission: '麦克风权限被拒绝，请在浏览器设置中允许',
     voiceNetwork: '语音识别服务不可用（可能需要网络代理）',

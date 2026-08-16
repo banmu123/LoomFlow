@@ -30,6 +30,9 @@ import {
   Settings,
   LogOut,
   KeyRound,
+  Loader2,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SimpleChatMessage, type ChatMessageStatus } from './SimpleChatMessage';
@@ -48,6 +51,28 @@ const HISTORY_MAX_WIDTH = 300;
 const HISTORY_DEFAULT_WIDTH = 240;
 
 type MessageRole = 'user' | 'assistant';
+
+// 工具名 → 可读标签（对话中的执行日志展示）
+const TOOL_LABELS: Record<string, string> = {
+  list_workflows: '查询工作流列表',
+  get_workflow: '查看工作流详情',
+  list_workflow_versions: '查询版本历史',
+  list_models: '查询模型配置',
+  get_api_key_status: '查询 API Key 状态',
+  get_execution_history: '查询执行记录',
+  get_api_call_logs: '查询调用日志',
+  list_knowledge_bases: '查询知识库列表',
+  search_knowledge: '检索知识库',
+  get_oss_config_status: '查询 OSS 配置状态',
+  create_knowledge_base: '创建知识库',
+  delete_knowledge_base: '删除知识库',
+  create_model: '配置模型',
+  list_users: '查询用户列表',
+  get_stats: '查询用量统计',
+  get_audit_logs: '查询审计日志',
+  get_admin_api_logs: '查询 API 调用日志',
+  get_publish_status: '查询发布状态',
+};
 
 interface Message {
   id: string;
@@ -97,6 +122,8 @@ export function ChatPanel({
   const [uploading, setUploading] = useState(false);
   // 无模型时的配置引导弹窗
   const [modelConfigOpen, setModelConfigOpen] = useState(false);
+  // 对话中的工具执行日志（显示 AI 正在查什么/做什么）
+  const [toolLogs, setToolLogs] = useState<Array<{ toolName: string; status: 'running' | 'done' | 'error' }>>([]);
   const [model, setModel] = useState('');
   const [modelOptions, setModelOptions] = useState<Array<{ value: string; label: string }>>([]);
 
@@ -494,6 +521,8 @@ export function ChatPanel({
               error?: string;
               errorText?: string;
               workflow?: unknown;
+              toolName?: string;
+              toolCallId?: string;
             };
 
             // 处理错误（兼容 error 和 errorText 两种字段）
@@ -535,6 +564,24 @@ export function ChatPanel({
                     : m,
                 ),
               }));
+            }
+
+            // 处理工具执行日志（AI 调用工具时实时显示过程）
+            if (data.type === 'tool-input-start' && data.toolName) {
+              setToolLogs((prev) => [
+                ...prev.filter((l) => l.toolName !== data.toolName),
+                { toolName: data.toolName as string, status: 'running' },
+              ]);
+            }
+            if (data.type === 'tool-output-available' && data.toolName) {
+              const output = (data as { output?: { error?: string } }).output;
+              setToolLogs((prev) => [
+                ...prev.filter((l) => l.toolName !== data.toolName),
+                {
+                  toolName: data.toolName as string,
+                  status: output?.error ? 'error' : 'done',
+                },
+              ]);
             }
 
             // 处理 text（正式回答）
@@ -722,6 +769,8 @@ export function ChatPanel({
     } finally {
       setIsGenerating(false);
       abortControllerRef.current = null;
+      // 回复结束，清空工具执行日志（过程已展示完毕）
+      setToolLogs([]);
     }
   };
 
@@ -1200,6 +1249,30 @@ export function ChatPanel({
                 />
               ))}
               <div ref={messagesEndRef} />
+            </div>
+          </div>
+        )}
+
+        {/* 工具执行日志（AI 调用工具时实时显示过程） */}
+        {toolLogs.length > 0 && (
+          <div className="border-b border-border px-4 py-2">
+            <div className="space-y-1 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs">
+              <p className="font-medium text-muted-foreground">{t('chat.toolLogTitle')}</p>
+              {toolLogs.map((log) => (
+                <div key={log.toolName} className="flex items-center gap-2">
+                  {log.status === 'running' ? (
+                    <Loader2 className="h-3 w-3 shrink-0 animate-spin text-primary" />
+                  ) : log.status === 'done' ? (
+                    <CheckCircle2 className="h-3 w-3 shrink-0 text-green-600" />
+                  ) : (
+                    <XCircle className="h-3 w-3 shrink-0 text-destructive" />
+                  )}
+                  <span className="truncate">{TOOL_LABELS[log.toolName] ?? log.toolName}</span>
+                  {log.status === 'running' && (
+                    <span className="text-muted-foreground">{t('chat.toolLogRunning')}</span>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         )}

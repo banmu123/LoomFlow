@@ -119,6 +119,8 @@ export const en: ZhMessages = {
     voiceStop: 'Stop listening',
     voiceListening: 'Listening…',
     voiceContinuousHint: 'Continuous listening on: each sentence is sent automatically, tap the mic again to stop',
+    toolLogTitle: 'Tool log',
+    toolLogRunning: 'running…',
     voiceUnsupported: 'Voice input is not supported in this browser (use Chrome / Edge)',
     voicePermission: 'Microphone permission denied — please allow it in browser settings',
     voiceNetwork: 'Speech recognition service unavailable (a proxy may be needed)',
