@@ -25,7 +25,7 @@ import {
   PanelLeftOpen,
   Trash2,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, truncateTitle } from '@/lib/utils';
 import { useT } from '@/lib/i18n';
 import { LocaleSwitcher } from './LocaleSwitcher';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -76,6 +76,8 @@ export function SidebarNav() {
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   // 删除对话确认
   const [deleteTarget, setDeleteTarget] = useState<ConversationItem | null>(null);
+  // 当前活跃对话由路由推导：/chat（无 id）= 新聊天；/chat/[id] = 该对话
+  const activeConvId = pathname.startsWith('/chat/') ? pathname.slice('/chat/'.length) : '';
 
   useEffect(() => {
     (async () => {
@@ -131,6 +133,19 @@ export function SidebarNav() {
     router.push('/login');
   };
 
+  // 删除对话：直接调 API；若删除的是当前对话（/chat/[id]）则回到新聊天
+  const handleDeleteConversation = async (conv: ConversationItem) => {
+    setDeleteTarget(null);
+    try {
+      await fetch(`/api/conversations/${conv.id}`, { method: 'DELETE' });
+      if (pathname === `/chat/${conv.id}`) router.push('/chat');
+    } catch {
+      // ignore
+    } finally {
+      loadConversations();
+    }
+  };
+
   const isActive = (href: string) =>
     pathname === href || (href !== '/workflows' && pathname.startsWith(href + '/'));
 
@@ -156,15 +171,13 @@ export function SidebarNav() {
     );
   };
 
-  // 打开对话（主区域显示当前对话）
+  // 打开对话：路由带 id（/chat/[id]），新聊天：/chat（无 id）
   const openConversation = (id: string) => {
-    window.dispatchEvent(new CustomEvent('chat-select', { detail: { id } }));
-    if (pathname !== '/') router.push('/');
+    if (pathname !== `/chat/${id}`) router.push(`/chat/${id}`);
   };
 
   const newConversation = () => {
-    window.dispatchEvent(new CustomEvent('chat-new'));
-    if (pathname !== '/') router.push('/');
+    if (pathname !== '/chat') router.push('/chat');
   };
 
   return (
@@ -176,7 +189,7 @@ export function SidebarNav() {
     >
       {/* Logo（点击回到对话）+ 折叠按钮 */}
       <div className={cn('flex items-center border-b border-border py-3', collapsed ? 'justify-center' : 'justify-between px-3')}>
-        <button onClick={() => router.push('/')} className="flex items-center gap-2" title={t('app.name')}>
+        <button onClick={() => router.push('/chat')} className="flex items-center gap-2" title={t('app.name')}>
           <div className="bg-brand-gradient flex h-7 w-7 items-center justify-center rounded-md shadow-md shadow-indigo-500/30">
             <GitBranch className="h-4 w-4 text-white" />
           </div>
@@ -197,7 +210,7 @@ export function SidebarNav() {
           onClick={newConversation}
           className={cn(
             'flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm font-medium transition-all',
-            pathname === '/'
+            pathname === '/chat'
               ? 'bg-primary/10 text-primary'
               : 'text-foreground hover:bg-muted',
           )}
@@ -262,14 +275,19 @@ export function SidebarNav() {
                 {conversations.map((conv) => (
                   <div
                     key={conv.id}
-                    className="group flex w-full items-center rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    className={cn(
+                      'group flex w-full items-center rounded-md px-2.5 py-1.5 text-sm transition-colors',
+                      conv.id === activeConvId
+                        ? 'bg-primary/10 font-medium text-primary'
+                        : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                    )}
                   >
                     <button
                       onClick={() => openConversation(conv.id)}
                       className="flex min-w-0 flex-1 items-center gap-2 text-left"
                     >
                       <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-60" />
-                      <span className="truncate">{conv.title}</span>
+                      <span className="truncate">{truncateTitle(conv.title)}</span>
                     </button>
                     <button
                       onClick={() => setDeleteTarget(conv)}
@@ -321,12 +339,7 @@ export function SidebarNav() {
         destructive
         title={deleteTarget ? t('chat.deleteConversationConfirm', { title: deleteTarget.title }) : ''}
         onConfirm={() => {
-          if (deleteTarget) {
-            window.dispatchEvent(
-              new CustomEvent('chat-delete-request', { detail: { id: deleteTarget.id } }),
-            );
-            setDeleteTarget(null);
-          }
+          if (deleteTarget) handleDeleteConversation(deleteTarget);
         }}
         onCancel={() => setDeleteTarget(null)}
       />

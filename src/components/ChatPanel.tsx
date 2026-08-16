@@ -103,14 +103,13 @@ interface Conversation {
 let seq = 0;
 const nextId = () => `${Date.now()}-${seq++}`;
 
-export function ChatPanel() {
+export function ChatPanel({ conversationId = '' }: { conversationId?: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const t = useT();
-  const [conversations, setConversations] = useState<Conversation[]>([
-    { id: nextId(), title: '新建对话', messages: [] },
-  ]);
-  const [activeId, setActiveId] = useState<string>('');
+  // 当前对话由路由决定：/chat（空）→ 新聊天；/chat/[id] → 已生成对话
+  const convId = conversationId;
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [input, setInput] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<Conversation | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -174,7 +173,7 @@ export function ChatPanel() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const [loadingHistory, setLoadingHistory] = useState(true);
+  const [loadingHistory, setLoadingHistory] = useState(!!conversationId);
   const [isAdmin, setIsAdmin] = useState(false);
 
   // 未配置模型：加载完成且为空时弹窗引导（仅 admin；避免刷新闪现）
@@ -288,7 +287,6 @@ export function ChatPanel() {
       );
 
       setConversations(convs);
-      setActiveId((prev) => prev || convs[0]?.id || '');
       setLoadingHistory(false);
     } catch {
       setLoadingHistory(false);
@@ -299,7 +297,57 @@ export function ChatPanel() {
     loadAllConversations();
   }, [loadAllConversations]);
 
-  const activeConversation = conversations.find((c) => c.id === activeId);
+  // 路由带对话 id：本地还没有该对话（直达/刷新/他人创建）时单独加载标题+消息
+  useEffect(() => {
+    if (!convId || conversations.some((c) => c.id === convId)) return;
+    setLoadingHistory(true);
+    fetch('/api/conversations')
+      .then((res) => res.json())
+      .then((list) => {
+        const meta = Array.isArray(list)
+          ? list.find((c: { id: string }) => c.id === convId)
+          : null;
+        if (!meta) {
+          // 对话不存在（如已被删除）：回到新聊天
+          router.replace('/chat');
+          return null;
+        }
+        return fetch(`/api/conversations/${convId}/messages`)
+          .then((res) => res.json())
+          .then((msgs) => ({ title: meta.title, msgs }));
+      })
+      .then((data) => {
+        if (!data) return;
+        const { title, msgs } = data;
+        if (!Array.isArray(msgs)) {
+          router.replace('/chat');
+          return;
+        }
+        setConversations((prev) => [
+          ...prev,
+          {
+            id: convId,
+            title,
+            messages: msgs.map((m) => ({
+              id: m.id,
+              role: m.role,
+              content: m.content,
+              reasoning: m.reasoning,
+              status: m.status,
+              error: m.error,
+              images: m.images ?? undefined,
+              createdAt: new Date(m.created_at).getTime(),
+            })),
+          },
+        ]);
+      })
+      .catch(() => {
+        // 加载失败也放行（消息区显示空态），避免卡在 loading
+      })
+      .finally(() => setLoadingHistory(false));
+  }, [convId, conversations, router]);
+
+  const activeConversation = conversations.find((c) => c.id === convId);
   const messages = activeConversation?.messages ?? [];
 
   // auto scroll
@@ -320,6 +368,30 @@ export function ChatPanel() {
     },
     [],
   );
+
+  // 创建真实对话（发送首条消息时才落库），返回创建结果；失败返回 null
+  const createDbConversation = useCallback(async (): Promise<Conversation | null> => {
+    try {
+      const res = await fetch('/api/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: '新建对话' }),
+      });
+      const db = await res.json();
+      if (!db?.id) return null;
+      const newConv: Conversation = {
+        id: db.id,
+        title: db.title,
+        messages: [],
+      };
+      setConversations((prev) => [newConv, ...prev]);
+      // 通知侧边栏刷新对话历史（新对话立即可见并高亮）
+      window.dispatchEvent(new Event('conversations-updated'));
+      return newConv;
+    } catch {
+      return null;
+    }
+  }, []);
 
   // 保存单条消息到 Supabase（fire-and-forget）
   const saveMessage = useCallback(
@@ -346,15 +418,23 @@ export function ChatPanel() {
     if (!text || isGenerating) return;
 
     setError(null);
-    // 确保对话已在数据库存在（本地 id 则同步创建），否则消息无法保存
-    let convId = activeId || conversations[0]?.id;
-    if (!convId) return;
-
-    try {
-      convId = await ensureConversation(convId);
-    } catch {
-      setError('对话同步失败，请重试');
-      return;
+    // 当前对话由路由决定：/chat（无 id）→ 创建新对话并跳转；/chat/[id] → 直接使用
+    // （函数内局部变量遮蔽组件级 const convId，便于创建后替换为真实 id）
+    let convId = conversationId;
+    let isFirstMessage = false;
+    const target = conversations.find((c) => c.id === convId);
+    if (!target) {
+      // 新聊天首条消息：创建真实对话，URL 立即带上新对话 id
+      const newConv = await createDbConversation();
+      if (!newConv) {
+        setError('对话同步失败，请重试');
+        return;
+      }
+      router.replace(`/chat/${newConv.id}`);
+      convId = newConv.id;
+      isFirstMessage = true;
+    } else {
+      isFirstMessage = target.messages.length === 0;
     }
 
     const userMsg: Message = {
@@ -373,9 +453,6 @@ export function ChatPanel() {
       status: 'pending',
       createdAt: Date.now() + 1,
     };
-
-    const isFirstMessage =
-      conversations.find((c) => c.id === convId)?.messages.length === 0;
 
     updateConversation(convId, (c) => ({
       ...c,
@@ -745,40 +822,9 @@ export function ChatPanel() {
   const startEmptyChat = async (text?: string) => {
     const content = (text ?? '').trim();
     if (!content || isGenerating) return;
-    await handleNewConversation();
-    // 新会话创建后 conversations[0] 即新会话（handleSend 有兜底）
+    // handleSend 内部负责创建真实对话（空态首条消息才落库）
     handleSend(content);
   };
-
-  // 侧边栏选择/新建对话事件
-  useEffect(() => {
-    const onSelect = (e: Event) => {
-      const id = (e as CustomEvent<{ id?: string }>).detail?.id;
-      if (id) {
-        if (!conversations.some((c) => c.id === id)) {
-          // 本地没有该对话（如其它会话创建）：重新加载
-          loadAllConversations();
-        }
-        setActiveId(id);
-      }
-    };
-    const onNew = () => {
-      setActiveId('');
-    };
-    // 侧边栏删除对话请求 → 统一走 handleDeleteConversation（状态切换 + API + 通知刷新）
-    const onDeleteRequest = (e: Event) => {
-      const id = (e as CustomEvent<{ id?: string }>).detail?.id;
-      if (id) handleDeleteConversation(id);
-    };
-    window.addEventListener('chat-select', onSelect);
-    window.addEventListener('chat-new', onNew);
-    window.addEventListener('chat-delete-request', onDeleteRequest);
-    return () => {
-      window.removeEventListener('chat-select', onSelect);
-      window.removeEventListener('chat-new', onNew);
-      window.removeEventListener('chat-delete-request', onDeleteRequest);
-    };
-  }, [conversations]);
 
   const handleStop = () => {
     abortControllerRef.current?.abort();
@@ -790,8 +836,7 @@ export function ChatPanel() {
   const handleRegenerate = useCallback(
     async (assistantMsgId: string) => {
       if (isGenerating) return;
-      const convId = activeId;
-      const conv = conversations.find((c) => c.id === convId);
+      const conv = conversations.find((c) => c.id === conversationId);
       if (!conv) return;
 
       const idx = conv.messages.findIndex((m) => m.id === assistantMsgId);
@@ -900,7 +945,7 @@ export function ChatPanel() {
         abortControllerRef.current = null;
       }
     },
-    [activeId, conversations, isGenerating, model, updateConversation],
+    [conversationId, conversations, isGenerating, model, updateConversation],
   );
 
   // 上传图片到 OSS
@@ -940,79 +985,10 @@ export function ChatPanel() {
     router.push('/login');
   }, [router]);
 
-  // 确保对话已在数据库中存在，返回真实 db id（本地 id 则先创建）
-  const ensureConversation = useCallback(
-    async (localId: string): Promise<string> => {
-      const isUuid =
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-          localId,
-        );
-      if (isUuid) return localId;
-
-      const conv = conversations.find((c) => c.id === localId);
-      const title = conv?.title || '新建对话';
-      const res = await fetch('/api/conversations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title }),
-      });
-      const db = await res.json();
-      if (!db?.id) throw new Error('创建对话失败');
-
-      // 本地 id 替换为 db id
-      setConversations((prev) =>
-        prev.map((c) => (c.id === localId ? { ...c, id: db.id } : c)),
-      );
-      setActiveId((prev) => (prev === localId ? db.id : prev));
-      // 通知侧边栏刷新对话历史（空态首条消息创建的对话立即可见）
-      window.dispatchEvent(new Event('conversations-updated'));
-      return db.id;
-    },
-    [conversations],
-  );
-
-  const handleNewConversation = async () => {
-    setError(null);
-    try {
-      const res = await fetch('/api/conversations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: '新建对话' }),
-      });
-      const db = await res.json();
-      if (!db?.id) {
-        setError('创建对话失败，请重试');
-        return;
-      }
-      const newConv: Conversation = {
-        id: db.id,
-        title: db.title,
-        messages: [],
-      };
-      setConversations((prev) => [newConv, ...prev]);
-      setActiveId(db.id);
-      // 通知侧边栏刷新对话历史
-      window.dispatchEvent(new Event('conversations-updated'));
-    } catch {
-      setError('创建对话失败，请重试');
-    }
-  };
-
   const handleDeleteConversation = (id: string) => {
-    setConversations((prev) => {
-      const filtered = prev.filter((c) => c.id !== id);
-      if (filtered.length === 0) {
-        const newConv: Conversation = {
-          id: nextId(),
-          title: '新建对话',
-          messages: [],
-        };
-        setActiveId(newConv.id);
-        return [newConv];
-      }
-      if (id === activeId) setActiveId(filtered[0].id);
-      return filtered;
-    });
+    // 删除的是当前对话（/chat/[id]）→ 回到新聊天
+    if (convId === id) router.replace('/chat');
+    setConversations((prev) => prev.filter((c) => c.id !== id));
     setDeleteTarget(null);
 
     // 异步从 Supabase 删除；删除完成后再通知侧边栏刷新（否则列表仍显示）
