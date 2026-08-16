@@ -75,12 +75,6 @@ curl -X POST https://your-host/api/publish/{workflowId}/execute \
 
 ---
 
-## 📸 界面截图
-
-| AI 对话 | 工作流画布 |
-|---------|-----------|
-| ![对话](public/screenshots/chat.png) | ![画布](public/screenshots/canvas.png) |
-
 ## 🏗️ 架构图
 
 ```mermaid

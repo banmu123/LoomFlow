@@ -92,12 +92,6 @@ Admin → Model Settings → Add Model
 
 ---
 
-## 📸 Screenshots
-
-| AI Chat | Workflow Canvas |
-|---------|-----------------|
-| ![Chat](public/screenshots/chat.png) | ![Canvas](public/screenshots/canvas.png) |
-
 ## 🏗️ Architecture
 
 ```mermaid
