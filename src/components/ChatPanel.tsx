@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { setPendingWorkflow } from '@/lib/pending-workflow';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
@@ -41,11 +40,13 @@ import { cn } from '@/lib/utils';
 import { SimpleChatMessage, type ChatMessageStatus } from './SimpleChatMessage';
 import { SimpleChatInput } from './SimpleChatInput';
 import { ModelConfigDialog } from './ModelConfigDialog';
+import { WorkflowPreviewDrawer } from './WorkflowPreviewDrawer';
 import { uploadFileToOSS } from '@/lib/oss-upload-client';
 import { useT } from '@/lib/i18n';
-import { ChevronsLeft } from 'lucide-react';
+import { ChevronsLeft, Boxes } from 'lucide-react';
 import { validateWorkflow } from '@/lib/tinyflow/schema';
 import { normalizeWorkflowModels } from '@/lib/workflow-templates';
+import type { TinyflowData } from '@/lib/tinyflow/types';
 import { LocaleSwitcher } from './LocaleSwitcher';
 
 const CHAT_PANEL_WIDTH = 440;
@@ -122,6 +123,9 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
   const [modelConfigOpen, setModelConfigOpen] = useState(false);
   // 对话中的工具执行日志（显示 AI 正在查什么/做什么）
   const [toolLogs, setToolLogs] = useState<Array<{ toolName: string; status: 'running' | 'done' | 'error' }>>([]);
+  // AI 生成的工作流（预览抽屉）
+  const [previewWorkflow, setPreviewWorkflow] = useState<TinyflowData | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [model, setModel] = useState('');
   const [modelOptions, setModelOptions] = useState<Array<{ value: string; label: string }>>([]);
   // 模型列表是否已加载完成（避免加载中误判为未配置）
@@ -380,8 +384,8 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
     }
   }, [convId, conversations]);
 
-  // 工作流提取：新完成的 assistant 消息包含工作流 JSON → 加载到画布。
-  // 只在"进入页面后的新消息"处理（首次挂载只记录基线，避免每次进对话重复跳转画布）
+  // 工作流提取：新完成的 assistant 消息包含工作流 JSON → 右上角出现「预览工作流」按钮。
+  // 只在"进入页面后的新消息"处理（首次挂载只记录基线，避免每次进对话重复触发）
   const lastSeenAssistantIdRef = useRef<string | null>(null);
   const initialScanDoneRef = useRef(false);
   useEffect(() => {
@@ -408,15 +412,13 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
         edges?: unknown;
       };
       if (parsed && Array.isArray(parsed.nodes) && Array.isArray(parsed.edges)) {
-        setPendingWorkflow(parsed);
-        if (window.location.pathname !== '/workflows/editor') {
-          router.push('/workflows/editor');
-        }
+        // 生成工作流 → 预览按钮（不自动跳转画布）
+        setPreviewWorkflow(parsed as TinyflowData);
       }
     } catch {
       // 不是合法 JSON，忽略
     }
-  }, [convId, conversations, router]);
+  }, [convId, conversations]);
 
 
   // 路由带对话 id：本地还没有该对话（直达/刷新/他人创建）时单独加载标题+消息
@@ -845,6 +847,18 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
               {activeConversation.title}
             </h2>
             <div className="flex items-center gap-1">
+              {/* AI 生成工作流后：右上角预览按钮 */}
+              {previewWorkflow && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1 text-xs"
+                  onClick={() => setPreviewOpen(true)}
+                >
+                  <Boxes className="h-3.5 w-3.5" />
+                  {t('chat.previewWorkflow')}
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
@@ -998,6 +1012,13 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
           open={modelConfigOpen}
           onOpenChange={setModelConfigOpen}
           onConfigured={loadModels}
+        />
+
+        {/* 工作流预览抽屉（AI 生成工作流后） */}
+        <WorkflowPreviewDrawer
+          open={previewOpen}
+          data={previewWorkflow}
+          onOpenChange={setPreviewOpen}
         />
       </div>
 
