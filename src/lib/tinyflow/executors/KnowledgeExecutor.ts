@@ -10,7 +10,7 @@ import { supabase } from '@/lib/supabase/server';
 // 去重后最多 8 个（PostgREST or 子句数量限制内）
 const SEARCH_STOP_WORDS = ['这个', '那个', '什么', '怎么', '有没有', '为什么', '是不是', '如何', '应该', '可以', '一下', '请帮', '帮我'];
 
-function buildSearchTerms(keyword: string): string[] {
+export function buildSearchTerms(keyword: string): string[] {
   const parts = keyword
     .replace(/[，。！？、；：""''（）\s,\.!?;:\(\)\[\]「」『』]/g, ' ')
     .split(/\s+/)
