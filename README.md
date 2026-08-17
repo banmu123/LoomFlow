@@ -12,9 +12,9 @@ Describe your idea in natural language → generate a runnable workflow → cust
 
 ## 📸 Screenshots
 
-![LoomFlow Chat](public/5be70282164e16081cdf02fd3a5dba99.png)
+![LoomFlow Chat](public/screenshots/chat.png)
 
-![LoomFlow Workflow Canvas](public/a165e581f754768c6241e36797e41eaa.png)
+![LoomFlow Workflow Canvas](public/screenshots/canvas.png)
 
 ---
 

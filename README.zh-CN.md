@@ -12,9 +12,9 @@
 
 ## 📸 界面截图
 
-![LoomFlow 对话](public/5be70282164e16081cdf02fd3a5dba99.png)
+![LoomFlow 对话](public/screenshots/chat.png)
 
-![LoomFlow 工作流画布](public/a165e581f754768c6241e36797e41eaa.png)
+![LoomFlow 工作流画布](public/screenshots/canvas.png)
 
 ---
 
