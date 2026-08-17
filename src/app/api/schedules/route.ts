@@ -3,6 +3,7 @@ import { Cron } from 'croner';
 import { supabase } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/server-auth';
 import { reloadSchedules } from '@/lib/scheduler';
+import { isSafeHttpUrl } from '@/lib/url-security';
 
 // 定时任务列表（用户自己的）
 export async function GET() {
@@ -63,6 +64,18 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: '无权操作该工作流' }, { status: 403 });
   }
 
+  // SSRF 防护：webhook_url 必须是安全的公网 http/https 地址
+  const webhookUrl = body.webhook_url ? String(body.webhook_url).trim() : null;
+  if (webhookUrl) {
+    const check = await isSafeHttpUrl(webhookUrl);
+    if (!check.ok) {
+      return Response.json(
+        { error: `webhook_url 不合法：${check.reason}` },
+        { status: 400 },
+      );
+    }
+  }
+
   const { data, error } = await supabase
     .from('scheduled_runs')
     .insert({
@@ -70,7 +83,7 @@ export async function POST(request: NextRequest) {
       user_id: user.id,
       cron_expr: cronExpr,
       inputs: body.inputs || {},
-      webhook_url: body.webhook_url || null,
+      webhook_url: webhookUrl,
       enabled: body.enabled !== false,
     })
     .select()

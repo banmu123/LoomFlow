@@ -2,10 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { flowRunStore } from '@/lib/tinyflow';
 import { saveFlowRun } from '@/lib/tinyflow/runFlow';
 import type { FlowError } from '@/lib/tinyflow/types';
+import { getCurrentUser } from '@/lib/server-auth';
 
 export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
+  // 强制登录 + 归属校验（安全：未认证可向任意暂停流程注入 confirmData）
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: '未登录，请先登录' }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
     const { flowId, confirmData = {} } = body as {
@@ -19,6 +26,9 @@ export async function POST(request: NextRequest) {
         { error: 'Flow run not found' },
         { status: 404 }
       );
+    }
+    if (record.userId && record.userId !== user.id && user.role !== 'admin') {
+      return NextResponse.json({ error: '无权操作该流程' }, { status: 403 });
     }
 
     if (record.status !== 'paused') {

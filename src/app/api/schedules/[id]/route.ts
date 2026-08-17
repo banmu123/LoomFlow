@@ -3,6 +3,7 @@ import { Cron } from 'croner';
 import { supabase } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/server-auth';
 import { reloadSchedules } from '@/lib/scheduler';
+import { isSafeHttpUrl } from '@/lib/url-security';
 
 // 更新定时任务
 export async function PATCH(
@@ -40,7 +41,20 @@ export async function PATCH(
     updates.cron_expr = body.cron_expr.trim();
   }
   if (body.inputs !== undefined) updates.inputs = body.inputs;
-  if (typeof body.webhook_url === 'string') updates.webhook_url = body.webhook_url || null;
+  if (typeof body.webhook_url === 'string') {
+    // SSRF 防护：webhook_url 必须是安全的公网 http/https 地址
+    const webhookUrl = body.webhook_url.trim() || null;
+    if (webhookUrl) {
+      const check = await isSafeHttpUrl(webhookUrl);
+      if (!check.ok) {
+        return Response.json(
+          { error: `webhook_url 不合法：${check.reason}` },
+          { status: 400 },
+        );
+      }
+    }
+    updates.webhook_url = webhookUrl;
+  }
   if (typeof body.enabled === 'boolean') updates.enabled = body.enabled;
 
   if (Object.keys(updates).length === 0) {

@@ -26,11 +26,24 @@ export async function uploadTextToOSS(
   const client = await getClient();
   if (!client) return null;
 
+  return uploadBufferToOSS(key, Buffer.from(content, 'utf8'), contentType);
+}
+
+// 二进制上传（通用：聊天图片 / 工作流附件走服务端代理上传，密钥不下发客户端）
+export async function uploadBufferToOSS(
+  key: string,
+  buffer: Buffer,
+  contentType = 'application/octet-stream',
+): Promise<string | null> {
+  const client = await getClient();
+  const config = await getOSSConfig();
+  if (!client || !config) return null;
+
   await client.send(
     new PutObjectCommand({
-      Bucket: (await getOSSConfig())!.bucket,
+      Bucket: config.bucket,
       Key: key,
-      Body: content,
+      Body: buffer,
       ContentType: contentType,
     }),
   );

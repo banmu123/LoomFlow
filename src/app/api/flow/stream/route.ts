@@ -1,10 +1,20 @@
 import { NextRequest } from 'next/server';
 import { FlowEngine, flowRunStore } from '@/lib/tinyflow';
 import type { TinyflowData, FlowError } from '@/lib/tinyflow/types';
+import { getCurrentUser } from '@/lib/server-auth';
 
 export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
+  // 强制登录（安全：未认证可执行任意 flowData = RCE/SSRF/成本滥用入口）
+  const user = await getCurrentUser();
+  if (!user) {
+    return new Response(JSON.stringify({ error: '未登录，请先登录' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   const encoder = new TextEncoder();
   const readable = new ReadableStream({
     async start(controller) {
@@ -58,6 +68,7 @@ export async function POST(request: NextRequest) {
           engine,
           status: 'running',
           context: engine.getContext(),
+          userId: user.id,
           createdAt: Date.now(),
           updatedAt: Date.now(),
         });

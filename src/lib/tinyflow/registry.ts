@@ -7,6 +7,8 @@ export interface FlowRunRecord {
   status: 'running' | 'paused' | 'completed' | 'failed' | 'stopped';
   context: FlowContext;
   confirmRequest?: ConfirmRequest;
+  /** 发起者用户 id（status/stop/confirm 端点校验归属；null=未登录遗留记录） */
+  userId?: string | null;
   createdAt: number;
   updatedAt: number;
 }

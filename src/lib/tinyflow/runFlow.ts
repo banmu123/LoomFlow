@@ -135,6 +135,7 @@ export async function runFlow(
     engine,
     status: 'running',
     context: engine.getContext(),
+    userId: options.userId,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   });

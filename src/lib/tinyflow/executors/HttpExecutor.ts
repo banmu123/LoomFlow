@@ -2,6 +2,12 @@ import type { FlowNode, FlowContext } from '../types';
 import { BaseExecutor } from './BaseExecutor';
 import type { ParameterResolver } from '../engine/ParameterResolver';
 import type { ExpressionEvaluator } from '../engine/ExpressionEvaluator';
+import { isSafeHttpUrl } from '@/lib/url-security';
+
+// 请求超时与响应体上限（SSRF 防护 + 资源限制）
+const REQUEST_TIMEOUT_MS = 10_000;
+const MAX_BODY_BYTES = 1024 * 1024; // 1MB
+const MAX_REDIRECTS = 5;
 
 export class HttpExecutor extends BaseExecutor {
   constructor(paramResolver: ParameterResolver, exprEvaluator: ExpressionEvaluator) {
@@ -59,14 +65,67 @@ export class HttpExecutor extends BaseExecutor {
         }
     }
 
-    const response = await fetch(url, { method, headers, body });
+    // ===== SSRF 防护：逐跳校验 URL（含 DNS 解析后校验内网地址）=====
+    let currentUrl = url;
+    let response: Response | null = null;
+
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+      const check = await isSafeHttpUrl(currentUrl);
+      if (!check.ok) {
+        throw new Error(`HTTP 节点请求被拒绝：${check.reason}`);
+      }
+
+      response = await fetch(currentUrl, {
+        method,
+        headers,
+        body,
+        redirect: 'manual',
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+
+      // 手动跟随重定向（每跳重新校验，防重定向到内网）
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get('location');
+        await response.body?.cancel().catch(() => {});
+        if (!location) break;
+        currentUrl = new URL(location, currentUrl).toString();
+        continue;
+      }
+      break;
+    }
+
+    if (!response) {
+      throw new Error('HTTP 请求无响应');
+    }
+
+    // 限制响应体大小（读流截断，防内网服务大响应耗尽内存）
+    const reader = response.body?.getReader();
+    let size = 0;
+    const chunks: Uint8Array[] = [];
+    if (reader) {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.length;
+        if (size > MAX_BODY_BYTES) {
+          await reader.cancel().catch(() => {});
+          throw new Error(`响应体超过 ${MAX_BODY_BYTES / 1024 / 1024}MB 限制`);
+        }
+        chunks.push(value);
+      }
+    }
+    const buffer = Buffer.concat(chunks);
 
     let result: unknown;
     const contentType = response.headers.get('content-type') || '';
     if (contentType.includes('application/json')) {
-      result = await response.json();
+      try {
+        result = JSON.parse(buffer.toString('utf8'));
+      } catch {
+        result = buffer.toString('utf8');
+      }
     } else {
-      result = await response.text();
+      result = buffer.toString('utf8');
     }
 
     if (!response.ok) {

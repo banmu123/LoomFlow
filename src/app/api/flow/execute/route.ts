@@ -20,12 +20,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 内部试运行：关联当前登录用户（未登录也允许执行，用户为空）
+    // 内部试运行：强制登录（安全：未认证可执行任意 flowData = RCE/SSRF/成本滥用入口）
     const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: '未登录，请先登录' }, { status: 401 });
+    }
 
     const result = await runFlow(flowData, inputs, {
       source: 'internal',
-      userId: user?.id ?? null,
+      userId: user.id,
     });
 
     if (result.status === 'failed') {
