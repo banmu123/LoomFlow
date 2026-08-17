@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
 
   // 改密码后清除登录态，强制重新登录（多个变体覆盖历史 cookie）
   const res = Response.json({ success: true });
-  for (const cookie of clearAuthCookie()) {
+  for (const cookie of clearAuthCookie(request)) {
     res.headers.append('Set-Cookie', cookie);
   }
   return res;

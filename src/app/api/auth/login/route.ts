@@ -118,6 +118,6 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  res.headers.append('Set-Cookie', authCookie(token));
+  res.headers.append('Set-Cookie', authCookie(token, undefined, request));
   return res;
 }

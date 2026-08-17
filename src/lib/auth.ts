@@ -59,9 +59,16 @@ export function verifyJWT(token: string): AuthPayload | null {
 
 export { COOKIE_NAME, TOKEN_TTL };
 
-// 生成 Set-Cookie 头（生产环境加 Secure：仅 HTTPS 传输）
-export function authCookie(token: string, maxAgeSec = TOKEN_TTL): string {
-  const secure = process.env.COZE_PROJECT_ENV === 'PROD' ? '; Secure' : '';
+// 判断请求是否 HTTPS（x-forwarded-proto 由反代设置；直连 HTTP 时为 http/undefined）
+// Secure 属性按实际协议动态决定——HTTP 直连（如 http://IP:5000）不能带 Secure，
+// 否则浏览器不发送 cookie 导致登录态无法维持；HTTPS 反代自动带 Secure 保证安全。
+function isHttpsRequest(request: Request): boolean {
+  return request.headers.get('x-forwarded-proto') === 'https';
+}
+
+// 生成 Set-Cookie 头（Secure 跟随请求协议）
+export function authCookie(token: string, maxAgeSec = TOKEN_TTL, request?: Request): string {
+  const secure = request && isHttpsRequest(request) ? '; Secure' : '';
   return `${COOKIE_NAME}=${token}; HttpOnly; Path=/; Max-Age=${maxAgeSec}; SameSite=Lax${secure}`;
 }
 
@@ -71,8 +78,8 @@ export function authCookie(token: string, maxAgeSec = TOKEN_TTL): string {
  * （如旧版无 Secure），单条清除无法匹配旧 cookie 导致退出后仍保持登录态。
  * 因此同时发送带 Secure 与不带 Secure 两个变体，确保任意历史 cookie 都能被清除。
  */
-export function clearAuthCookie(): string[] {
-  const secure = process.env.COZE_PROJECT_ENV === 'PROD' ? '; Secure' : '';
+export function clearAuthCookie(request?: Request): string[] {
+  const secure = request && isHttpsRequest(request) ? '; Secure' : '';
   return [
     `${COOKIE_NAME}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax${secure}`,
     `${COOKIE_NAME}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax`,
