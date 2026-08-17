@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import '@tinyflow-ai/ui/dist/index.css';
-import type { Tinyflow as TinyflowInstance } from '@tinyflow-ai/ui';
+import type { Tinyflow as TinyflowInstance, CustomNode } from '@tinyflow-ai/ui';
 import type { TinyflowData, Parameter, FlowNode } from '@/lib/tinyflow/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -289,6 +289,36 @@ export default function TinyflowWrapper() {
       } catch {
         // 拉取失败保持空列表
       }
+      // 自定义节点（source: custom）→ Tinyflow customNodes 注册：
+      // 画布才能渲染/配置自定义类型（不注册则 setData 添加后不显示）
+      let customNodeMap: Record<string, CustomNode> = {};
+      try {
+        const res = await fetch('/api/nodes');
+        const data = await res.json();
+        const customDefs = (Array.isArray(data?.nodes) ? data.nodes : []).filter(
+          (n: { source?: string }) => n.source === 'custom',
+        );
+        customNodeMap = Object.fromEntries(
+          customDefs.map((n: { type: string; label: string; description?: string; configSchema?: Array<{ name: string; label: string; type: string; default?: unknown }> }) => [
+            n.type,
+            {
+              title: n.label,
+              description: n.description ?? '',
+              group: 'custom',
+              parametersEnable: true,
+              parameters: (n.configSchema ?? []).map((f) => ({
+                name: f.name,
+                label: f.label,
+                dataType: f.type === 'number' ? 'number' : f.type === 'boolean' ? 'boolean' : 'string',
+                ...(f.default !== undefined ? { defaultValue: String(f.default) } : {}),
+              })),
+              outputDefsEnable: true,
+            },
+          ]),
+        );
+      } catch {
+        // 自定义节点拉取失败不影响内置节点
+      }
       if (destroyed || !containerRef.current) return;
 
       const { Tinyflow } = await import('@tinyflow-ai/ui');
@@ -300,6 +330,7 @@ export default function TinyflowWrapper() {
           llm: () => llmOptions,
           knowledge: () => knowledgeOptions,
         },
+        customNodes: customNodeMap,
         // 节点库启用控制：隐藏未启用的节点类型（勾选后才在面板显示）
         hiddenNodes: () => [...enabledTypesRef.current],
         onDataChange: (data) => {

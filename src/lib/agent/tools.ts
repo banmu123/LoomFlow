@@ -6,6 +6,7 @@ import type { AuthUser } from '@/lib/server-auth';
 import { logAudit } from '@/lib/audit';
 import { deleteOSSObject } from '@/lib/oss-server';
 import { getOSSConfig } from '@/lib/oss-config';
+import { createCustomNode } from '@/lib/tinyflow/node-custom';
 
 // ===== Agent 只读工具集 =====
 // P1：让 AI 对话能查询系统状态（工作流/模型/日志/发布），实现「知道一切 + 排错」
@@ -652,6 +653,63 @@ const getPublishStatus = tool({
   },
 });
 
+// ===== 自定义节点工具（Phase 5：AI 可创建自定义节点）=====
+const createCustomNodeTool = tool({
+  description:
+    '创建自定义节点（metadata / configSchema / 输入输出端口）。执行类操作——调用前必须先向用户展示节点定义方案并征得同意后再执行。',
+  inputSchema: z.object({
+    type: z.string().describe('节点类型标识（字母开头，仅含字母/数字/_-，如 greetNode）'),
+    label: z.string().describe('节点显示名（如 问候节点）'),
+    description: z.string().optional().describe('节点描述'),
+    category: z.enum(['ai', 'integration', 'logic', 'data', 'custom']).default('custom').describe('节点分类'),
+    inputs: z
+      .array(z.object({ name: z.string(), label: z.string(), dataType: z.string().default('string'), required: z.boolean().optional() }))
+      .optional()
+      .describe('输入端口'),
+    outputs: z
+      .array(z.object({ name: z.string(), label: z.string(), dataType: z.string().default('string') }))
+      .optional()
+      .describe('输出端口'),
+    configSchema: z
+      .array(
+        z.object({
+          name: z.string(),
+          label: z.string(),
+          type: z.enum(['string', 'number', 'boolean', 'select', 'textarea', 'json', 'code']).default('string'),
+          required: z.boolean().optional(),
+          default: z.unknown().optional(),
+          description: z.string().optional(),
+          options: z.array(z.object({ value: z.string(), label: z.string() })).optional(),
+        }),
+      )
+      .optional()
+      .describe('配置表单字段'),
+  }),
+  execute: async ({ type, label, description, category, inputs, outputs, configSchema }) => {
+    const u = await getAuthUser();
+    if (!isUser(u)) return { error: u };
+    const result = await createCustomNode(u.id, {
+      type,
+      label,
+      description: description ?? '',
+      category: category ?? 'custom',
+      inputs: inputs ?? [],
+      outputs: outputs ?? [],
+      configSchema: configSchema ?? [],
+      executorType: type,
+      builtin: false,
+      source: 'custom',
+    });
+    if (result.error) return { error: result.error };
+    return {
+      success: true,
+      nodeType: result.node?.type,
+      label: result.node?.label,
+      hint: '自定义节点已注册，可在「自定义节点库」查看；注意执行器尚未实现，画布添加后执行会提示未注册',
+    };
+  },
+});
+
 // ===== 工具集（导出给 chat-ai 使用）=====
 export const agentTools = {
   list_workflows: listWorkflows,
@@ -672,6 +730,7 @@ export const agentTools = {
   get_audit_logs: getAuditLogs,
   get_admin_api_logs: getAdminApiLogs,
   get_publish_status: getPublishStatus,
+  create_custom_node: createCustomNodeTool,
 };
 
 export const agentToolsPrompt = `你有能力查询并操作用户的系统。可用工具：
@@ -693,6 +752,7 @@ export const agentToolsPrompt = `你有能力查询并操作用户的系统。�
 - get_audit_logs：审计日志（仅管理员）
 - get_admin_api_logs：API 调用记录（仅管理员）
 - get_publish_status：发布状态
+- create_custom_node：创建自定义节点（执行类，需先征得同意）
 
 ## 权限规则
 - 标有"仅管理员"的工具：非管理员调用会返回"仅管理员可查看/操作"，此时如实告知用户需要管理员权限

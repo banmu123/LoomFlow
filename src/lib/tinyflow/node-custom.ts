@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase/server';
 import { nodeRegistry } from './node-registry';
+import { ExecutorRegistry } from './executors';
 import type { NodeDefinition, NodeConfigField, NodePortDefinition } from './node-definition';
 
 // ===== 自定义节点库（Phase 5）=====
@@ -106,7 +107,24 @@ export async function createCustomNode(
 
   const node = recordToDefinition(data as unknown as CustomNodeRecord);
   nodeRegistry.register(node);
+  // 路径 A：指定 executorType 时复用内置执行器（自定义节点可真正执行）
+  // 例如 executorType='templateNode' → 画布执行走模板渲染逻辑
+  bindExecutor(node);
   return { node };
+}
+
+/**
+ * 将自定义节点绑定执行器：
+ * - 未指定 executorType（= type）：不绑定（执行时报「未注册执行器」）
+ * - 指定了已注册的 executorType：把内置执行器注册到本节点 type 名下
+ */
+function bindExecutor(def: NodeDefinition): void {
+  const executorType = def.executorType ?? def.type;
+  if (executorType === def.type) return; // 默认 = type：未实现执行器，跳过
+  const Ctor = ExecutorRegistry.get(executorType);
+  if (Ctor) {
+    ExecutorRegistry.register(def.type, Ctor);
+  }
 }
 
 /** 更新自定义节点（仅本人；type 不可改——改类型需删除重建） */
