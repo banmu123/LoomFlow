@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { Inspector } from 'react-dev-inspector';
 import { Toaster } from 'sonner';
 import { I18nProvider } from '@/lib/i18n';
 import './globals.css';
@@ -19,13 +18,10 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const isDev = process.env.COZE_PROJECT_ENV === 'DEV';
-
   return (
     <html lang="zh-CN">
       <body className={`antialiased`}>
         <I18nProvider>
-          {isDev && <Inspector />}
           {children}
           {/* 全局 toast（此前未挂载导致所有 toast 静默失效——接口错误不显示） */}
           <Toaster position="top-center" richColors />
