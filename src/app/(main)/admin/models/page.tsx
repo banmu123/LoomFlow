@@ -42,7 +42,7 @@ interface AiModel {
 }
 
 const CAPABILITIES = ['text', 'vision', 'audio', 'image', 'tool'];
-const PROVIDERS = ['deepseek', 'ark', 'openai-compatible', 'custom'];
+const PROVIDERS = ['deepseek', 'ark', 'openai', 'claude', 'gemini', 'qwen', 'ollama', 'custom'];
 
 const EMPTY_FORM = {
   id: '',
