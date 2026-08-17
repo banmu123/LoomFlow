@@ -71,10 +71,20 @@ export async function saveFlowRun(
     };
 
     if (exists.data) {
-      await supabase
-        .from('flow_runs')
-        .update({ ...row, updated_at: new Date().toISOString() })
-        .eq('id', flowId);
+      // 更新分支只补传入的字段——否则第二次调用（completed）会把
+      // 首次写入的 inputs/workflow_id/user_id/source 覆盖成 null
+      const patch: Record<string, unknown> = {
+        updated_at: new Date().toISOString(),
+      };
+      if (data.workflowId !== undefined) patch.workflow_id = data.workflowId;
+      if (data.userId !== undefined) patch.user_id = data.userId;
+      if (data.source !== undefined) patch.source = data.source;
+      if (data.status !== undefined) patch.status = data.status;
+      if (data.inputs !== undefined) patch.inputs = data.inputs;
+      if (data.outputs !== undefined) patch.outputs = data.outputs;
+      if (data.events !== undefined) patch.events = data.events;
+      if (data.error !== undefined) patch.error = data.error;
+      await supabase.from('flow_runs').update(patch).eq('id', flowId);
     } else {
       await supabase.from('flow_runs').insert({ id: flowId, ...row });
     }
