@@ -1,5 +1,32 @@
 # Changelog
 
+## [v0.1.4] - 2026-08-17
+
+### 安全（重点）
+
+- **flow 试运行路由强制认证**：`/api/flow/execute|stream` 未登录 401；`status|stop|confirm` 增加登录 + 流程归属校验（此前未认证可执行任意工作流 = RCE/SSRF/成本滥用入口）
+- **Code Node 沙箱逃逸封堵**：移除宿主 realm 对象注入（vm 逃逸已实测 RCE），utils 改从新 realm 获取、移除 fetch、inputs 深克隆、异步挂起超时兜底
+- **HTTP Node SSRF 防护**：URL 协议白名单 + 内网/回环/链路本地拦截（含特殊编码/IPv6/IPv4 映射 + DNS 解析二次校验）+ 手动重定向逐跳校验 + 10s 超时 + 1MB 响应体限制
+- **OSS AccessKeySecret 不再下发客户端**：新增 `/api/oss/upload` 服务端代理上传（MIME 白名单 + 大小限制），`/api/oss/config` 只返回非敏感字段
+- **webhook_url SSRF 防护**：定时任务创建/更新时校验公网 http/https
+- 修复退出登录后仍保持登录态（清除 cookie 多属性变体）；Secure cookie 改为按请求协议动态判断（HTTP 直连可正常登录）
+
+### 新增
+
+- **定时任务功能完整化**：调度器启用（服务启动加载 + 10 分钟 DB 同步）、容器时区 TZ、页面频率预设点选（无需懂 cron）、webhook 回调
+- AI 回复 **Markdown 渲染美化**：JSON 代码块/列表/跳转按钮层次分明，内容宽度撑满（AI 头像 → 用户头像）
+
+### 修复
+
+- **执行历史输入被清空**：saveFlowRun 更新分支只补传入字段（二次调用不再覆盖 inputs/workflow_id）
+- 切换对话闪现欢迎页空态 → 加载占位
+
+### 测试
+
+- 126 个单元测试（新增：生成执行器状态机、工作流提取、调度器、SSRF 防护、沙箱逃逸回归、频率预设等 40 个）
+
+---
+
 ## [v0.1.3] - 2026-08-16
 
 ### 新增
