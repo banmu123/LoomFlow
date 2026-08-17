@@ -113,6 +113,9 @@ importers:
       '@supabase/supabase-js':
         specifier: 2.95.3
         version: 2.95.3
+      '@tailwindcss/postcss':
+        specifier: ^4
+        version: 4.1.18
       '@tinyflow-ai/ui':
         specifier: ^1.3.6
         version: 1.3.6(@internationalized/date@3.12.2)(svelte@5.56.4(@typescript-eslint/types@8.54.0))
@@ -197,6 +200,9 @@ importers:
       tailwind-merge:
         specifier: ^2.6.0
         version: 2.6.0
+      tailwindcss:
+        specifier: ^4
+        version: 4.1.18
       tw-animate-css:
         specifier: ^1.4.0
         version: 1.4.0
@@ -210,9 +216,6 @@ importers:
         specifier: ^4.3.6
         version: 4.3.6
     devDependencies:
-      '@tailwindcss/postcss':
-        specifier: ^4
-        version: 4.1.18
       '@types/node':
         specifier: ^20
         version: 20.19.30
@@ -237,9 +240,6 @@ importers:
       shadcn:
         specifier: latest
         version: 3.7.0(@cfworker/json-schema@4.1.1)(@types/node@20.19.30)(hono@4.11.7)(typescript@5.9.3)
-      tailwindcss:
-        specifier: ^4
-        version: 4.1.18
       tsup:
         specifier: ^8.3.5
         version: 8.5.1(jiti@2.6.1)(postcss@8.5.26)(tsx@4.21.0)(typescript@5.9.3)(yaml@1.10.2)
