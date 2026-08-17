@@ -2,15 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { runFlow } from '@/lib/tinyflow/runFlow';
 import type { TinyflowData } from '@/lib/tinyflow/types';
 import { getCurrentUser } from '@/lib/server-auth';
+import { supabase } from '@/lib/supabase/server';
 
 export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { flowData, inputs = {} } = body as {
+    const { flowData, inputs = {}, workflowId = null } = body as {
       flowData: TinyflowData;
       inputs?: Record<string, unknown>;
+      workflowId?: string | null;
     };
 
     if (!flowData || !flowData.nodes || !flowData.edges) {
@@ -26,9 +28,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '未登录，请先登录' }, { status: 401 });
     }
 
+    // workflowId 关联到执行记录（flow_runs.workflow_id，供 AI 排查稳定性）；
+    // 校验归属：必须属于当前用户，否则忽略（防伪造他人工作流 id）
+    let safeWorkflowId: string | null = null;
+    if (workflowId) {
+      const { data: wf } = await supabase
+        .from('workflow_history')
+        .select('id')
+        .eq('id', workflowId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (wf) safeWorkflowId = workflowId;
+    }
+
     const result = await runFlow(flowData, inputs, {
       source: 'internal',
       userId: user.id,
+      workflowId: safeWorkflowId,
     });
 
     if (result.status === 'failed') {

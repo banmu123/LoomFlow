@@ -527,7 +527,12 @@ export default function TinyflowWrapper() {
       const response = await fetch('/api/flow/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ flowData, inputs }),
+        body: JSON.stringify({
+          flowData,
+          inputs,
+          // 关联当前工作流（执行记录 flow_runs.workflow_id 落库，供 AI 排查稳定性）
+          workflowId: currentWorkflowId ?? null,
+        }),
       });
       const data = await response.json();
 

@@ -147,11 +147,13 @@ const getApiKeyStatus = tool({
 
 // 6. 执行历史（画布试运行 + API 调用）
 const getExecutionHistory = tool({
-  description: '获取最近的工作流执行记录（来源/状态/错误信息/耗时）。回答"上次运行失败了吗""执行报错了什么"时使用。',
+  description:
+    '获取最近的工作流执行记录（画布试运行 + 外部 API 调用，含状态/错误/耗时）。回答"这个工作流为什么不稳定""上次运行失败了吗""执行报错了什么"时使用——可按 workflowId 过滤指定工作流，并返回成功率统计。',
   inputSchema: z.object({
+    workflowId: z.string().optional().describe('工作流 id（可选；指定后只返回该工作流的记录与统计）'),
     limit: z.number().int().min(1).max(20).optional().describe('条数，默认 5'),
   }),
-  execute: async ({ limit = 5 }) => {
+  execute: async ({ workflowId, limit = 5 }) => {
     const u = await getAuthUser();
     if (!isUser(u)) return { error: u };
     // 当前用户的工作流 id（api_call_logs 无 user_id，按工作流归属过滤）
@@ -161,31 +163,68 @@ const getExecutionHistory = tool({
       .eq('user_id', u.id)
       .eq('saved', true);
     const myIds = (mine ?? []).map((w: { id: string }) => w.id);
-    if (myIds.length === 0) return { canvasRuns: [], apiCalls: [] };
+    if (myIds.length === 0) return { canvasRuns: [], apiCalls: [], stats: null };
 
-    // 画布试运行记录（flow_runs）
-    const { data: runs, error: runsErr } = await supabase
+    // 归属校验：指定 workflowId 时必须属于当前用户（防枚举他人工作流）
+    const targetId = workflowId && myIds.includes(workflowId) ? workflowId : null;
+
+    // 画布试运行记录（flow_runs；注意无 duration_ms 列）
+    let runsQuery = supabase
       .from('flow_runs')
-      .select('workflow_id, status, error, created_at, duration_ms')
+      .select('workflow_id, status, error, created_at')
       .eq('user_id', u.id)
       .order('created_at', { ascending: false })
       .limit(limit);
+    if (targetId) runsQuery = runsQuery.eq('workflow_id', targetId);
+    const { data: runs, error: runsErr } = await runsQuery;
+
     // 外部 API 调用记录（api_call_logs）
-    const { data: logs, error: logsErr } = await supabase
+    let logsQuery = supabase
       .from('api_call_logs')
       .select('workflow_id, status, error, created_at, duration_ms')
       .in('workflow_id', myIds)
       .order('created_at', { ascending: false })
       .limit(limit);
+    if (targetId) logsQuery = logsQuery.eq('workflow_id', targetId);
+    const { data: logs, error: logsErr } = await logsQuery;
+
     if (runsErr || logsErr) {
       return { error: runsErr?.message || logsErr?.message };
     }
+
+    // 成功率统计（针对指定工作流；最近 50 条合并两类记录）
+    let stats: { total: number; failed: number; successRate: string } | null = null;
+    if (targetId) {
+      const [runsAll, logsAll] = await Promise.all([
+        supabase
+          .from('flow_runs')
+          .select('status')
+          .eq('user_id', u.id)
+          .eq('workflow_id', targetId)
+          .limit(50),
+        supabase
+          .from('api_call_logs')
+          .select('status')
+          .eq('workflow_id', targetId)
+          .limit(50),
+      ]);
+      const statuses = [
+        ...((runsAll.data ?? []) as Array<{ status: string }>),
+        ...((logsAll.data ?? []) as Array<{ status: string }>),
+      ].map((r) => r.status);
+      const failed = statuses.filter((s) => s !== 'completed' && s !== 'success').length;
+      stats = {
+        total: statuses.length,
+        failed,
+        successRate: statuses.length > 0 ? `${Math.round(((statuses.length - failed) / statuses.length) * 100)}%` : '-',
+      };
+    }
+
     return {
-      canvasRuns: (runs ?? []).map((r: { workflow_id: string; status: string; error: string | null; duration_ms: number | null; created_at: string }) => ({
+      canvasRuns: (runs ?? []).map((r: { workflow_id: string; status: string; error: string | null; created_at: string }) => ({
         workflowId: r.workflow_id,
         status: r.status,
         error: r.error ? String(r.error).slice(0, 300) : null,
-        durationMs: r.duration_ms,
         at: r.created_at,
       })),
       apiCalls: (logs ?? []).map((l: { workflow_id: string; status: string; error: string | null; duration_ms: number | null; created_at: string }) => ({
@@ -195,6 +234,7 @@ const getExecutionHistory = tool({
         durationMs: l.duration_ms,
         at: l.created_at,
       })),
+      stats,
     };
   },
 });
