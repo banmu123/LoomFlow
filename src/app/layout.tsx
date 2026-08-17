@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Inspector } from 'react-dev-inspector';
+import { Toaster } from 'sonner';
 import { I18nProvider } from '@/lib/i18n';
 import './globals.css';
 
@@ -26,6 +27,8 @@ export default function RootLayout({
         <I18nProvider>
           {isDev && <Inspector />}
           {children}
+          {/* 全局 toast（此前未挂载导致所有 toast 静默失效——接口错误不显示） */}
+          <Toaster position="top-center" richColors />
         </I18nProvider>
       </body>
     </html>
