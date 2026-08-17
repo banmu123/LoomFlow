@@ -246,7 +246,7 @@ Checklist:
 - **[Roadmap](ROADMAP.md)** — where the project is heading (v0.1 → v0.5)
 - **[Architecture](docs/config/architecture.md)** — from natural language to executable API, end-to-end
 - **[Security](docs/config/security.md)** — sandbox, auth, quotas, audit, isolation
-- **[Custom Node Guide](docs/config/custom-node-guide.md)** — build your own nodes (developer platform)
+- **[Node System Architecture](docs/nodes.md)** — NodeDefinition/Registry/Factory, configSchema, plugin SDK
 - **[Deployment Manual](docs/config/Deployment-Manual.md)** — self-host, migrate, HTTPS
 
 ---

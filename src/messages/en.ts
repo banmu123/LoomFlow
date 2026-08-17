@@ -33,6 +33,7 @@ export const en: ZhMessages = {
     logs: 'Audit Logs',
     apiLogs: 'API Calls',
     apiKeys: 'API Keys',
+    customNodes: 'Custom Nodes',
     knowledge: 'Knowledge Base',
     oss: 'Storage Settings',
     admin: 'Admin',

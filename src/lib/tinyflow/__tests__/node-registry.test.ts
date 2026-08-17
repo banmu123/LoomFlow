@@ -82,10 +82,11 @@ describe('NodeRegistry 查询', () => {
 });
 
 describe('内置节点注册（全局单例）', () => {
-  it('10 个内置节点全部注册', () => {
+  it('11 个内置节点全部注册', () => {
     const types = nodeRegistry.list().map((n) => n.type).sort();
     expect(types).toEqual([
       'codeNode',
+      'conditionNode',
       'confirmNode',
       'endNode',
       'httpNode',
@@ -126,5 +127,56 @@ describe('内置节点注册（全局单例）', () => {
   it('开始/结束节点属于 core 分类', () => {
     expect(nodeRegistry.get('startNode')?.category).toBe('core');
     expect(nodeRegistry.get('endNode')?.category).toBe('core');
+  });
+});
+
+describe('Phase 1：Registry 增强（Plugin SDK 基础）', () => {
+  it('getByExecutorType 按执行器类型查询', () => {
+    const def = nodeRegistry.getByExecutorType('llmNode');
+    expect(def?.type).toBe('llmNode');
+  });
+
+  it('listBySource 区分 builtin / custom', () => {
+    const builtin = nodeRegistry.listBySource('builtin');
+    expect(builtin.length).toBeGreaterThan(0);
+    // 测试注册的自定义节点按 custom 归类（source 缺省为 builtin）
+    const registry = makeRegistry();
+    registry.register(makeNode({ source: 'custom' }));
+    expect(registry.listBySource('custom')).toHaveLength(1);
+  });
+
+  it('toJSON 序列化全部定义（/api/nodes 数据源）', () => {
+    const defs = nodeRegistry.toJSON();
+    expect(Array.isArray(defs)).toBe(true);
+    expect(defs.some((n) => n.type === 'startNode')).toBe(true);
+    // 每个定义含输入输出 schema
+    for (const d of defs) {
+      expect(Array.isArray(d.inputs)).toBe(true);
+      expect(Array.isArray(d.outputs)).toBe(true);
+    }
+  });
+
+  it('configSchema 声明式配置（可选字段，缺省兼容现有节点）', () => {
+    const withSchema = makeNode({
+      configSchema: [
+        { name: 'url', label: 'URL', type: 'string', required: true },
+        { name: 'method', label: 'Method', type: 'select', options: [{ value: 'GET', label: 'GET' }] },
+      ],
+    });
+    expect(withSchema.configSchema?.[0].name).toBe('url');
+    // Phase 2：官方节点已补 configSchema（LLM 含 model/temperature/maxTokens/systemPrompt）
+    const llm = nodeRegistry.get('llmNode');
+    expect(Array.isArray(llm?.configSchema)).toBe(true);
+    expect(llm?.configSchema?.some((f) => f.name === 'temperature')).toBe(true);
+    // 未声明 configSchema 的自定义节点仍合法（可选字段，向后兼容）
+    const custom = makeNode();
+    expect(custom.configSchema).toBeUndefined();
+  });
+
+  it('自定义节点可注册（source: custom 为 Plugin SDK 预留）', () => {
+    const registry = makeRegistry();
+    registry.register(makeNode({ type: 'myPluginNode', source: 'custom' }));
+    expect(registry.has('myPluginNode')).toBe(true);
+    expect(registry.get('myPluginNode')?.source).toBe('custom');
   });
 });

@@ -31,6 +31,7 @@ export const zh = {
     logs: '审计日志',
     apiLogs: 'API 调用',
     apiKeys: 'API 管理',
+    customNodes: '自定义节点',
     knowledge: '知识库',
     oss: '存储设置',
     admin: '管理后台',

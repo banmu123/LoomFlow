@@ -156,5 +156,27 @@ END $$;
 -- 24. 后台生成：消息工具执行日志（后台执行器流式写入，前端轮询展示）
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS tool_logs JSONB;
 
+
+-- 26. 自定义节点库（Phase 5）：用户创建的节点定义，持久化后合并进 NodeRegistry
+CREATE TABLE IF NOT EXISTS node_definitions (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  type          TEXT NOT NULL,                     -- 节点类型标识（如 myNode，用户唯一即可）
+  label         TEXT NOT NULL,
+  description   TEXT,
+  category      TEXT NOT NULL DEFAULT 'custom',
+  icon          TEXT,
+  inputs        JSONB NOT NULL DEFAULT '[]',       -- NodePortDefinition[]
+  outputs       JSONB NOT NULL DEFAULT '[]',
+  config_schema JSONB NOT NULL DEFAULT '[]',       -- NodeConfigField[]
+  capabilities  JSONB NOT NULL DEFAULT '["text"]',
+  version       INTEGER NOT NULL DEFAULT 1,
+  status        TEXT NOT NULL DEFAULT 'active',    -- active | disabled
+  user_id       UUID REFERENCES users(id) ON DELETE CASCADE,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (type, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_node_definitions_user ON node_definitions(user_id);
+
 -- 25. 迁移完成后刷新 PostgREST schema 缓存（否则新列 PATCH 报 PGRST204）
 NOTIFY pgrst, 'reload schema';

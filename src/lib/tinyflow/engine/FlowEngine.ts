@@ -196,6 +196,15 @@ export class FlowEngine {
     const nextNodes: string[] = [];
 
     for (const edge of outEdges) {
+      // 输出端口路由（如条件节点 true/false）：仅当节点输出对应端口为 truthy 才走
+      const port = edge.data?.sourcePort;
+      if (port) {
+        if (result.outputs[port]) {
+          nextNodes.push(edge.target);
+        }
+        continue;
+      }
+
       if (!edge.data?.condition) {
         nextNodes.push(edge.target);
         continue;

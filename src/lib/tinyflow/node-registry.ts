@@ -26,6 +26,21 @@ export class NodeRegistry {
     return this.list().filter((n) => n.category === category);
   }
 
+  /** 按执行器类型查询（多节点类型共用同一执行器时使用） */
+  getByExecutorType(executorType: string): NodeDefinition | undefined {
+    return this.list().find((n) => n.executorType === executorType);
+  }
+
+  /** 按来源查询（builtin / custom——Plugin SDK 场景） */
+  listBySource(source: 'builtin' | 'custom'): NodeDefinition[] {
+    return this.list().filter((n) => (n.source ?? 'builtin') === source);
+  }
+
+  /** 序列化全部节点定义（/api/nodes 与前端节点库共用） */
+  toJSON(): NodeDefinition[] {
+    return this.list();
+  }
+
   has(type: string): boolean {
     return this.nodes.has(type);
   }

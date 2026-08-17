@@ -8,6 +8,7 @@ import { CodeExecutor } from './CodeExecutor';
 import { KnowledgeExecutor } from './KnowledgeExecutor';
 import { SearchEngineExecutor } from './SearchEngineExecutor';
 import { TemplateExecutor } from './TemplateExecutor';
+import { ConditionExecutor } from './ConditionExecutor';
 import { ConfirmExecutor } from './ConfirmExecutor';
 import { LoopExecutor } from './LoopExecutor';
 import type { ParameterResolver } from '../engine/ParameterResolver';
@@ -30,6 +31,7 @@ export class ExecutorRegistryClass {
     this.register('knowledgeNode', KnowledgeExecutor);
     this.register('searchEngineNode', SearchEngineExecutor);
     this.register('templateNode', TemplateExecutor);
+    this.register('conditionNode', ConditionExecutor);
     this.register('confirmNode', ConfirmExecutor);
     this.register('loopNode', LoopExecutor);
   }
@@ -48,3 +50,21 @@ export class ExecutorRegistryClass {
 }
 
 export const ExecutorRegistry = new ExecutorRegistryClass();
+
+/**
+ * 执行器工厂：按节点类型创建执行器实例。
+ * Registry/Factory 模式——新增节点只需注册（NodeDefinition + Executor），
+ * 调度方统一走工厂，不出现针对具体节点的 if/else。
+ * 未知类型抛出明确错误，便于插件定位问题。
+ */
+export function createExecutor(
+  type: string,
+  paramResolver: ParameterResolver,
+  exprEvaluator: ExpressionEvaluator,
+): BaseExecutor {
+  const Ctor = ExecutorRegistry.get(type);
+  if (!Ctor) {
+    throw new Error(`未注册的执行器类型: ${type}`);
+  }
+  return new Ctor(paramResolver, exprEvaluator);
+}

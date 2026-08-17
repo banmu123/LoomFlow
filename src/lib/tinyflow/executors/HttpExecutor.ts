@@ -27,6 +27,12 @@ export class HttpExecutor extends BaseExecutor {
 
     if (!url) throw new Error('HTTP 节点缺少 URL');
 
+    // 超时从节点配置读取（configSchema 字段）；必须为正数，非法值回退默认
+    const timeout = Number(data.timeout);
+    const requestTimeoutMs = Number.isFinite(timeout) && timeout > 0
+      ? Math.min(timeout, 60) * 1000
+      : REQUEST_TIMEOUT_MS;
+
     // 解析 headers
     const headers: Record<string, string> = {};
     for (const h of data.headers || []) {
@@ -80,7 +86,7 @@ export class HttpExecutor extends BaseExecutor {
         headers,
         body,
         redirect: 'manual',
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal: AbortSignal.timeout(requestTimeoutMs),
       });
 
       // 手动跟随重定向（每跳重新校验，防重定向到内网）

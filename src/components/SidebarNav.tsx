@@ -24,6 +24,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Trash2,
+  Boxes,
 } from 'lucide-react';
 import { cn, truncateTitle } from '@/lib/utils';
 import { useT } from '@/lib/i18n';
@@ -50,6 +51,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/workflows/history', labelKey: 'sidebar.history', icon: History },
   { href: '/workflows/schedules', labelKey: 'sidebar.schedules', icon: Clock },
   { href: '/workflows/api-keys', labelKey: 'sidebar.apiKeys', icon: KeyRound },
+  { href: '/workflows/custom-nodes', labelKey: 'sidebar.customNodes', icon: Boxes },
   { href: '/knowledge', labelKey: 'sidebar.knowledge', icon: Library },
 ];
 

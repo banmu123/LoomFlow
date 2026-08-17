@@ -99,6 +99,7 @@ export class LLMExecutor extends BaseExecutor {
       messages,
       system: systemPrompt || undefined,
       temperature,
+      maxOutputTokens: Number(data.maxTokens) || 8192,
     });
 
     if (outType === 'json') {

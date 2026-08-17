@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import '@tinyflow-ai/ui/dist/index.css';
 import type { Tinyflow as TinyflowInstance } from '@tinyflow-ai/ui';
-import type { TinyflowData, Parameter } from '@/lib/tinyflow/types';
+import type { TinyflowData, Parameter, FlowNode } from '@/lib/tinyflow/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -37,7 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Play, Square, Loader2, CheckCircle2, XCircle, Clock, Settings2, ArrowLeft, Braces, Upload, Save, Boxes, History, RotateCcw } from 'lucide-react';
+import { Play, Square, Loader2, CheckCircle2, XCircle, Clock, Settings2, ArrowLeft, Braces, Upload, Save, Boxes, History, RotateCcw, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useT } from '@/lib/i18n';
 import { toast } from 'sonner';
@@ -45,6 +45,9 @@ import { getPendingWorkflow, clearPendingWorkflow } from '@/lib/pending-workflow
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { formatVersion } from '@/lib/version';
 import { uploadFileToOSS } from '@/lib/oss-upload-client';
+import { NodeConfigPanel } from '@/components/NodeConfigPanel';
+import { getConfigDefaults, mergeConfig } from '@/lib/tinyflow/node-config';
+import type { NodeDefinition } from '@/lib/tinyflow/node-definition';
 
 // ===== Types =====
 
@@ -151,6 +154,90 @@ export default function TinyflowWrapper() {
     })();
   }, [nodesOpen]);
 
+  // ===== 节点库 → 画布：添加 / 配置 / 启用 =====
+  // 启用节点集合（隐藏未启用的库节点面板项）
+  const [enabledTypes, setEnabledTypes] = useState<Set<string>>(() => new Set());
+  // ref 透传给 hiddenNodes（避免闭包捕获初始空集）
+  const enabledTypesRef = useRef(enabledTypes);
+  enabledTypesRef.current = enabledTypes;
+  // 配置面板目标
+  const [configTarget, setConfigTarget] = useState<{ id: string; type: string; data: Record<string, unknown> } | null>(null);
+
+  // 从节点库添加节点到画布（数据来自 Registry，非硬编码；用 configSchema 默认值初始化配置）
+  const handleAddNode = (def: NodeDefinition) => {
+    const data = instanceRef.current?.getData() as TinyflowData | undefined;
+    if (!data) return;
+    const newNode: FlowNode = {
+      id: `node_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+      type: def.type,
+      position: { x: 100 + Math.random() * 240, y: 100 + Math.random() * 240 },
+      data: {
+        title: def.label,
+        description: def.description ?? '',
+        condition: '',
+        loopEnable: false,
+        loopIntervalMs: '0',
+        maxLoopCount: '0',
+        loopBreakCondition: '',
+        retryEnable: false,
+        retryIntervalMs: '0',
+        maxRetryCount: '0',
+        resetRetryCountAfterNormal: false,
+        ...getConfigDefaults(def.configSchema),
+      },
+    };
+    instanceRef.current?.setData({ ...data, nodes: [...data.nodes, newNode] });
+    toast.success(`已添加节点：${def.label}`);
+  };
+
+  // 读取画布当前节点（配置面板/删除用）
+  const getCanvasNodes = (): FlowNode[] => {
+    const data = instanceRef.current?.getData() as TinyflowData | undefined;
+    return data?.nodes ?? [];
+  };
+
+  // 打开节点配置面板（回显 node.data；configSchema 默认值兜底）
+  const openNodeConfig = (node: FlowNode) => {
+    setConfigTarget({ id: node.id, type: node.type, data: (node.data as Record<string, unknown>) || {} });
+  };
+
+  // 保存节点配置（按 configSchema 合并回 node.data，全量写回画布）
+  const handleSaveNodeConfig = (nodeId: string, values: Record<string, unknown>) => {
+    const data = instanceRef.current?.getData() as TinyflowData | undefined;
+    if (!data) return;
+    const def = nodeLibrary.find((n) => n.type === configTarget?.type);
+    const schema = (def as unknown as NodeDefinition | undefined)?.configSchema ?? [];
+    instanceRef.current?.setData({
+      ...data,
+      nodes: data.nodes.map((n) =>
+        n.id === nodeId ? { ...n, data: mergeConfig(n.data as Record<string, unknown>, schema, values) } : n,
+      ),
+    });
+    toast.success('节点配置已保存');
+  };
+
+  // 删除画布节点
+  const handleRemoveNode = (nodeId: string) => {
+    const data = instanceRef.current?.getData() as TinyflowData | undefined;
+    if (!data) return;
+    instanceRef.current?.setData({
+      ...data,
+      nodes: data.nodes.filter((n) => n.id !== nodeId),
+      edges: data.edges.filter((e) => e.source !== nodeId && e.target !== nodeId),
+    });
+    toast.success('节点已删除');
+  };
+
+  // 启用/禁用节点类型（Tinyflow 库面板按 hiddenNodes 隐藏）
+  const toggleNodeType = (type: string, enabled: boolean) => {
+    setEnabledTypes((prev) => {
+      const next = new Set(prev);
+      if (enabled) next.delete(type);
+      else next.add(type);
+      return next;
+    });
+  };
+
   // 分类标签
   const CATEGORY_LABELS: Record<string, string> = {
     core: '核心',
@@ -213,6 +300,8 @@ export default function TinyflowWrapper() {
           llm: () => llmOptions,
           knowledge: () => knowledgeOptions,
         },
+        // 节点库启用控制：隐藏未启用的节点类型（勾选后才在面板显示）
+        hiddenNodes: () => [...enabledTypesRef.current],
         onDataChange: (data) => {
           // 数据变化时触发重新计算 startParams
           console.log('Tinyflow data changed:', data);
@@ -1337,19 +1426,33 @@ export default function TinyflowWrapper() {
                           <p className="mt-0.5 truncate text-xs text-muted-foreground">
                             {node.description}
                           </p>
+                          {/* 启用开关：关闭后从画布节点面板隐藏（hiddenNodes） */}
+                          <button
+                            type="button"
+                            onClick={() => toggleNodeType(node.type, !enabledTypes.has(node.type))}
+                            className="mt-1 text-[11px] text-muted-foreground hover:text-foreground"
+                          >
+                            {enabledTypes.has(node.type) ? '已隐藏（点击启用）' : '已启用（点击隐藏）'}
+                          </button>
                         </div>
-                        {node.capabilities.length > 0 && (
-                          <div className="ml-2 flex shrink-0 gap-1">
-                            {node.capabilities.map((cap) => (
-                              <span
-                                key={cap}
-                                className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary"
-                              >
-                                {cap}
-                              </span>
-                            ))}
-                          </div>
-                        )}
+                        <div className="ml-2 flex shrink-0 flex-col items-end gap-1">
+                          <Button size="sm" className="h-7 text-xs" onClick={() => handleAddNode(node as unknown as NodeDefinition)}>
+                            <Plus className="mr-1 h-3 w-3" />
+                            添加
+                          </Button>
+                          {node.capabilities.length > 0 && (
+                            <div className="flex gap-1">
+                              {node.capabilities.map((cap) => (
+                                <span
+                                  key={cap}
+                                  className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary"
+                                >
+                                  {cap}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1359,8 +1462,44 @@ export default function TinyflowWrapper() {
               <p className="py-8 text-center text-sm text-muted-foreground">节点库为空</p>
             )}
           </div>
+
+          {/* 画布节点（配置 / 删除） */}
+          <div className="border-t border-border pt-3">
+            <h4 className="mb-2 text-sm font-semibold text-muted-foreground">画布节点（{getCanvasNodes().length}）</h4>
+            <div className="space-y-1.5">
+              {getCanvasNodes().map((n) => (
+                <div key={n.id} className="flex items-center justify-between rounded-md border border-border bg-card px-2.5 py-1.5 text-xs">
+                  <span className="min-w-0 truncate">
+                    {String((n.data as Record<string, unknown>).title || n.type)}
+                    <code className="ml-1.5 text-[10px] text-muted-foreground">{n.type}</code>
+                  </span>
+                  <div className="flex shrink-0 gap-1">
+                    <Button variant="outline" size="sm" className="h-6 px-2 text-[11px]" onClick={() => openNodeConfig(n)}>
+                      配置
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-6 px-2 text-[11px] text-destructive" onClick={() => handleRemoveNode(n.id)}>
+                      删除
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {getCanvasNodes().length === 0 && (
+                <p className="py-3 text-center text-xs text-muted-foreground">画布暂无节点，从上方节点库添加</p>
+              )}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
+
+      {/* 节点配置面板（configSchema 驱动表单） */}
+      <NodeConfigPanel
+        open={!!configTarget}
+        onOpenChange={(open) => !open && setConfigTarget(null)}
+        node={configTarget ? { id: configTarget.id, type: configTarget.type } : null}
+        definition={(nodeLibrary.find((n) => n.type === configTarget?.type) as unknown as NodeDefinition | null) ?? null}
+        initialData={configTarget?.data ?? {}}
+        onSave={handleSaveNodeConfig}
+      />
 
       <Dialog open={!!confirmReq} onOpenChange={(open) => !open && !running && setConfirmReq(null)}>
         <DialogContent className="z-[1200]">

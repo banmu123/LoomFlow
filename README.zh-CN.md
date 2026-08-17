@@ -224,7 +224,7 @@ curl http://localhost:5000/api/health
 - **[Roadmap 路线图](ROADMAP.md)** — 项目规划（v0.1 → v0.5）
 - **[架构说明](docs/config/architecture.md)** — 从自然语言到可执行 API 的完整链路
 - **[安全设计](docs/config/security.md)** — 沙箱/认证/配额/审计/隔离
-- **[自定义节点指南](docs/config/custom-node-guide.md)** — 开发自己的节点（开发者平台）
+- **[节点系统架构](docs/nodes.md)** — NodeDefinition/Registry/Factory、configSchema、插件 SDK
 - **[部署手册](docs/config/Deployment-Manual.md)** — 自托管/迁移/HTTPS
 
 ---

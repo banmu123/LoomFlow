@@ -55,6 +55,12 @@ export const LLM_NODE: NodeDefinition = {
       label: 'Images',
       dataType: 'image[]',
     },
+    {
+      name: 'variables',
+      label: 'Variables',
+      dataType: 'object',
+      description: '模板插值变量（prompt 中的 {{var}} 会替换）',
+    },
   ],
 
   outputs: [
@@ -69,12 +75,71 @@ export const LLM_NODE: NodeDefinition = {
 
   executorType: 'llmNode',
   builtin: true,
+  configSchema: [
+    {
+      name: 'llmId',
+      label: '模型',
+      type: 'select',
+      required: true,
+      description: '选择已配置的模型（管理后台 → 模型配置）',
+      // 动态选项：/api/nodes 返回前 resolve 为静态 options（前端可直接渲染）
+      optionsProvider: async () => {
+        try {
+          const res = await fetch('/api/ai/models');
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            return data.map((m: { id: string; label: string | null }) => ({
+              value: m.id,
+              label: m.label || m.id,
+            }));
+          }
+        } catch {
+          // 拉取失败返回空选项
+        }
+        return [];
+      },
+    },
+    {
+      name: 'systemPrompt',
+      label: '系统提示词',
+      type: 'textarea',
+      rows: 4,
+      description: '系统角色设定（支持 {{var}} 插值）',
+    },
+    {
+      name: 'temperature',
+      label: '温度',
+      type: 'number',
+      default: 0.7,
+      min: 0,
+      max: 2,
+      description: '采样温度，越高越随机',
+    },
+    {
+      name: 'maxTokens',
+      label: '最大输出长度',
+      type: 'number',
+      default: 8192,
+      min: 1,
+      description: '生成的最大 token 数',
+    },
+    {
+      name: 'outType',
+      label: '输出格式',
+      type: 'select',
+      default: 'text',
+      options: [
+        { value: 'text', label: '文本' },
+        { value: 'json', label: 'JSON' },
+      ],
+    },
+  ],
 };
 
 export const HTTP_NODE: NodeDefinition = {
   type: 'httpNode',
   label: 'HTTP',
-  description: '发送 HTTP 请求',
+  description: '发送 HTTP 请求（SSRF 防护：仅公网 http/https）',
   category: 'integration',
   inputs: [
     {
@@ -82,6 +147,12 @@ export const HTTP_NODE: NodeDefinition = {
       label: 'URL',
       dataType: 'string',
       required: true,
+    },
+    {
+      name: 'variables',
+      label: 'Variables',
+      dataType: 'object',
+      description: 'URL/Headers/Body 中的 {{var}} 插值变量',
     },
   ],
   outputs: [
@@ -93,6 +164,62 @@ export const HTTP_NODE: NodeDefinition = {
   ],
   executorType: 'httpNode',
   builtin: true,
+  configSchema: [
+    {
+      name: 'method',
+      label: '请求方法',
+      type: 'select',
+      default: 'GET',
+      options: [
+        { value: 'GET', label: 'GET' },
+        { value: 'POST', label: 'POST' },
+        { value: 'PUT', label: 'PUT' },
+        { value: 'PATCH', label: 'PATCH' },
+        { value: 'DELETE', label: 'DELETE' },
+      ],
+    },
+    {
+      name: 'url',
+      label: 'URL',
+      type: 'string',
+      required: true,
+      placeholder: 'https://api.example.com/v1（仅公网地址）',
+      description: '支持 {{var}} 插值',
+    },
+    {
+      name: 'headers',
+      label: '请求头',
+      type: 'json',
+      description: '键值对，如 {"Authorization": "Bearer xxx"}',
+    },
+    {
+      name: 'bodyType',
+      label: '请求体类型',
+      type: 'select',
+      default: 'json',
+      options: [
+        { value: 'json', label: 'JSON' },
+        { value: 'raw', label: 'Raw 文本' },
+        { value: 'form-data', label: 'Form Data' },
+        { value: 'form-urlencoded', label: 'URL 编码' },
+      ],
+    },
+    {
+      name: 'bodyJson',
+      label: 'JSON 请求体',
+      type: 'json',
+      description: '支持 {{var}} 插值',
+    },
+    {
+      name: 'timeout',
+      label: '超时（秒）',
+      type: 'number',
+      default: 10,
+      min: 1,
+      max: 60,
+      description: '请求超时时间',
+    },
+  ],
 };
 
 export const CODE_NODE: NodeDefinition = {
@@ -168,15 +295,21 @@ export const SEARCH_ENGINE_NODE: NodeDefinition = {
 
 export const TEMPLATE_NODE: NodeDefinition = {
   type: 'templateNode',
-  label: '模板',
-  description: '使用模板渲染文本',
-  category: 'data',
+  label: '提示词模板',
+  description: '使用模板渲染文本（{{var}} 变量替换）',
+  category: 'ai',
   inputs: [
     {
       name: 'template',
       label: 'Template',
       dataType: 'string',
       required: true,
+    },
+    {
+      name: 'variables',
+      label: 'Variables',
+      dataType: 'object',
+      description: '模板中的 {{var}} 插值变量',
     },
   ],
   outputs: [
@@ -188,6 +321,59 @@ export const TEMPLATE_NODE: NodeDefinition = {
   ],
   executorType: 'templateNode',
   builtin: true,
+  configSchema: [
+    {
+      name: 'template',
+      label: '模板内容',
+      type: 'textarea',
+      rows: 8,
+      required: true,
+      placeholder: '你是一个客服助手。\n\n用户问题：{{question}}\n\n请生成回复。',
+      description: '{{变量}} 会在运行时替换',
+    },
+  ],
+};
+
+// ===== 条件节点（逻辑分支）=====
+export const CONDITION_NODE: NodeDefinition = {
+  type: 'conditionNode',
+  label: '条件',
+  description: '根据条件表达式决定流程分支（true / false 两个输出）',
+  category: 'logic',
+  inputs: [
+    {
+      name: 'input',
+      label: '输入',
+      dataType: 'object',
+      description: '参与判断的数据',
+    },
+  ],
+  outputs: [
+    {
+      name: 'true',
+      label: 'True',
+      dataType: 'boolean',
+    },
+    {
+      name: 'false',
+      label: 'False',
+      dataType: 'boolean',
+    },
+  ],
+  executorType: 'conditionNode',
+  builtin: true,
+  configSchema: [
+    {
+      name: 'condition',
+      label: '条件表达式',
+      type: 'textarea',
+      rows: 2,
+      required: true,
+      placeholder: '{{score}} > 80',
+      description:
+        '支持 {{input.字段}} 插值 + 比较运算符：== != > >= < <= contains startsWith endsWith',
+    },
+  ],
 };
 
 export const CONFIRM_NODE: NodeDefinition = {
@@ -247,6 +433,7 @@ nodeRegistry.register(CODE_NODE);
 nodeRegistry.register(KNOWLEDGE_NODE);
 nodeRegistry.register(SEARCH_ENGINE_NODE);
 nodeRegistry.register(TEMPLATE_NODE);
+nodeRegistry.register(CONDITION_NODE);
 nodeRegistry.register(CONFIRM_NODE);
 nodeRegistry.register(LOOP_NODE);
 

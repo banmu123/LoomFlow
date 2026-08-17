@@ -21,7 +21,12 @@ export interface FlowEdge {
   id: string;
   source: string;
   target: string;
-  data?: { condition?: string };
+  data?: {
+    condition?: string;
+    /** 输出端口路由：边从源节点的哪个输出端口走（如条件节点 true/false）。
+     *  仅当源节点输出结果中该端口为 truthy 时才会走此边；缺省 = 无条件/条件表达式模式 */
+    sourcePort?: string;
+  };
   selected?: boolean;
 }
 
