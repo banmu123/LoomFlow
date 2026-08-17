@@ -203,6 +203,9 @@ importers:
       tailwindcss:
         specifier: ^4
         version: 4.1.18
+      tsup:
+        specifier: ^8.3.5
+        version: 8.5.1(jiti@2.6.1)(postcss@8.5.26)(tsx@4.21.0)(typescript@5.9.3)(yaml@1.10.2)
       tw-animate-css:
         specifier: ^1.4.0
         version: 1.4.0
@@ -240,15 +243,12 @@ importers:
       shadcn:
         specifier: latest
         version: 3.7.0(@cfworker/json-schema@4.1.1)(@types/node@20.19.30)(hono@4.11.7)(typescript@5.9.3)
-      tsup:
-        specifier: ^8.3.5
-        version: 8.5.1(jiti@2.6.1)(postcss@8.5.26)(tsx@4.21.0)(typescript@5.9.3)(yaml@1.10.2)
       tsx:
         specifier: ^4.19.2
         version: 4.21.0
       vitest:
         specifier: ^4.1.10
-        version: 4.1.10(@types/node@20.19.30)(msw@2.12.7(@types/node@20.19.30)(typescript@5.9.3))(vite@8.2.1(@types/node@20.19.30)(esbuild@0.25.12)(jiti@2.6.1)(terser@5.48.0)(tsx@4.21.0)(yaml@1.10.2))
+        version: 4.1.10(@types/node@20.19.30)(msw@2.12.7(@types/node@20.19.30)(typescript@5.9.3))(vite@8.2.1(@types/node@20.19.30)(esbuild@0.27.3)(jiti@2.6.1)(terser@5.48.0)(tsx@4.21.0)(yaml@1.10.2))
 
 packages:
 
@@ -9411,14 +9411,14 @@ snapshots:
       chai: 6.2.2
       tinyrainbow: 3.1.1
 
-  '@vitest/mocker@4.1.10(msw@2.12.7(@types/node@20.19.30)(typescript@5.9.3))(vite@8.2.1(@types/node@20.19.30)(esbuild@0.25.12)(jiti@2.6.1)(terser@5.48.0)(tsx@4.21.0)(yaml@1.10.2))':
+  '@vitest/mocker@4.1.10(msw@2.12.7(@types/node@20.19.30)(typescript@5.9.3))(vite@8.2.1(@types/node@20.19.30)(esbuild@0.27.3)(jiti@2.6.1)(terser@5.48.0)(tsx@4.21.0)(yaml@1.10.2))':
     dependencies:
       '@vitest/spy': 4.1.10
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
       msw: 2.12.7(@types/node@20.19.30)(typescript@5.9.3)
-      vite: 8.2.1(@types/node@20.19.30)(esbuild@0.25.12)(jiti@2.6.1)(terser@5.48.0)(tsx@4.21.0)(yaml@1.10.2)
+      vite: 8.2.1(@types/node@20.19.30)(esbuild@0.27.3)(jiti@2.6.1)(terser@5.48.0)(tsx@4.21.0)(yaml@1.10.2)
 
   '@vitest/pretty-format@4.1.10':
     dependencies:
@@ -13093,7 +13093,7 @@ snapshots:
       d3-time: 3.1.0
       d3-timer: 3.0.1
 
-  vite@8.2.1(@types/node@20.19.30)(esbuild@0.25.12)(jiti@2.6.1)(terser@5.48.0)(tsx@4.21.0)(yaml@1.10.2):
+  vite@8.2.1(@types/node@20.19.30)(esbuild@0.27.3)(jiti@2.6.1)(terser@5.48.0)(tsx@4.21.0)(yaml@1.10.2):
     dependencies:
       lightningcss: 1.33.0
       picomatch: 4.0.5
@@ -13102,17 +13102,17 @@ snapshots:
       tinyglobby: 0.2.17
     optionalDependencies:
       '@types/node': 20.19.30
-      esbuild: 0.25.12
+      esbuild: 0.27.3
       fsevents: 2.3.3
       jiti: 2.6.1
       terser: 5.48.0
       tsx: 4.21.0
       yaml: 1.10.2
 
-  vitest@4.1.10(@types/node@20.19.30)(msw@2.12.7(@types/node@20.19.30)(typescript@5.9.3))(vite@8.2.1(@types/node@20.19.30)(esbuild@0.25.12)(jiti@2.6.1)(terser@5.48.0)(tsx@4.21.0)(yaml@1.10.2)):
+  vitest@4.1.10(@types/node@20.19.30)(msw@2.12.7(@types/node@20.19.30)(typescript@5.9.3))(vite@8.2.1(@types/node@20.19.30)(esbuild@0.27.3)(jiti@2.6.1)(terser@5.48.0)(tsx@4.21.0)(yaml@1.10.2)):
     dependencies:
       '@vitest/expect': 4.1.10
-      '@vitest/mocker': 4.1.10(msw@2.12.7(@types/node@20.19.30)(typescript@5.9.3))(vite@8.2.1(@types/node@20.19.30)(esbuild@0.25.12)(jiti@2.6.1)(terser@5.48.0)(tsx@4.21.0)(yaml@1.10.2))
+      '@vitest/mocker': 4.1.10(msw@2.12.7(@types/node@20.19.30)(typescript@5.9.3))(vite@8.2.1(@types/node@20.19.30)(esbuild@0.27.3)(jiti@2.6.1)(terser@5.48.0)(tsx@4.21.0)(yaml@1.10.2))
       '@vitest/pretty-format': 4.1.10
       '@vitest/runner': 4.1.10
       '@vitest/snapshot': 4.1.10
@@ -13129,7 +13129,7 @@ snapshots:
       tinyexec: 1.0.2
       tinyglobby: 0.2.15
       tinyrainbow: 3.1.1
-      vite: 8.2.1(@types/node@20.19.30)(esbuild@0.25.12)(jiti@2.6.1)(terser@5.48.0)(tsx@4.21.0)(yaml@1.10.2)
+      vite: 8.2.1(@types/node@20.19.30)(esbuild@0.27.3)(jiti@2.6.1)(terser@5.48.0)(tsx@4.21.0)(yaml@1.10.2)
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 20.19.30
