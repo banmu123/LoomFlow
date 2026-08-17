@@ -1,6 +1,7 @@
 import { createServer } from 'http';
 import { parse } from 'url';
 import next from 'next';
+import { initScheduler } from './lib/scheduler';
 
 const dev = process.env.COZE_PROJECT_ENV !== 'PROD';
 const hostname = process.env.HOSTNAME || 'localhost';
@@ -11,7 +12,9 @@ const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
 app.prepare().then(() => {
-  // 定时任务调度器（initScheduler）暂未启用，启用时在 src/lib/scheduler.ts 引入
+  // 定时任务调度器：启动时加载所有启用的任务，每 10 分钟同步一次 DB 变更
+  // 注意：单进程架构（Docker 单副本）安全；若未来多副本部署，需加分布式锁防重复执行
+  initScheduler();
 
   const server = createServer(async (req, res) => {
     try {

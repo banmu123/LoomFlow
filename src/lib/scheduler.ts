@@ -16,8 +16,8 @@ interface ScheduleRecord {
 
 const jobs = new Map<string, Cron>();
 
-// 执行一个定时任务
-async function executeSchedule(schedule: ScheduleRecord): Promise<void> {
+// 执行一个定时任务（导出供测试）
+export async function executeSchedule(schedule: ScheduleRecord): Promise<void> {
   console.log('[scheduler] executing:', schedule.id.slice(0, 8), 'cron:', schedule.cron_expr);
   try {
     const { data: wf, error: wfError } = await supabase

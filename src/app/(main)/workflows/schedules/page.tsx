@@ -6,6 +6,7 @@ import { ArrowLeft, Clock, Plus, RefreshCw, Trash2, Loader2, Pencil } from 'luci
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useT } from '@/lib/i18n';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -51,6 +52,8 @@ interface WorkflowOption {
   id: string;
   title: string;
 }
+
+import { FREQUENCY_PRESETS } from '@/lib/schedules-presets';
 
 const EMPTY_FORM = {
   workflow_id: '',
@@ -217,7 +220,10 @@ export default function WorkflowSchedulesPage() {
           </div>
           <div>
             <h1 className="text-lg font-semibold text-foreground">定时任务</h1>
-            <p className="text-sm text-muted-foreground">按 cron 表达式定时执行工作流，支持 Webhook 回调</p>
+            <p className="text-sm text-muted-foreground">
+              按 cron 表达式定时执行工作流，支持 Webhook 回调
+              （按服务器时区执行：Asia/Shanghai）
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -338,6 +344,24 @@ export default function WorkflowSchedulesPage() {
               </Select>
             </div>
             <div className="space-y-1.5">
+              <Label>执行频率 *</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {FREQUENCY_PRESETS.map((p) => (
+                  <button
+                    key={p.cron}
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, cron_expr: p.cron }))}
+                    className={cn(
+                      'rounded-full border px-2.5 py-1 text-xs transition-colors',
+                      form.cron_expr === p.cron
+                        ? 'border-primary/40 bg-primary/10 text-primary'
+                        : 'border-border text-muted-foreground hover:border-primary/40 hover:text-primary',
+                    )}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
               <Label>Cron 表达式 *</Label>
               <Input
                 value={form.cron_expr}
@@ -346,7 +370,7 @@ export default function WorkflowSchedulesPage() {
                 className="font-mono text-sm"
               />
               <p className="text-[11px] text-muted-foreground">
-                格式：分 时 日 月 周。例：0 9 * * 1-5 = 工作日 9:00；*&#47;10 * * * * = 每 10 分钟
+                点选上方频率即可，也可手动填写（高级）。格式：分 时 日 月 周，例：0 9 * * 1-5 = 工作日 9:00
               </p>
             </div>
             <div className="space-y-1.5">

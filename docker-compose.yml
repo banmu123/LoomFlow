@@ -128,6 +128,8 @@ services:
       COZE_PROJECT_ENV: PROD
       PORT: "5000"
       NODE_OPTIONS: "--max-old-space-size=2048"
+      # 定时任务 cron 按此容器时区执行（croner 默认用进程时区）
+      TZ: Asia/Shanghai
       # 自托管环境：应用经 Nginx 访问 PostgREST（覆盖 .env 中的云地址）
       COZE_SUPABASE_URL: http://nginx:80
     healthcheck:
