@@ -13,6 +13,9 @@ export async function POST(request: Request) {
   });
 
   const res = Response.json({ success: true });
-  res.headers.append('Set-Cookie', clearAuthCookie());
+  // 发送多个清除变体（覆盖历史 cookie 的不同 Secure 属性）
+  for (const cookie of clearAuthCookie()) {
+    res.headers.append('Set-Cookie', cookie);
+  }
   return res;
 }

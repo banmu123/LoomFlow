@@ -69,8 +69,10 @@ export async function POST(request: NextRequest) {
     ip: getClientIp(request),
   });
 
-  // 改密码后清除登录态，强制重新登录
+  // 改密码后清除登录态，强制重新登录（多个变体覆盖历史 cookie）
   const res = Response.json({ success: true });
-  res.headers.append('Set-Cookie', clearAuthCookie());
+  for (const cookie of clearAuthCookie()) {
+    res.headers.append('Set-Cookie', cookie);
+  }
   return res;
 }

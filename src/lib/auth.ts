@@ -65,7 +65,16 @@ export function authCookie(token: string, maxAgeSec = TOKEN_TTL): string {
   return `${COOKIE_NAME}=${token}; HttpOnly; Path=/; Max-Age=${maxAgeSec}; SameSite=Lax${secure}`;
 }
 
-export function clearAuthCookie(): string {
+/**
+ * 清除登录 cookie（返回多个属性变体）：
+ * 浏览器按属性（Secure/Path/Domain）匹配 cookie——历史版本生成的 cookie 属性可能不同
+ * （如旧版无 Secure），单条清除无法匹配旧 cookie 导致退出后仍保持登录态。
+ * 因此同时发送带 Secure 与不带 Secure 两个变体，确保任意历史 cookie 都能被清除。
+ */
+export function clearAuthCookie(): string[] {
   const secure = process.env.COZE_PROJECT_ENV === 'PROD' ? '; Secure' : '';
-  return `${COOKIE_NAME}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax${secure}`;
+  return [
+    `${COOKIE_NAME}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax${secure}`,
+    `${COOKIE_NAME}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax`,
+  ];
 }
