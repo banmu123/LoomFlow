@@ -42,6 +42,7 @@ import { SimpleChatInput } from './SimpleChatInput';
 import { ModelConfigDialog } from './ModelConfigDialog';
 import { WorkflowPreviewDrawer } from './WorkflowPreviewDrawer';
 import { uploadFileToOSS } from '@/lib/oss-upload-client';
+import { extractWorkflowJson } from '@/lib/agent/workflow-extract';
 import { useT } from '@/lib/i18n';
 import { ChevronsLeft, Boxes } from 'lucide-react';
 import { validateWorkflow } from '@/lib/tinyflow/schema';
@@ -394,19 +395,10 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
       .find((m) => m.role === 'assistant' && m.status === 'done');
     if (!lastAssistant?.content) return;
     // 提取 ```json 代码块并判断是否为工作流结构（{ nodes, edges }）
-    const jsonMatch = lastAssistant.content.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (!jsonMatch) return;
-    try {
-      const parsed = JSON.parse(jsonMatch[1].trim()) as {
-        nodes?: unknown;
-        edges?: unknown;
-      };
-      if (parsed && Array.isArray(parsed.nodes) && Array.isArray(parsed.edges)) {
-        // 生成工作流 → 预览按钮（不自动跳转画布）
-        setPreviewWorkflow(parsed as TinyflowData);
-      }
-    } catch {
-      // 不是合法 JSON，忽略
+    const workflow = extractWorkflowJson(lastAssistant.content);
+    if (workflow) {
+      // 生成工作流 → 预览按钮（不自动跳转画布；AI 输出可能缺 viewport，Tinyflow 会默认处理）
+      setPreviewWorkflow(workflow as unknown as TinyflowData);
     }
   }, [convId, conversations]);
 
