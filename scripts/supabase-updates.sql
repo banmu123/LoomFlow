@@ -224,3 +224,14 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
 
 -- 31. 迁移完成后刷新 PostgREST schema 缓存
 NOTIFY pgrst, 'reload schema';
+
+-- 32. 全局 API Key 加密：加哈希列（等值鉴权用），api_key 列改存密文
+-- 存量明文 key 回填哈希（密文由应用下次轮换时写入，decrypt 兼容明文）
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+ALTER TABLE user_api_keys ADD COLUMN IF NOT EXISTS api_key_hash TEXT;
+UPDATE user_api_keys
+   SET api_key_hash = encode(digest(api_key, 'sha256'), 'hex')
+ WHERE api_key_hash IS NULL AND api_key IS NOT NULL;
+
+-- 33. 迁移完成后刷新 PostgREST schema 缓存
+NOTIFY pgrst, 'reload schema';

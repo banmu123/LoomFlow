@@ -1,5 +1,13 @@
 import { supabase } from './supabase/server';
+import { hashApiKey } from './api-key';
+import { decryptSecret } from './secrets';
 import type { TinyflowData } from './tinyflow/types';
+
+interface ApiKeyRow {
+  user_id: string;
+  api_key_expires_at: string | null;
+  api_key: string | null;
+}
 
 export interface PublishedWorkflow {
   id: string;
@@ -23,11 +31,29 @@ export async function getWorkflowByApiKey(
   }
 
   // 全局 Key → 找到所属用户
-  const { data: keyRow } = await supabase
+  // api_key 列存密文，无法等值查询：先按哈希列查，命中后解密二次校验；
+  // 哈希未命中时回退按明文查（存量历史 key 兼容，下次轮换后自动迁移为密文）
+  const keyHash = hashApiKey(apiKey);
+  let keyRow: ApiKeyRow | null = null;
+  const { data: hashHit } = (await supabase
     .from('user_api_keys')
-    .select('user_id, api_key_expires_at')
-    .eq('api_key', apiKey)
-    .single();
+    .select('user_id, api_key_expires_at, api_key')
+    .eq('api_key_hash', keyHash)
+    .maybeSingle()) as { data: ApiKeyRow | null };
+  if (hashHit) {
+    keyRow = hashHit;
+    // 密文二次校验（防哈希碰撞 / 数据损坏）
+    if (decryptSecret(String(keyRow.api_key ?? '')) !== apiKey) {
+      keyRow = null;
+    }
+  } else {
+    const { data: legacy } = (await supabase
+      .from('user_api_keys')
+      .select('user_id, api_key_expires_at, api_key')
+      .eq('api_key', apiKey)
+      .maybeSingle()) as { data: ApiKeyRow | null };
+    keyRow = legacy;
+  }
 
   if (!keyRow) {
     return Response.json({ error: 'API Key 无效或已重新生成' }, { status: 401 });

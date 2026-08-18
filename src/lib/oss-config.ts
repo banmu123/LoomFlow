@@ -1,4 +1,6 @@
-// OSS 配置接口
+// ===== OSS 配置接口 =====
+import { decryptSecret } from '@/lib/secrets';
+
 export interface OSSConfig {
   accessKeyId: string;
   accessKeySecret: string;
@@ -63,8 +65,9 @@ export async function getOSSConfigFromDb(): Promise<OSSConfig | null> {
       | undefined;
     if (v && v.accessKeyId && v.accessKeySecret && v.bucket && v.region) {
       dbConfigCache = {
-        accessKeyId: v.accessKeyId,
-        accessKeySecret: v.accessKeySecret,
+        // 存储的密钥为密文（enc: 前缀），读取时解密；旧明文数据透明兼容
+        accessKeyId: decryptSecret(v.accessKeyId),
+        accessKeySecret: decryptSecret(v.accessKeySecret),
         bucket: v.bucket,
         region: v.region,
         endpoint: v.endpoint || undefined,

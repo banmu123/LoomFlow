@@ -1,5 +1,6 @@
-import { randomBytes } from 'crypto';
+import { randomBytes, createHash } from 'crypto';
 import { supabase } from './supabase/server';
+import { encryptSecret } from './secrets';
 
 export interface UserApiKey {
   user_id: string;
@@ -7,6 +8,11 @@ export interface UserApiKey {
   api_key_expires_days: number | null;
   api_key_expires_at: string | null;
   created_at: string;
+}
+
+/** SHA-256 哈希（鉴权等值查询用；api_key 列本身存 AES-256-GCM 密文） */
+export function hashApiKey(key: string): string {
+  return createHash('sha256').update(key).digest('hex');
 }
 
 // 读取用户全局 API Key（无则返回 null）
@@ -37,7 +43,9 @@ export async function ensureUserApiKey(
 
   const { error } = await supabase.from('user_api_keys').insert({
     user_id: userId,
-    api_key: apiKey,
+    // 密文存储（AES-256-GCM）+ 哈希列（鉴权等值查询）
+    api_key: encryptSecret(apiKey),
+    api_key_hash: hashApiKey(apiKey),
     api_key_expires_days: days > 0 ? days : null,
     api_key_expires_at:
       days > 0 ? new Date(Date.now() + days * 24 * 3600 * 1000).toISOString() : null,
@@ -64,7 +72,8 @@ export async function rotateUserApiKey(
   const { data, error } = await supabase
     .from('user_api_keys')
     .update({
-      api_key: newKey,
+      api_key: encryptSecret(newKey),
+      api_key_hash: hashApiKey(newKey),
       api_key_expires_at:
         days > 0 ? new Date(Date.now() + days * 24 * 3600 * 1000).toISOString() : null,
     })

@@ -2,9 +2,10 @@ import { NextRequest } from 'next/server';
 import { supabase } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/server-auth';
 import { clearOSSConfigCache } from '@/lib/oss-config';
+import { encryptSecret, decryptSecret } from '@/lib/secrets';
 import { logAudit, getClientIp } from '@/lib/audit';
 
-// 读取当前 OSS 配置（管理后台「存储设置」，仅 admin）
+// 读取当前 OSS 配置（管理后台「存储设置」，仅 admin；解密后返回）
 export async function GET() {
   const auth = await requireAdmin();
   if (auth instanceof Response) return auth;
@@ -15,7 +16,17 @@ export async function GET() {
     .eq('key', 'oss_config')
     .maybeSingle();
 
-  return Response.json(data?.value ?? null);
+  const value = data?.value as
+    | { accessKeyId?: string; accessKeySecret?: string; bucket?: string; region?: string; endpoint?: string }
+    | null
+    | undefined;
+  if (!value) return Response.json(null);
+
+  return Response.json({
+    ...value,
+    accessKeyId: value.accessKeyId ? decryptSecret(value.accessKeyId) : '',
+    accessKeySecret: value.accessKeySecret ? decryptSecret(value.accessKeySecret) : '',
+  });
 }
 
 // 保存 OSS 配置（仅 admin；写入数据库，无需改环境变量）
@@ -34,8 +45,8 @@ export async function PUT(request: NextRequest) {
   }
 
   const value = {
-    accessKeyId,
-    accessKeySecret,
+    accessKeyId: encryptSecret(accessKeyId),
+    accessKeySecret: encryptSecret(accessKeySecret),
     bucket,
     region,
     endpoint: body?.endpoint?.trim() || null,
