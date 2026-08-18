@@ -1,5 +1,33 @@
 # Changelog
 
+## [v0.1.5] - 2026-08-18
+
+### 新增
+
+- **Search Provider 系统**：统一搜索适配层（`SearchProviderRegistry` + tavily/exa/google 三实现 + 统一 `{results: [{title,url,content}]}` 输出）；管理后台「搜索配置」页（添加/编辑/删除/启用开关/**测试连接**/google cx 动态字段）；画布搜索节点引擎下拉选择已启用服务；AI 生成工作流注入真实服务列表防幻觉
+- **内置 Excel 节点**（excelNode）：数据生成 .xlsx（SheetJS 写入方向），输出 base64（前端直接下载）或上传 OSS；数据源支持上游节点输出或静态 jsonData；AI 生成工作流与 `create_custom_node`（executorType=excelNode）均可使用
+- **一键 Docker 部署脚本**（`scripts/deploy-docker.sh`）：同步代码 → 迁移 → 权限自检 → 构建 → 健康验证；`/api/health` 增加 db 连通自检
+- **自定义节点可复用内置执行器**：`executor_type` 落库 + 重启恢复绑定；AI 对话可创建可直接运行的自定义节点（template/code/llm/http/excel 等 10 种执行器）
+
+### 安全（重点）
+
+- **密钥全加密**：AES-256-GCM（密钥由 AUTH_SECRET 派生）覆盖搜索服务 / AI 模型 / 全局 API Key / OSS 配置四类密钥；全局 API Key 增加 SHA-256 哈希列支持等值鉴权（密文不可直接查询）；旧明文数据透明兼容
+- **容器非 root 运行**（USER node）+ 服务器 `.env` 权限收紧（600）
+- **自托管增量表权限修复**：migration 阶段新建的表（node_definitions / search_providers）自动补 GRANT + `ALTER DEFAULT PRIVILEGES` 治本（杜绝未来新表无权限）+ 部署时权限自检
+
+### 修复
+
+- **搜索节点字段冲突**：统一 `keyword`/`limit`（画布内置面板字段），修正 `??` 优先级导致「搜索数据量/关键字」被旧字段遮蔽的问题
+- **自定义节点 AI 创建失效**：intent 分流修正（含「节点」关键词启用工具）+ `executorType` 不再硬编码自身类型
+- Vercel/CI 构建系列修复：移除 react-dev-inspector/.babelrc、typescript/tailwindcss/tsup 移入 dependencies、Next 16.1.1 → 16.2.12（SSRF/DoS/缓存投毒安全修复）
+- 全局 toast 不显示（挂载 sonner Toaster）
+
+### 测试
+
+- 211 个单元测试（新增 search registry/providers 19、secrets 8、excel-executor 7、search-executor 8、node-custom 绑定、intent、api-key 等 85 个）
+
+---
+
 ## [v0.1.4] - 2026-08-17
 
 ### 安全（重点）
