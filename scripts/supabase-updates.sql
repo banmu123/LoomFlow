@@ -213,5 +213,14 @@ GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, service_role;
 GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO anon, service_role;
 
+-- 30.5 默认权限（治本）：migration 以 postgres 角色建表，此后新建对象自动带授权，
+-- 即使未来新增独立 SQL 文件漏写 GRANT 也不会复现"新表无权限"问题
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+  GRANT ALL ON TABLES TO anon, service_role;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+  GRANT ALL ON SEQUENCES TO anon, service_role;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+  GRANT ALL ON FUNCTIONS TO anon, service_role;
+
 -- 31. 迁移完成后刷新 PostgREST schema 缓存
 NOTIFY pgrst, 'reload schema';
