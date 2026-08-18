@@ -40,6 +40,7 @@ import {
 import { Play, Square, Loader2, CheckCircle2, XCircle, Clock, Settings2, ArrowLeft, Braces, Upload, Save, Boxes, History, RotateCcw, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useT } from '@/lib/i18n';
+import { useTinyflowLocale } from '@/lib/tinyflow-locale';
 import { toast } from 'sonner';
 import { getPendingWorkflow, clearPendingWorkflow } from '@/lib/pending-workflow';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -125,6 +126,9 @@ export default function TinyflowWrapper() {
   const containerRef = useRef<HTMLDivElement>(null);
   const instanceRef = useRef<TinyflowInstance | null>(null);
   const flowIdRef = useRef<string | null>(null);
+
+  // tinyflow 库内置文本国际化（库无 i18n API，DOM 翻译层：en 时替换，zh/卸载恢复）
+  useTinyflowLocale(containerRef);
 
   // Run state
   const [running, setRunning] = useState(false);
