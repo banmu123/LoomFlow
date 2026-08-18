@@ -155,9 +155,12 @@ export function useTinyflowLocale(
         const text = node as Text;
         const raw = text.data;
         if (!originals.has(text)) originals.set(text, raw);
-        const target = TINYFLOW_ZH_EN[raw];
-        if (target && text.data !== target) {
-          text.data = target;
+        // trim 匹配（tinyflow 部分文本带前导空格，如 " 开始节点"）
+        const trimmed = raw.trim();
+        const target = TINYFLOW_ZH_EN[trimmed];
+        if (target && raw !== target) {
+          const idx = raw.indexOf(trimmed);
+          text.data = `${raw.slice(0, idx)}${target}${raw.slice(idx + trimmed.length)}`;
         }
         node = walker.nextNode();
       }
