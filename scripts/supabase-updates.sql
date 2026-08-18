@@ -206,5 +206,12 @@ NOTIFY pgrst, 'reload schema';
 -- 空/等于自身 type = 未绑定（执行报「未注册执行器」）；指定内置节点 type（如 templateNode）= 复用其执行逻辑
 ALTER TABLE node_definitions ADD COLUMN IF NOT EXISTS executor_type TEXT;
 
--- 30. 迁移完成后刷新 PostgREST schema 缓存
+-- 30. 增量建表权限（40-grants.sql 仅在数据卷首次初始化时执行，之后 migration 阶段新建的表
+-- 如 node_definitions / search_providers 需在此补授权；每次 compose up 重跑，未来新表也覆盖）
+GRANT USAGE ON SCHEMA public TO anon, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, service_role;
+GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO anon, service_role;
+
+-- 31. 迁移完成后刷新 PostgREST schema 缓存
 NOTIFY pgrst, 'reload schema';
