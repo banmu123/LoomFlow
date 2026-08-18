@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import '@tinyflow-ai/ui/dist/index.css';
-import type { Tinyflow as TinyflowInstance, CustomNode } from '@tinyflow-ai/ui';
+import 'loomflow-ui/dist/index.css';
+import type { Tinyflow as TinyflowInstance, CustomNode } from 'loomflow-ui';
 import type { TinyflowData, Parameter, FlowNode } from '@/lib/tinyflow/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -306,14 +306,19 @@ export default function TinyflowWrapper() {
       } catch {
         // 拉取失败保持空列表（画布会提示先配置搜索服务）
       }
-      // 自定义节点（source: custom）→ Tinyflow customNodes 注册：
-      // 画布才能渲染/配置自定义类型（不注册则 setData 添加后不显示）
+      // tinyflow 未内置的类型 → 注册为 customNode，画布才能正常渲染（否则显示 TinyFlow.ai 兜底节点）：
+      // 1) 自定义节点（source: custom）2) 本项目新增的内置类型（如 excelNode，source: official 但 tinyflow 不认识）
+      const TINYFLOW_BUILTIN_TYPES = [
+        'startNode', 'endNode', 'llmNode', 'httpNode', 'codeNode', 'knowledgeNode',
+        'searchEngineNode', 'templateNode', 'conditionNode', 'confirmNode', 'loopNode',
+      ];
       let customNodeMap: Record<string, CustomNode> = {};
       try {
         const res = await fetch('/api/nodes');
         const data = await res.json();
         const customDefs = (Array.isArray(data?.nodes) ? data.nodes : []).filter(
-          (n: { source?: string }) => n.source === 'custom',
+          (n: { type: string; source?: string }) =>
+            n.source === 'custom' || !TINYFLOW_BUILTIN_TYPES.includes(n.type),
         );
         customNodeMap = Object.fromEntries(
           customDefs.map((n: { type: string; label: string; description?: string; configSchema?: Array<{ name: string; label: string; type: string; default?: unknown }> }) => [
@@ -338,7 +343,7 @@ export default function TinyflowWrapper() {
       }
       if (destroyed || !containerRef.current) return;
 
-      const { Tinyflow } = await import('@tinyflow-ai/ui');
+      const { Tinyflow } = await import('loomflow-ui');
       if (destroyed || !containerRef.current) return;
       instanceRef.current = new Tinyflow({
         element: containerRef.current,
