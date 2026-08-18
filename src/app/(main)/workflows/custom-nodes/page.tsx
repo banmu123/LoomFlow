@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Boxes, Plus, Pencil, Copy, Trash2, Loader2 } from 'lucide-react';
+import { Boxes, Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,7 +18,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import type { NodeDefinition, NodeConfigField, NodePortDefinition } from '@/lib/tinyflow/node-definition';
 
 // ===== 自定义节点库（Phase 5）=====
-// 官方节点只读（内置）；自定义节点可创建/编辑/复制/删除。
+// 官方节点只读（内置）；自定义节点可创建/编辑/删除。
 // 数据持久化到 node_definitions 表，运行时合并进 NodeRegistry。
 
 const CATEGORIES = ['ai', 'integration', 'logic', 'data', 'custom'];
@@ -121,17 +121,6 @@ export default function CustomNodesPage() {
     }
   };
 
-  const handleDuplicate = async (node: NodeDefinition) => {
-    const res = await fetch(`/api/nodes/custom/${encodeURIComponent(node.type)}`, { method: 'POST' });
-    const data = await res.json();
-    if (!res.ok) {
-      toast.error(data?.error || '复制失败');
-      return;
-    }
-    toast.success('已复制节点');
-    load();
-  };
-
   const handleDelete = async () => {
     if (!deleteTarget) return;
     const res = await fetch(`/api/nodes/custom/${encodeURIComponent(deleteTarget.type)}`, { method: 'DELETE' });
@@ -199,9 +188,6 @@ export default function CustomNodesPage() {
                   <Button variant="outline" size="sm" className="h-7 flex-1 text-xs" onClick={() => openEdit(node)}>
                     <Pencil className="mr-1 h-3 w-3" />
                     编辑
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" title="复制" onClick={() => handleDuplicate(node)}>
-                    <Copy className="h-3.5 w-3.5" />
                   </Button>
                   <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" title="删除" onClick={() => setDeleteTarget(node)}>
                     <Trash2 className="h-3.5 w-3.5" />

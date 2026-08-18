@@ -191,18 +191,3 @@ export async function deleteCustomNode(
   if (nodeType) nodeRegistry.unregister(nodeType);
   return {};
 }
-
-/** 复制自定义节点（type 加后缀避免冲突） */
-export async function duplicateCustomNode(
-  userId: string,
-  source: NodeDefinition,
-): Promise<{ error?: string; node?: NodeDefinition }> {
-  const type = `${source.type}_copy`;
-  const copy: NodeDefinition = {
-    ...source,
-    type,
-    label: `${source.label}（副本）`,
-    source: 'custom',
-  };
-  return createCustomNode(userId, copy);
-}
