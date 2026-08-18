@@ -286,7 +286,7 @@ src/
 
 ## 🧪 Testing & CI
 
-- **Vitest** — 60 unit tests (engine, schema, sandbox, i18n, model registry, node registry)
+- **Vitest** — 209 unit tests (engine, schema, sandbox, executors, search providers, secrets encryption, model registry, node registry, agent tools, i18n)
 - **GitHub Actions** — lint + typecheck + test + production build on every push (Node 20/22 matrix)
 
 ---
