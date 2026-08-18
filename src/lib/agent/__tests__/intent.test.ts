@@ -24,6 +24,13 @@ describe('detectIntent 意图分流', () => {
     expect(detectIntent('帮我配置一个模型')).toBe('query');
   });
 
+  it('查询类：自定义节点（含创建——需工具模式）', () => {
+    expect(detectIntent('帮我创建一个自定义节点')).toBe('query');
+    expect(detectIntent('帮我创建一个翻译节点')).toBe('query');
+    expect(detectIntent('帮我封装一个可复用节点')).toBe('query');
+    expect(detectIntent('自定义节点库里有什么')).toBe('query');
+  });
+
   it('生成类：创建工作流', () => {
     expect(detectIntent('帮我创建一个工作流')).toBe('generate');
     expect(detectIntent('设计一个文案生成流程')).toBe('generate');

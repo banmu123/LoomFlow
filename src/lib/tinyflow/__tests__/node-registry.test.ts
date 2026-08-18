@@ -82,13 +82,14 @@ describe('NodeRegistry 查询', () => {
 });
 
 describe('内置节点注册（全局单例）', () => {
-  it('11 个内置节点全部注册', () => {
+  it('12 个内置节点全部注册', () => {
     const types = nodeRegistry.list().map((n) => n.type).sort();
     expect(types).toEqual([
       'codeNode',
       'conditionNode',
       'confirmNode',
       'endNode',
+      'excelNode',
       'httpNode',
       'knowledgeNode',
       'llmNode',

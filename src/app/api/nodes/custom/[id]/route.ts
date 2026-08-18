@@ -86,7 +86,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     outputs: rec.outputs ?? [],
     configSchema: rec.config_schema ?? [],
     capabilities: rec.capabilities ?? ['text'],
-    executorType: rec.type,
+    executorType: rec.executor_type || rec.type,
     builtin: false,
     source: 'custom',
     version: rec.version ?? 1,

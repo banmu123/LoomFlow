@@ -22,6 +22,8 @@ export interface CustomNodeRecord {
   version: number;
   status: string;
   user_id: string | null;
+  /** 复用内置执行器：空/等于自身 type = 未绑定；指定内置节点 type（如 templateNode）= 复用其执行逻辑 */
+  executor_type?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -38,14 +40,14 @@ function recordToDefinition(rec: CustomNodeRecord): NodeDefinition {
     outputs: Array.isArray(rec.outputs) ? rec.outputs : [],
     configSchema: Array.isArray(rec.config_schema) ? rec.config_schema : [],
     capabilities: (rec.capabilities as NodeDefinition['capabilities']) ?? ['text'],
-    executorType: rec.type,
+    executorType: rec.executor_type || rec.type,
     builtin: false,
     source: 'custom',
     version: rec.version ?? 1,
   };
 }
 
-/** 加载某用户的自定义节点并注册进 registry（幂等：先注销同 type 再注册） */
+/** 加载某用户的自定义节点并注册进 registry（幂等：先注销同 type 再注册）+ 恢复执行器绑定 */
 export async function loadCustomNodesForUser(userId: string): Promise<void> {
   const { data } = await supabase
     .from('node_definitions')
@@ -56,6 +58,8 @@ export async function loadCustomNodesForUser(userId: string): Promise<void> {
   for (const rec of data ?? []) {
     const r = rec as unknown as CustomNodeRecord;
     nodeRegistry.register(recordToDefinition(r));
+    // 重启后恢复 executorType 绑定（否则自定义节点执行报「未注册执行器」）
+    bindExecutor(recordToDefinition(r));
   }
 }
 
@@ -96,6 +100,7 @@ export async function createCustomNode(
       config_schema: def.configSchema ?? [],
       capabilities: def.capabilities ?? ['text'],
       version: def.version ?? 1,
+      executor_type: def.executorType && def.executorType !== def.type ? def.executorType : null,
       user_id: userId,
     })
     .select()
@@ -117,10 +122,11 @@ export async function createCustomNode(
  * 将自定义节点绑定执行器：
  * - 未指定 executorType（= type）：不绑定（执行时报「未注册执行器」）
  * - 指定了已注册的 executorType：把内置执行器注册到本节点 type 名下
+ *   （如 executorType='templateNode' → 画布执行走模板渲染逻辑）
  */
 function bindExecutor(def: NodeDefinition): void {
   const executorType = def.executorType ?? def.type;
-  if (executorType === def.type) return; // 默认 = type：未实现执行器，跳过
+  if (!executorType || executorType === def.type) return; // 默认 = type：未实现执行器，跳过
   const Ctor = ExecutorRegistry.get(executorType);
   if (Ctor) {
     ExecutorRegistry.register(def.type, Ctor);
@@ -143,6 +149,11 @@ export async function updateCustomNode(
   if (def.configSchema !== undefined) patch.config_schema = def.configSchema;
   if (def.capabilities !== undefined) patch.capabilities = def.capabilities;
   if (def.version !== undefined) patch.version = def.version;
+  // executorType 变更：清空（null）或复用内置执行器（≠ type 时落库；= type 视为清空）
+  if (def.executorType !== undefined) {
+    patch.executor_type =
+      def.executorType && def.executorType !== def.type ? def.executorType : null;
+  }
   patch.updated_at = new Date().toISOString();
 
   const { data, error } = await supabase
@@ -158,8 +169,9 @@ export async function updateCustomNode(
   }
 
   const node = recordToDefinition(data as unknown as CustomNodeRecord);
-  // 重新注册（覆盖旧定义）
+  // 重新注册（覆盖旧定义）+ 重新绑定执行器
   nodeRegistry.register(node);
+  bindExecutor(node);
   return { node };
 }
 

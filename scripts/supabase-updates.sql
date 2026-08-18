@@ -201,3 +201,10 @@ END $$;
 
 -- 28. 迁移完成后刷新 PostgREST schema 缓存（否则新列 PATCH 报 PGRST204）
 NOTIFY pgrst, 'reload schema';
+
+-- 29. 自定义节点：复用内置执行器（executor_type 落库，重启后恢复绑定）
+-- 空/等于自身 type = 未绑定（执行报「未注册执行器」）；指定内置节点 type（如 templateNode）= 复用其执行逻辑
+ALTER TABLE node_definitions ADD COLUMN IF NOT EXISTS executor_type TEXT;
+
+-- 30. 迁移完成后刷新 PostgREST schema 缓存
+NOTIFY pgrst, 'reload schema';

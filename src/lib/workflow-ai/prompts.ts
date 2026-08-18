@@ -16,6 +16,7 @@ export const NODE_TYPES = `
 | codeNode | 动态代码 | 执行 JavaScript 代码 |
 | knowledgeNode | 知识库 | 检索知识库文档 |
 | searchEngineNode | 搜索引擎 | 网络搜索 |
+| excelNode | Excel | 将数据生成 xlsx 文件 |
 | templateNode | 内容模板 | 模板渲染输出文本 |
 | confirmNode | 用户确认 | 暂停等待人工确认 |
 | loopNode | 循环 | 遍历数组执行子流程 |
@@ -322,6 +323,41 @@ export const NODE_CONFIGS: Record<string, string> = {
 - data.limit: 返回数量
 
 输出: {documents: [{title, content}]}
+`,
+
+  excelNode: `
+### ExcelNode Excel节点
+- data.sheetName: 工作表名，默认 Sheet1
+- data.fileName: 文件名，默认 data.xlsx
+- data.outputType: "base64"（默认）或 "oss"（需已配置存储）
+- data.parameters: 输入参数——必须有一个名为 data 的输入（refType=ref，ref 指向上游输出的数组）
+
+输出: {base64, fileName, sheetName, rowCount}（base64 模式）或 {ossKey, fileName, sheetName, rowCount}（oss 模式）
+
+示例（把上游搜索结果整理成 Excel）:
+\`\`\`json
+{
+  "id": "node_excel",
+  "type": "excelNode",
+  "position": { "x": 400, "y": 200 },
+  "data": {
+    "title": "导出Excel",
+    "description": "把数据整理成 Excel",
+    "expand": true,
+    "sheetName": "Sheet1",
+    "fileName": "export.xlsx",
+    "outputType": "base64",
+    "parameters": [
+      { "id": "ep1", "name": "data", "refType": "ref", "ref": "node_search.results" }
+    ],
+    "outputDefs": [
+      { "id": "eo1", "name": "base64", "dataType": "String" }
+    ]
+  }
+}
+\`\`\`
+
+使用场景：用户需要"导出/下载/整理成 Excel/生成表格文件"时，在流程末尾加上 excelNode 把前面的数据（如搜索结果、LLM 生成的 JSON）写入 Excel。
 `,
 
   confirmNode: `

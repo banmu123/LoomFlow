@@ -654,14 +654,41 @@ const getPublishStatus = tool({
 });
 
 // ===== 自定义节点工具（Phase 5：AI 可创建自定义节点）=====
+// 可复用的内置执行器（自定义节点绑定后画布可直接运行）：
+// - templateNode：模板渲染（data.template 支持 {{var}}）
+// - codeNode：JS 代码（data.code 返回对象）
+// - conditionNode：条件分支（data.condition 表达式）
+// - llmNode：调用 LLM（data.llmId/data.systemPrompt/data.userPrompt/data.temperature）
+// - httpNode：HTTP 请求（data.method/data.url/data.bodyJson）
+// - knowledgeNode / searchEngineNode / confirmNode / loopNode：对应内置逻辑
+// - excelNode：把数据生成 Excel（data.sheetName/data.fileName/data.outputType；输入参数名为 data 的数组）
+const REUSABLE_EXECUTOR_TYPES = [
+  'templateNode',
+  'codeNode',
+  'conditionNode',
+  'llmNode',
+  'httpNode',
+  'knowledgeNode',
+  'searchEngineNode',
+  'confirmNode',
+  'loopNode',
+  'excelNode',
+] as const;
+
 const createCustomNodeTool = tool({
   description:
-    '创建自定义节点（metadata / configSchema / 输入输出端口）。执行类操作——调用前必须先向用户展示节点定义方案并征得同意后再执行。',
+    '创建自定义节点（metadata / configSchema / 输入输出端口）。执行类操作——调用前必须先向用户展示节点定义方案并征得同意后再执行。配置表单字段（configSchema）与可复用执行器（executorType）决定节点的可执行性。',
   inputSchema: z.object({
     type: z.string().describe('节点类型标识（字母开头，仅含字母/数字/_-，如 greetNode）'),
     label: z.string().describe('节点显示名（如 问候节点）'),
     description: z.string().optional().describe('节点描述'),
     category: z.enum(['ai', 'integration', 'logic', 'data', 'custom']).default('custom').describe('节点分类'),
+    executorType: z
+      .enum(REUSABLE_EXECUTOR_TYPES)
+      .optional()
+      .describe(
+        '复用内置执行器（可选）：templateNode=模板渲染 / codeNode=JS代码 / conditionNode=条件分支 / llmNode=调LLM / httpNode=HTTP请求 / knowledgeNode=知识库检索 / searchEngineNode=网络搜索 / confirmNode=人工确认 / loopNode=循环 / excelNode=生成Excel文件。不指定则节点仅占位，画布执行会报「未注册执行器」。configSchema 的字段名必须与所选执行器要求的数据字段一致（如 templateNode 需要 template 字段，excelNode 需要 sheetName/fileName/outputType）。',
+      ),
     inputs: z
       .array(z.object({ name: z.string(), label: z.string(), dataType: z.string().default('string'), required: z.boolean().optional() }))
       .optional()
@@ -683,9 +710,9 @@ const createCustomNodeTool = tool({
         }),
       )
       .optional()
-      .describe('配置表单字段'),
+      .describe('配置表单字段（字段 name 必须与执行器要求的数据字段一致）'),
   }),
-  execute: async ({ type, label, description, category, inputs, outputs, configSchema }) => {
+  execute: async ({ type, label, description, category, executorType, inputs, outputs, configSchema }) => {
     const u = await getAuthUser();
     if (!isUser(u)) return { error: u };
     const result = await createCustomNode(u.id, {
@@ -696,16 +723,20 @@ const createCustomNodeTool = tool({
       inputs: inputs ?? [],
       outputs: outputs ?? [],
       configSchema: configSchema ?? [],
-      executorType: type,
+      executorType: executorType ?? type,
       builtin: false,
       source: 'custom',
     });
     if (result.error) return { error: result.error };
+    const bound = !!executorType;
     return {
       success: true,
       nodeType: result.node?.type,
       label: result.node?.label,
-      hint: '自定义节点已注册，可在「自定义节点库」查看；注意执行器尚未实现，画布添加后执行会提示未注册',
+      boundExecutor: executorType ?? null,
+      message: bound
+        ? `自定义节点「${label}」已创建，并复用内置执行器 ${executorType}——画布添加后可直接运行（注意 configSchema 字段要与执行器要求一致）`
+        : `自定义节点「${label}」已创建并注册到节点库（画布可添加，但执行器未绑定，执行会提示未注册）；如需可执行，请用 create_custom_node 传入 executorType 重建`,
     };
   },
 });
@@ -763,14 +794,30 @@ export const agentToolsPrompt = `你有能力查询并操作用户的系统。�
 2. 排查错误时：先查执行记录或调用日志找到错误，再查相关工作流/模型配置分析原因，给出明确的解决建议
 3. 工具返回 error 时如实说明，不要编造
 
-## 执行类操作规则（create_knowledge_base / delete_knowledge_base）
+## 执行类操作规则（create_knowledge_base / delete_knowledge_base / create_model / create_custom_node）
 
 这些工具会修改用户数据，必须遵守两段式确认：
 1. **调用前先向用户展示将要执行的操作**（如："我将创建知识库「测试」（数据库存储），确认执行吗？"），等待用户明确回复
 2. 用户明确同意（"确认/好/可以/执行"等）后，**再调用工具**
 3. 用户拒绝或未明确同意时，**不得调用**执行类工具
 4. 删除类操作要特别说明影响（"将删除知识库及其所有文档"）
-5. **关键参数不明确时先询问，不要擅自用默认值**：如创建知识库未指定名称、或未指定存储方式（数据库/OSS）时，先问用户选择（可用 get_oss_config_status 了解 OSS 是否可用，给出建议），等用户明确后再执行`;
+5. **关键参数不明确时先询问，不要擅自用默认值**：如创建知识库未指定名称、或未指定存储方式（数据库/OSS）时，先问用户选择（可用 get_oss_config_status 了解 OSS 是否可用，给出建议），等用户明确后再执行
+
+## 自定义节点创建规则（create_custom_node）
+
+用户要求"创建/封装一个节点""做一个可复用的 XX 节点"时使用：
+1. **先设计**：根据用户需求给出节点方案（type/label/分类/输入输出端口/配置字段），说明将复用哪个内置执行器（executorType），征得同意后再调用工具
+2. **executorType 优先复用内置执行器**（否则节点画布上执行会报「未注册执行器」）：
+   - 模板渲染类 → templateNode（配置字段：template）
+   - 数据处理类 → codeNode（配置字段：code）
+   - 逻辑分支类 → conditionNode（配置字段：condition）
+   - AI 处理类 → llmNode（配置字段：llmId/systemPrompt/userPrompt/temperature）
+   - 外部调用类 → httpNode（配置字段：method/url/headers/bodyJson）
+   - 检索类 → knowledgeNode / searchEngineNode
+   - 表格/导出类 → excelNode（配置字段：sheetName/fileName/outputType；输入参数名为 data 的数组）
+   - 配置字段的 name 必须与执行器要求的数据字段一致（如上括号标注）
+3. 创建成功后告知用户：可在「自定义节点库」查看/编辑，画布节点库「自定义」分类下添加使用
+4. 重复创建相同 type 会报「已存在」——此时建议用户改用 update 能力（修改现有节点）或换个 type`;
 
 // 系统页面导航知识：全模式注入（不依赖工具），让 AI 能引导用户去正确页面操作
 export const systemNavPrompt = `## 系统页面导航（给用户的操作指引）
@@ -782,6 +829,7 @@ export const systemNavPrompt = `## 系统页面导航（给用户的操作指引
 - 知识库：/knowledge（创建知识库、上传文档；工作流中的「知识库」节点从这里选）
 - 执行历史：/workflows/history
 - 定时任务：/workflows/schedules
+- 自定义节点：/workflows/custom-nodes（查看/编辑 AI 创建的自定义节点）
 
 当用户需要做某件事（配置模型、发布、查看日志、重新生成 Key 等）时：
 1. 先查相关状态（如有必要）

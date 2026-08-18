@@ -454,6 +454,64 @@ export const LOOP_NODE: NodeDefinition = {
   builtin: true,
 };
 
+export const EXCEL_NODE: NodeDefinition = {
+  type: 'excelNode',
+  label: 'Excel',
+  description: '将数据生成 Excel 文件（xlsx，base64 或上传 OSS）',
+  category: 'data',
+  inputs: [
+    {
+      name: 'data',
+      label: 'Data',
+      dataType: 'array',
+      required: true,
+    },
+  ],
+  outputs: [
+    {
+      name: 'output',
+      label: 'File',
+      dataType: 'object',
+    },
+  ],
+  executorType: 'excelNode',
+  builtin: true,
+  configSchema: [
+    {
+      name: 'sheetName',
+      label: '工作表名',
+      type: 'string',
+      default: 'Sheet1',
+      description: '生成的 Excel 工作表名称（最长 31 字符）',
+    },
+    {
+      name: 'fileName',
+      label: '文件名',
+      type: 'string',
+      default: 'data.xlsx',
+      description: '输出的文件名（含 .xlsx 后缀）',
+    },
+    {
+      name: 'outputType',
+      label: '输出方式',
+      type: 'select',
+      default: 'base64',
+      options: [
+        { value: 'base64', label: 'Base64（前端直接下载）' },
+        { value: 'oss', label: '上传 OSS（返回文件地址）' },
+      ],
+      description: 'base64 无需额外配置；oss 需要已配置存储',
+    },
+    {
+      name: 'jsonData',
+      label: '静态数据（可选）',
+      type: 'json',
+      description:
+        '不连接上游时可直接填入对象数组，如 [{"名称":"A","数量":2}]；连接了上游数据则优先使用上游',
+    },
+  ],
+};
+
 // ===== 统一注册 =====
 
 nodeRegistry.register(START_NODE);
@@ -467,6 +525,7 @@ nodeRegistry.register(TEMPLATE_NODE);
 nodeRegistry.register(CONDITION_NODE);
 nodeRegistry.register(CONFIRM_NODE);
 nodeRegistry.register(LOOP_NODE);
+nodeRegistry.register(EXCEL_NODE);
 
 // ===== 一致性校验（运行时动态执行，避免静态打包 coze SDK） =====
 // 校验每个节点的 executorType 在 ExecutorRegistry 中存在（防幽灵节点）
