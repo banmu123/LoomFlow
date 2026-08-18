@@ -156,8 +156,8 @@ importers:
         specifier: ^1.4.2
         version: 1.4.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       loomflow-ui:
-        specifier: ^0.1.0
-        version: 0.1.0(@internationalized/date@3.12.3)(svelte@5.56.9(@typescript-eslint/types@8.54.0))
+        specifier: ^0.1.1
+        version: 0.1.1(@internationalized/date@3.12.3)(svelte@5.56.9(@typescript-eslint/types@8.54.0))
       lucide-react:
         specifier: ^0.468.0
         version: 0.468.0(react@19.2.3)
@@ -4866,8 +4866,8 @@ packages:
   longest-streak@3.1.0:
     resolution: {integrity: sha512-9Ri+o0JYgehTaVBBDoMqIl8GXtbWg711O3srftcHhZ0dqnETqLaoIK0x17fUw9rFSlK/0NlsKe0Ahhyl5pXE2g==}
 
-  loomflow-ui@0.1.0:
-    resolution: {integrity: sha512-AfOzD2jiq89TrQwIZ/PiBKI7RJthiMG0n4ZLQYOGHOQtBbGL+Tw7qtqshJKOND8EIoD+ws95VHYWz+fcf/blXg==}
+  loomflow-ui@0.1.1:
+    resolution: {integrity: sha512-4JPNaZGOLBPUjtfM19b9n8zbqap+JkpX1Kl5tsmPMPEJwUSaMywgS5HuZKCy37Fs+GNGJNhDBaYmzj+suSV+tg==}
 
   loose-envify@1.4.0:
     resolution: {integrity: sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==}
@@ -11282,7 +11282,7 @@ snapshots:
 
   longest-streak@3.1.0: {}
 
-  loomflow-ui@0.1.0(@internationalized/date@3.12.3)(svelte@5.56.9(@typescript-eslint/types@8.54.0)):
+  loomflow-ui@0.1.1(@internationalized/date@3.12.3)(svelte@5.56.9(@typescript-eslint/types@8.54.0)):
     dependencies:
       '@floating-ui/dom': 1.7.5
       '@xyflow/svelte': 1.6.3(svelte@5.56.9(@typescript-eslint/types@8.54.0))
