@@ -272,7 +272,7 @@ export const KNOWLEDGE_NODE: NodeDefinition = {
 export const SEARCH_ENGINE_NODE: NodeDefinition = {
   type: 'searchEngineNode',
   label: '搜索',
-  description: '执行网络搜索',
+  description: '执行网络搜索（通过已配置的搜索服务）',
   category: 'ai',
   inputs: [
     {
@@ -291,6 +291,37 @@ export const SEARCH_ENGINE_NODE: NodeDefinition = {
   ],
   executorType: 'searchEngineNode',
   builtin: true,
+  configSchema: [
+    {
+      name: 'engine',
+      label: '搜索服务',
+      type: 'select',
+      required: true,
+      description: '选择已启用的搜索服务（管理后台 → 搜索配置）',
+      // 动态选项：服务端直接查 DB（与 LLM 节点 optionsProvider 同模式，但走直连避免相对路径 fetch）
+      optionsProvider: async () => {
+        const { getEnabledSearchProviders } = await import('@/lib/search/db-providers');
+        const providers = await getEnabledSearchProviders();
+        return providers.map((p) => ({ value: p.id, label: p.label || p.id }));
+      },
+    },
+    {
+      name: 'maxResults',
+      label: '返回数量',
+      type: 'number',
+      default: 5,
+      min: 1,
+      max: 20,
+      description: '最多返回的搜索结果条数',
+    },
+    {
+      name: 'query',
+      label: '搜索关键词',
+      type: 'string',
+      required: true,
+      description: '支持 {{var}} 插值',
+    },
+  ],
 };
 
 export const TEMPLATE_NODE: NodeDefinition = {

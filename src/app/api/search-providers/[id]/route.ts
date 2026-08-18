@@ -1,13 +1,14 @@
 import { NextRequest } from 'next/server';
 import { supabase } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/server-auth';
-import { invalidateModelsCache } from '@/lib/ai/db-models';
+import { invalidateSearchProvidersCache } from '@/lib/search/db-providers';
+import { isBuiltinSearchProviderType } from '@/lib/search/providers';
 import { encryptSecret } from '@/lib/secrets';
 import { getClientIp, logAudit } from '@/lib/audit';
 
-const VALID_CAPABILITIES = ['text', 'vision', 'audio', 'image', 'tool'];
+const VALID_CAPABILITIES = ['web', 'news', 'image', 'video'];
 
-// 编辑模型（仅 admin）
+// 编辑搜索服务（仅 admin）
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -25,17 +26,30 @@ export async function PATCH(
 
   const updates: Record<string, unknown> = {};
   if (typeof body.provider === 'string' && body.provider.trim()) {
+    if (!isBuiltinSearchProviderType(body.provider.trim())) {
+      return Response.json({ error: 'provider 类型不合法' }, { status: 400 });
+    }
     updates.provider = body.provider.trim();
-  }
-  if (Array.isArray(body.capabilities)) {
-    const caps = body.capabilities.filter((c: string) => VALID_CAPABILITIES.includes(c));
-    if (caps.length > 0) updates.capabilities = caps;
   }
   if (typeof body.label === 'string') {
     updates.label = body.label.trim() || null;
   }
   if (typeof body.base_url === 'string') {
     updates.base_url = body.base_url.trim() || null;
+  }
+  // config 整体替换（google 的 cx 修改走这里）
+  if (body.config && typeof body.config === 'object') {
+    updates.config = body.config;
+    if (updates.provider === 'google' && !String(body.config.cx ?? '').trim()) {
+      return Response.json({ error: 'Google Custom Search 需要配置 cx（搜索引擎 ID）' }, { status: 400 });
+    }
+  }
+  if (Array.isArray(body.capabilities)) {
+    const caps = body.capabilities.filter((c: string) => VALID_CAPABILITIES.includes(c));
+    if (caps.length > 0) updates.capabilities = caps;
+  }
+  if (typeof body.enabled === 'boolean') {
+    updates.enabled = body.enabled;
   }
   // api_key 留空表示不修改；非空则更新（入库前加密）
   if (typeof body.api_key === 'string' && body.api_key.trim()) {
@@ -47,7 +61,7 @@ export async function PATCH(
   }
 
   const { data, error } = await supabase
-    .from('ai_models')
+    .from('search_providers')
     .update(updates)
     .eq('id', id)
     .select()
@@ -57,19 +71,19 @@ export async function PATCH(
     return Response.json({ error: error.message }, { status: 500 });
   }
 
-  invalidateModelsCache();
+  invalidateSearchProvidersCache();
   await logAudit({
     userId: user.id,
     username: user.username,
-    action: 'model_update',
-    detail: { modelId: id, updates: Object.keys(updates) },
+    action: 'search_provider_update',
+    detail: { id, updates: Object.keys(updates), hasKey: typeof updates.api_key === 'string' },
     ip: getClientIp(request),
   });
 
   return Response.json(data);
 }
 
-// 删除模型（仅 admin）
+// 删除搜索服务（仅 admin）
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -84,18 +98,18 @@ export async function DELETE(
 
   const { id } = await params;
 
-  const { error } = await supabase.from('ai_models').delete().eq('id', id);
+  const { error } = await supabase.from('search_providers').delete().eq('id', id);
 
   if (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
 
-  invalidateModelsCache();
+  invalidateSearchProvidersCache();
   await logAudit({
     userId: user.id,
     username: user.username,
-    action: 'model_delete',
-    detail: { modelId: id },
+    action: 'search_provider_delete',
+    detail: { id },
     ip: getClientIp(request),
   });
 

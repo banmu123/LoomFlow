@@ -28,6 +28,7 @@ export const en: ZhMessages = {
     history: 'History',
     schedules: 'Schedules',
     models: 'Models',
+    searchProviders: 'Search Providers',
     users: 'Users',
     stats: 'Statistics',
     logs: 'Audit Logs',

@@ -289,6 +289,19 @@ export default function TinyflowWrapper() {
       } catch {
         // 拉取失败保持空列表
       }
+      // 搜索服务列表（画布搜索节点「搜索引擎」下拉，仅已启用的）
+      let searchProviderOptions: { value: string; label: string }[] = [];
+      try {
+        const res = await fetch('/api/search-providers');
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          searchProviderOptions = (data as Array<{ id: string; label: string | null; enabled: boolean }>)
+            .filter((p) => p.enabled)
+            .map((p) => ({ value: p.id, label: p.label || p.id }));
+        }
+      } catch {
+        // 拉取失败保持空列表（画布会提示先配置搜索服务）
+      }
       // 自定义节点（source: custom）→ Tinyflow customNodes 注册：
       // 画布才能渲染/配置自定义类型（不注册则 setData 添加后不显示）
       let customNodeMap: Record<string, CustomNode> = {};
@@ -329,6 +342,7 @@ export default function TinyflowWrapper() {
         provider: {
           llm: () => llmOptions,
           knowledge: () => knowledgeOptions,
+          searchEngine: () => searchProviderOptions,
         },
         customNodes: customNodeMap,
         // 节点库启用控制：隐藏未启用的节点类型（勾选后才在面板显示）

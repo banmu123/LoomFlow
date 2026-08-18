@@ -256,10 +256,11 @@ export const NODE_CONFIGS: Record<string, string> = {
 
   searchEngineNode: `
 ### SearchEngineNode 搜索引擎节点
-- data.keyword: 搜索关键词，支持 {{var}}
-- data.limit: 返回数量，默认5
+- data.engine: 搜索服务 ID（管理后台 → 搜索配置中添加，如 tavily-main）
+- data.query: 搜索关键词，支持 {{var}}
+- data.maxResults: 返回数量，默认5
 
-输出: {documents: [{title, content}]}
+输出: {results: [{title, url, content}], keyword}
 
 示例:
 \`\`\`json
@@ -271,13 +272,14 @@ export const NODE_CONFIGS: Record<string, string> = {
     "title": "网络搜索",
     "description": "搜索信息",
     "expand": true,
-    "keyword": "{{query}}",
-    "limit": "5",
+    "engine": "tavily-main",
+    "query": "{{query}}",
+    "maxResults": 5,
     "parameters": [
       { "id": "sp1", "name": "query", "refType": "ref", "ref": "node_start.query" }
     ],
     "outputDefs": [
-      { "id": "so1", "name": "documents", "dataType": "Array" }
+      { "id": "so1", "name": "results", "dataType": "Array" }
     ]
   }
 }
@@ -382,14 +384,22 @@ export const SELF_CHECK = `
 
 // 组装完整系统提示词
 // availableModels：当前模型配置中的可用模型（id 列表），动态注入防止 AI 幻觉出不存在的模型 id
+// availableSearchProviders：当前已启用的搜索服务（id 列表），防止 AI 幻觉出不存在的搜索服务 id
 export function buildSystemPrompt(
   availableModels?: Array<{ id: string; label?: string | null }>,
+  availableSearchProviders?: Array<{ id: string; label?: string | null }>,
 ): string {
   const modelHint =
     availableModels && availableModels.length > 0
       ? `只能从以下已配置的模型 ID 中选择（严禁使用列表之外的模型 ID）：
 ${availableModels.map((m) => `- ${m.id}（${m.label || m.id}）`).join('\n')}`
       : '当前没有已配置的模型：llmId 留空，并提醒用户先在「模型配置」中添加模型';
+
+  const searchProviderHint =
+    availableSearchProviders && availableSearchProviders.length > 0
+      ? `只能从以下已配置的搜索服务 ID 中选择 searchEngineNode 的 data.engine（严禁使用列表之外的 ID）：
+${availableSearchProviders.map((s) => `- ${s.id}（${s.label || s.id}）`).join('\n')}`
+      : '当前没有已配置的搜索服务：searchEngineNode 的 data.engine 留空，并提醒用户先在「搜索配置」中添加搜索服务';
 
   return `你是一个工作流设计专家，根据用户需求生成 Tinyflow 工作流 JSON。
 
@@ -412,6 +422,10 @@ ${SELF_CHECK}
 ## 模型使用规则
 
 ${modelHint}
+
+## 搜索服务使用规则
+
+${searchProviderHint}
 
 ## 输出要求
 

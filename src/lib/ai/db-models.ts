@@ -1,5 +1,6 @@
 import type { ModelCapability, ModelDefinition } from './capabilities';
 import { supabase } from '@/lib/supabase/server';
+import { decryptSecret } from '@/lib/secrets';
 
 // ===== 数据库模型加载（内置模型 + 用户配置合并）=====
 
@@ -34,7 +35,8 @@ async function loadFromDb(): Promise<ModelDefinition[]> {
     capabilities: (Array.isArray(row.capabilities) ? row.capabilities : ['text']) as ModelCapability[],
     label: row.label || undefined,
     baseURL: row.base_url || undefined,
-    apiKey: row.api_key || undefined,
+    // 解密存储的 apiKey（旧明文数据透明兼容）
+    apiKey: row.api_key ? decryptSecret(row.api_key) : undefined,
   }));
 }
 

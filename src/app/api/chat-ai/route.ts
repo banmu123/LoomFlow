@@ -13,6 +13,7 @@ import { getAllModels } from '@/lib/ai/db-models';
 import { agentTools, agentToolsPrompt, systemNavPrompt } from '@/lib/agent/tools';
 // 确定性意图预分流（query=查询带工具 / generate=生成不带工具 / chat=闲聊）
 import { detectIntentFromMessages } from '@/lib/agent/intent';
+import { getEnabledSearchProviders } from '@/lib/search/db-providers';
 
 async function getProviderForModel(modelId: string) {
   const models = await getAllModels();
@@ -50,15 +51,16 @@ const CHAT_RULES = `你是一个AI助手，可以进行正常对话，也可以�
 - JSON 要放在 \`\`\`json 代码块中`;
 
 // 完整系统提示词（对话规则 + 工作流生成规则）
-// 动态构建：注入当前模型配置列表，防止 AI 幻觉出未配置的模型 id
+// 动态构建：注入当前模型配置列表与搜索服务列表，防止 AI 幻觉出未配置的 id
 function buildFullSystemPrompt(
   availableModels: Array<{ id: string; label?: string | null }>,
+  availableSearchProviders: Array<{ id: string; label?: string | null }>,
 ): string {
   return `${CHAT_RULES}
 
 ---
 
-${buildSystemPrompt(availableModels)}`;
+${buildSystemPrompt(availableModels, availableSearchProviders)}`;
 }
 
 // 解析响应中的 JSON
@@ -146,8 +148,13 @@ export async function POST(request: NextRequest) {
   console.log('[chat-ai] Using model:', modelId);
 
   // 动态注入模型配置列表（防止 AI 生成工作流时幻觉出未配置的模型 id）
+  const searchProviders = (await getEnabledSearchProviders()).map((s) => ({
+    id: s.id,
+    label: s.label,
+  }));
   const systemPrompt = buildFullSystemPrompt(
     allModels.map((m) => ({ id: m.id, label: m.label })),
+    searchProviders,
   );
 
   // 确定性意图预分流：query=带工具查询/排错；generate、chat=不带工具（杜绝生成时误调工具）

@@ -26,6 +26,7 @@ export const zh = {
     history: '执行历史',
     schedules: '定时任务',
     models: '模型配置',
+    searchProviders: '搜索配置',
     users: '用户管理',
     stats: '用量统计',
     logs: '审计日志',

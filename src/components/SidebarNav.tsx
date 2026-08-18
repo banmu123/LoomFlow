@@ -25,6 +25,7 @@ import {
   PanelLeftOpen,
   Trash2,
   Boxes,
+  Search,
 } from 'lucide-react';
 import { cn, truncateTitle } from '@/lib/utils';
 import { useT } from '@/lib/i18n';
@@ -57,6 +58,7 @@ const NAV_ITEMS: NavItem[] = [
 
 const ADMIN_ITEMS: NavItem[] = [
   { href: '/admin/models', labelKey: 'sidebar.models', icon: Cpu },
+  { href: '/admin/search-providers', labelKey: 'sidebar.searchProviders', icon: Search },
   { href: '/admin/users', labelKey: 'sidebar.users', icon: Users },
   { href: '/admin/stats', labelKey: 'sidebar.stats', icon: BarChart3 },
   { href: '/admin/logs', labelKey: 'sidebar.logs', icon: FileClock },

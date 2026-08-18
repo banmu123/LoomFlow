@@ -178,5 +178,26 @@ CREATE TABLE IF NOT EXISTS node_definitions (
 );
 CREATE INDEX IF NOT EXISTS idx_node_definitions_user ON node_definitions(user_id);
 
--- 25. 迁移完成后刷新 PostgREST schema 缓存（否则新列 PATCH 报 PGRST204）
+-- 27. 搜索服务配置表（初始为空，由用户在管理后台 → 搜索配置添加）
+CREATE TABLE IF NOT EXISTS search_providers (
+  id            TEXT PRIMARY KEY,               -- 配置名（用户可读，如 tavily-main）
+  provider      TEXT NOT NULL,                  -- tavily / exa / google
+  label         TEXT,
+  api_key       TEXT,
+  base_url      TEXT,                           -- 自定义端点（留空用默认）
+  config        JSONB NOT NULL DEFAULT '{}',    -- provider 专属配置（如 google 的 cx）
+  capabilities  JSONB NOT NULL DEFAULT '["web"]',
+  enabled       BOOLEAN NOT NULL DEFAULT true,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE search_providers ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_policies WHERE policyname = 'Allow all on search_providers' AND tablename = 'search_providers') THEN
+    CREATE POLICY "Allow all on search_providers" ON search_providers FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+
+-- 28. 迁移完成后刷新 PostgREST schema 缓存（否则新列 PATCH 报 PGRST204）
 NOTIFY pgrst, 'reload schema';

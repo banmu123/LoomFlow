@@ -3,6 +3,7 @@ import type { ModelMessage } from 'ai';
 import { buildSystemPrompt } from '@/lib/workflow-ai/prompts';
 import { getProviderClientForModel, hasCapability } from '@/lib/ai';
 import { getAllModels } from '@/lib/ai/db-models';
+import { getEnabledSearchProviders } from '@/lib/search/db-providers';
 import { agentTools, agentToolsPrompt, systemNavPrompt } from '@/lib/agent/tools';
 import { detectIntentFromMessages } from '@/lib/agent/intent';
 import { supabase } from '@/lib/supabase/server';
@@ -34,15 +35,16 @@ const CHAT_RULES = `你是一个AI助手，可以进行正常对话，也可以�
 - JSON 要放在 \`\`\`json 代码块中`;
 
 // 完整系统提示词（对话规则 + 工作流生成规则）
-// 动态构建：注入当前模型配置列表，防止 AI 幻觉出未配置的模型 id
+// 动态构建：注入当前模型配置列表与搜索服务列表，防止 AI 幻觉出未配置的 id
 function buildFullSystemPrompt(
   availableModels: Array<{ id: string; label?: string | null }>,
+  availableSearchProviders: Array<{ id: string; label?: string | null }>,
 ): string {
   return `${CHAT_RULES}
 
 ---
 
-${buildSystemPrompt(availableModels)}`;
+${buildSystemPrompt(availableModels, availableSearchProviders)}`;
 }
 
 export interface ToolLog {
@@ -203,8 +205,13 @@ export async function runAiGeneration(opts: {
     // ===== 4. 意图分流 + 系统提示词 =====
     const intent = detectIntentFromMessages(chatHistory);
     const useTools = intent === 'query';
+    const searchProviders = (await getEnabledSearchProviders()).map((s) => ({
+      id: s.id,
+      label: s.label,
+    }));
     const systemPrompt = buildFullSystemPrompt(
       allModels.map((m) => ({ id: m.id, label: m.label })),
+      searchProviders,
     );
 
     // ===== 5. 流式生成（后台执行，边生成边写库）=====
