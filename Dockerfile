@@ -40,6 +40,10 @@ COPY --from=builder /app/next.config.ts ./
 COPY --from=builder /app/tsconfig.json ./
 COPY --from=builder /app/.env.example ./
 
+# 非 root 运行：容器被攻破时降权（node:20-slim 自带 node 用户 UID 1000）
+RUN chown -R node:node /app
+USER node
+
 EXPOSE 5000
 
 # 健康检查（/api/health 已实现）
