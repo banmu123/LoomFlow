@@ -13,17 +13,23 @@ WORKDIR /app
 RUN corepack enable
 
 # 先复制依赖清单，利用 Docker 层缓存
+# 依赖安装：pnpm store 持久化缓存（BuildKit cache mount）——lock 文件未变时秒过，变更时只装差异
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,target=/root/.local/share/pnpm \
+    pnpm install --frozen-lockfile
 
-# 复制源码并构建（next build + tsup）
+# 复制源码并构建
 COPY . .
 # 构建期占位环境变量（无 NEXT_PUBLIC 依赖；dotenv 兜底不会失败）
 ENV COZE_SUPABASE_URL=https://placeholder.invalid \
     COZE_SUPABASE_SERVICE_ROLE_KEY=placeholder \
     DEEPSEEK_API_KEY=placeholder \
     AUTH_SECRET=placeholder-build-secret
-RUN pnpm build
+# 直接 next build + tsup（跳过 scripts/build.sh 里的重复 pnpm install）
+# Turbopack 编译缓存持久化（/app/.next/cache 跨构建保留）——只编译变更部分，不再全量重建
+RUN --mount=type=cache,target=/app/.next/cache \
+    pnpm next build && \
+    pnpm tsup src/server.ts --format cjs --platform node --target node20 --outDir dist --no-splitting --no-minify
 
 # ---- Stage 2: 运行 ----
 FROM node:20-slim AS runner
