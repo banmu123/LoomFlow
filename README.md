@@ -50,7 +50,7 @@ No drag-and-drop required to start — just **describe your process in plain lan
 Then fine-tune visually and publish as an API.
 
 ### 🎨 Visual Canvas
-Tinyflow canvas editor: drag nodes, connect flows, configure parameters. 10 node types (LLM / HTTP / Code / Template / Loop / Human Confirm, etc.).
+Tinyflow canvas editor: drag nodes, connect flows, configure parameters. 12 node types (LLM / HTTP / Code / Template / Search / Excel / Loop / Human Confirm, etc.).
 
 ### 🚀 Workflow as API
 One-click publish a workflow as an HTTP endpoint — **one global API Key calls all of your published workflows**, with unlimited calls and call logs:
@@ -111,20 +111,20 @@ flowchart TB
 
     subgraph App["LoomFlow App (Next.js)"]
         UI["App Router pages<br/>Chat / Workflows / Admin / Share"]
-        API["API Routes<br/>auth / chat-ai / workflow-history / publish / api-key"]
+        API["API Routes<br/>auth / chat-ai / workflow-history / publish / api-key<br/>search-providers / nodes / schedules"]
         Engine["Workflow engine<br/>FlowEngine + NodeRegistry + Executors"]
-        Registry["Model Registry<br/>model config / providers"]
+        Registry["Registries<br/>Model Registry · Search Provider Registry"]
     end
 
     subgraph Data["Data layer"]
         PostgREST["PostgREST"]
-        PG[("PostgreSQL<br/>conversations / workflow_history / workflow_versions<br/>user_api_keys / ai_models / audit_logs ···")]
+        PG[("PostgreSQL<br/>conversations / workflow_history / workflow_versions<br/>user_api_keys / ai_models / search_providers<br/>node_definitions / audit_logs ···")]
     end
 
     subgraph ExternalSvc["External services"]
         LLM["LLM Providers<br/>DeepSeek / any OpenAI-compatible endpoint"]
         OSS["Object storage<br/>Aliyun OSS / S3-compatible"]
-        Search["Search API"]
+        Search["Search Providers<br/>Tavily / Exa / Google"]
     end
 
     Browser --> UI
@@ -148,6 +148,7 @@ flowchart LR
     App -->|"http://nginx:80/rest/v1"| Nginx["Nginx reverse proxy"]
     Nginx --> PostgREST["PostgREST"]
     PostgREST --> PG[("PostgreSQL 16<br/>volume: loomflow-pgdata")]
+    Mig["migration container<br/>idempotent SQL on every `up`"] -.-> PG
 ```
 
 ## 🚀 Quick Start
@@ -201,7 +202,12 @@ Environment variables (where to get them):
 #    ② scripts/supabase-users.sql   ← ⚠️ set your own admin password BEFORE running
 #    ③ scripts/supabase-updates.sql
 #    ④ scripts/supabase-apikeys.sql  ← global API Key table (idempotent)
-#    Verify tables: conversations / messages / workflow_history / users / ai_models ...
+#    ⑤ scripts/supabase-versions.sql
+#    ⑥ scripts/supabase-publish-version.sql
+#    ⑦ scripts/supabase-knowledge.sql
+#    ⑧ scripts/supabase-settings.sql
+#    Verify tables: conversations / messages / workflow_history / users / ai_models / search_providers ...
+#    💡 Docker self-hosting runs ①-⑧ automatically (initdb + migration container) — no manual SQL
 
 # 4. Start
 pnpm dev
@@ -215,13 +221,17 @@ Open http://localhost:5000.
 
 Full guide: **[docs/config/Deployment-Manual.md](docs/config/Deployment-Manual.md)**
 
+**Docker Compose (recommended)** — fully self-contained (app + PostgreSQL + PostgREST + Nginx + migration), one-command updates from your local machine:
+
 ```bash
-pnpm build
-COZE_PROJECT_ENV=PROD PORT=5000 pm2 start dist/server.js --name loomflow
-pm2 save
+SERVER_IP=your-server ./scripts/deploy-docker.sh
+# 1/6 sync code → 2/6 extract → 3/6 migration + grant self-check
+# 4/6 rebuild & restart → 5/6 wait healthy → 6/6 verify version & db
 ```
 
 Minimum server: 1 CPU / 1 GB RAM / Ubuntu 20.04+ / Node ≥ 20.9.
+
+> Alternative (pm2): `pnpm build` then `COZE_PROJECT_ENV=PROD PORT=5000 pm2 start dist/server.js --name loomflow && pm2 save`
 
 ### 🗄️ Self-Hosted PostgreSQL
 
@@ -231,7 +241,7 @@ Switch from Supabase cloud to your own PostgreSQL via **Docker self-hosted Supab
 
 ```bash
 curl http://localhost:5000/api/health
-# {"status":"ok","service":"loomflow","version":"v0.1.2",...}
+# {"status":"ok","service":"loomflow","version":"v0.1.5","db":"ok",...}
 ```
 
 Checklist:
@@ -260,7 +270,7 @@ Checklist:
 | AI | AI SDK v7 + DeepSeek (OpenAI-compatible, switchable to any model) |
 | Database | Supabase (PostgreSQL) / self-hosted PostgreSQL |
 | Storage | Aliyun OSS / S3-compatible |
-| Deployment | pm2 + Nginx + one-click deploy script |
+| Deployment | Docker Compose self-hosting (one-command) + deploy script |
 
 ---
 
@@ -271,15 +281,18 @@ src/
 ├── app/                  # Pages & API routes
 │   ├── (main)/           # Main UI (chat + workflows + admin)
 │   ├── share/            # Public workflow share pages
-│   └── api/              # Backend APIs (auth / conversations / publish / admin / nodes)
+│   └── api/              # Backend APIs (auth / conversations / workflow-history / publish / admin / nodes / search-providers)
 ├── components/           # UI components
 ├── lib/
 │   ├── tinyflow/         # Workflow execution engine + NodeRegistry/NodeDefinition
+│   ├── search/           # Search Provider Registry (Tavily / Exa / Google)
 │   ├── ai/               # Model Registry (providers / capabilities / models)
+│   ├── agent/            # AI chat tools (create_custom_node, knowledge, stats...)
 │   ├── workflow-ai/      # AI workflow generation prompts
+│   ├── secrets.ts        # Sensitive config encryption (AES-256-GCM)
 │   └── i18n.tsx          # i18n framework
 ├── messages/             # zh/en translations
-└── scripts/              # SQL init + deploy scripts
+└── scripts/              # SQL init + build/deploy scripts
 ```
 
 ---

@@ -50,7 +50,7 @@
 之后可视化微调，一键发布为 API。
 
 ### 🎨 可视化画布
-Tinyflow 画布编辑器：拖拽节点、连接流程、配置参数，支持 10 种节点（LLM / HTTP / 代码 / 模板 / 循环 / 人工确认等）。
+Tinyflow 画布编辑器：拖拽节点、连接流程、配置参数，支持 12 种节点（LLM / HTTP / 代码 / 模板 / 搜索 / Excel / 循环 / 人工确认等）。
 
 ### 🚀 工作流即 API
 一键发布工作流为 HTTP 接口（**一个全局 API Key 调用你所有已发布工作流**，不限调用次数，含调用日志），外部系统直接对接：
@@ -94,20 +94,20 @@ flowchart TB
 
     subgraph App["LoomFlow 应用（Next.js）"]
         UI["App Router 页面<br/>对话 / 工作流 / 管理 / 分享"]
-        API["API Routes<br/>auth / chat-ai / workflow-history / publish / api-key"]
+        API["API Routes<br/>auth / chat-ai / workflow-history / publish / api-key<br/>search-providers / nodes / schedules"]
         Engine["工作流执行引擎<br/>FlowEngine + NodeRegistry + Executors"]
-        Registry["Model Registry<br/>模型配置 / Provider"]
+        Registry["注册表<br/>Model Registry · Search Provider Registry"]
     end
 
     subgraph Data["数据层"]
         PostgREST["PostgREST"]
-        PG[("PostgreSQL<br/>conversations / workflow_history / workflow_versions<br/>user_api_keys / ai_models / audit_logs ···")]
+        PG[("PostgreSQL<br/>conversations / workflow_history / workflow_versions<br/>user_api_keys / ai_models / search_providers<br/>node_definitions / audit_logs ···")]
     end
 
     subgraph ExternalSvc["外部服务"]
         LLM["LLM 服务<br/>DeepSeek / 任意 OpenAI 兼容接口"]
         OSS["对象存储<br/>阿里云 OSS / S3 兼容"]
-        Search["搜索 API"]
+        Search["搜索服务<br/>Tavily / Exa / Google"]
     end
 
     Browser --> UI
@@ -131,6 +131,7 @@ flowchart LR
     App -->|"http://nginx:80/rest/v1"| Nginx["Nginx 反向代理"]
     Nginx --> PostgREST["PostgREST"]
     PostgREST --> PG[("PostgreSQL 16<br/>数据卷：loomflow-pgdata")]
+    Mig["migration 容器<br/>每次 up 自动执行幂等 SQL"] -.-> PG
 ```
 
 ## 🚀 快速开始
@@ -179,7 +180,12 @@ cp .env.example .env.local
 #    ② scripts/supabase-users.sql   ← ⚠️ 执行前先把默认 admin 密码改成你自己的
 #    ③ scripts/supabase-updates.sql
 #    ④ scripts/supabase-apikeys.sql  ← 全局 API Key 表（可重复执行）
-#    验证表：conversations / messages / workflow_history / users / ai_models ...
+#    ⑤ scripts/supabase-versions.sql
+#    ⑥ scripts/supabase-publish-version.sql
+#    ⑦ scripts/supabase-knowledge.sql
+#    ⑧ scripts/supabase-settings.sql
+#    验证表：conversations / messages / workflow_history / users / ai_models / search_providers ...
+#    💡 Docker 自托管自动执行 ①-⑧（initdb + migration 容器），无需手动跑 SQL
 
 # 4. 启动
 pnpm dev
@@ -193,13 +199,17 @@ pnpm dev
 
 完整指南：**[docs/config/Deployment-Manual.md](docs/config/Deployment-Manual.md)**
 
+**Docker Compose（推荐）** — 应用 + PostgreSQL + PostgREST + Nginx + migration 全容器化，本地一条命令更新：
+
 ```bash
-pnpm build
-COZE_PROJECT_ENV=PROD PORT=5000 pm2 start dist/server.js --name loomflow
-pm2 save
+SERVER_IP=你的服务器 ./scripts/deploy-docker.sh
+# 1/6 同步代码 → 2/6 解压 → 3/6 数据库迁移 + 权限自检
+# 4/6 重建并重启 → 5/6 等待健康 → 6/6 验证版本与数据层
 ```
 
 最低服务器：1 核 CPU / 1GB 内存 / Ubuntu 20.04+ / Node ≥ 20.9。
+
+> 备选（pm2）：`pnpm build` 后执行 `COZE_PROJECT_ENV=PROD PORT=5000 pm2 start dist/server.js --name loomflow && pm2 save`
 
 ### 🗄️ 自建 PostgreSQL
 
@@ -209,7 +219,7 @@ pm2 save
 
 ```bash
 curl http://localhost:5000/api/health
-# {"status":"ok","service":"loomflow","version":"v0.1.2",...}
+# {"status":"ok","service":"loomflow","version":"v0.1.5","db":"ok",...}
 ```
 
 检查清单：
@@ -236,9 +246,9 @@ curl http://localhost:5000/api/health
 | 前端 | Next.js 16 (App Router) + React 19 + Tailwind CSS 4 + shadcn/ui |
 | 画布 | @tinyflow-ai/ui |
 | AI | AI SDK v7 + DeepSeek（OpenAI 兼容，可切换任意模型） |
-| 数据库 | Supabase (PostgreSQL) + Drizzle ORM 预装 |
+| 数据库 | Supabase (PostgreSQL) / 自建 PostgreSQL |
 | 存储 | 阿里云 OSS / S3 兼容 |
-| 部署 | pm2 + Nginx + 一键部署脚本 |
+| 部署 | Docker Compose 自托管（一键）+ 部署脚本 |
 
 ---
 
@@ -247,17 +257,20 @@ curl http://localhost:5000/api/health
 ```
 src/
 ├── app/                  # 页面与 API 路由
-│   ├── (main)/           # 主界面（对话 + 工作流）
-│   ├── admin/            # 管理后台
+│   ├── (main)/           # 主界面（对话 + 工作流 + 管理后台）
 │   ├── share/            # 工作流分享页
-│   └── api/              # 后端 API（auth / conversations / workflow-history / publish / admin）
+│   └── api/              # 后端 API（auth / conversations / workflow-history / publish / admin / nodes / search-providers）
 ├── components/           # UI 组件
 ├── lib/
-│   ├── tinyflow/         # 工作流执行引擎（10 种节点执行器）
+│   ├── tinyflow/         # 工作流执行引擎（12 种节点执行器）
+│   ├── search/           # 搜索适配层（Tavily / Exa / Google）
+│   ├── ai/               # 模型注册表（providers / capabilities / models）
+│   ├── agent/            # AI 对话工具（create_custom_node、知识库、统计等）
 │   ├── workflow-ai/      # AI 生成工作流提示词
+│   ├── secrets.ts        # 敏感配置加密（AES-256-GCM）
 │   └── i18n.tsx          # 国际化框架
 ├── messages/             # 中英文案
-└── scripts/              # 部署脚本
+└── scripts/              # SQL 初始化 + 构建/部署脚本
 ```
 
 ---
