@@ -6,7 +6,7 @@
 
 Describe your idea in natural language → generate a runnable workflow → customize it on a visual canvas → publish it as an API.
 
-让每个人都能创建自己的 AI 自动化流程。
+*Everyone should be able to create their own AI automation flows.*
 
 ---
 
@@ -29,12 +29,12 @@ Describe your idea in natural language → generate a runnable workflow → cust
 
 | | **LoomFlow** | Dify | n8n |
 |---|---|---|---|
-| 起步方式 | **自然语言直接生成工作流**，秒级开始 | 模板/手动搭建，偏企业级 LLM 应用平台 | 手动拖节点，AI 只是众多节点之一 |
-| 定位 | 轻量 · 个人/小团队 · **AI 优先** | 重：RAG/知识库/团队协作/复杂部署 | 通用自动化，节点多而杂 |
-| 部署 | **一条命令 Docker 自托管**（1GB 内存即可） | 较重 | 中等 |
-| 对外提供 | 一键发布为带鉴权的 HTTP API + 分享页 | 应用/工作流为主 | Webhook/API |
+| Getting started | **Natural language → runnable workflow**, seconds to start | Templates / manual setup, enterprise-grade LLM app platform | Drag nodes manually, AI is just one of many node types |
+| Positioning | Lightweight · individuals / small teams · **AI-first** | Heavy: RAG / knowledge bases / team collaboration / complex deployment | General automation, many node types |
+| Deployment | **One-command Docker self-hosting** (1 GB RAM is enough) | Heavy | Moderate |
+| Output | One-click publish as an **authenticated HTTP API** + share pages | App / workflow centric | Webhook / API |
 
-**一句话**：Dify 是给团队造 LLM 应用平台的，n8n 是给所有人做通用自动化的——**LoomFlow 是给个人和小团队"用一句话把想法变成可运行、可发布的工作流"**。不追求大而全，追求 30 秒上手、一分钟部署。
+**In one sentence**: Dify builds LLM app platforms for teams, n8n does general automation for everyone — **LoomFlow turns "one sentence" into a runnable, publishable workflow for individuals and small teams**. It doesn't chase comprehensiveness — it pursues a 30-second learning curve and a one-minute deployment.
 
 ---
 
@@ -43,9 +43,9 @@ Describe your idea in natural language → generate a runnable workflow → cust
 ### 💬 Natural Language → Workflow
 No drag-and-drop required to start — just **describe your process in plain language**, and the AI generates an executable workflow directly onto the canvas:
 
-> **You:** "帮我做一个流程：输入产品名，AI 生成卖点文案，再生成推广视频脚本"
+> **You:** "Build me a workflow: input a product name → AI generates selling-point copy → generates a promo video script"
 >
-> **AI:** ✅ Generated a 4-node workflow (Start → LLM 文案 → LLM 脚本 → End), loaded to canvas
+> **AI:** ✅ Generated a 4-node workflow (Start → LLM Copy → LLM Script → End), loaded to canvas
 
 Then fine-tune visually and publish as an API.
 
