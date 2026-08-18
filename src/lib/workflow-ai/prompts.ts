@@ -257,8 +257,8 @@ export const NODE_CONFIGS: Record<string, string> = {
   searchEngineNode: `
 ### SearchEngineNode 搜索引擎节点
 - data.engine: 搜索服务 ID（管理后台 → 搜索配置中添加，如 tavily-main）
-- data.query: 搜索关键词，支持 {{var}}
-- data.maxResults: 返回数量，默认5
+- data.keyword: 搜索关键词，支持 {{var}}
+- data.limit: 返回数量，默认5
 
 输出: {results: [{title, url, content}], keyword}
 
@@ -273,8 +273,8 @@ export const NODE_CONFIGS: Record<string, string> = {
     "description": "搜索信息",
     "expand": true,
     "engine": "tavily-main",
-    "query": "{{query}}",
-    "maxResults": 5,
+    "keyword": "{{query}}",
+    "limit": 5,
     "parameters": [
       { "id": "sp1", "name": "query", "refType": "ref", "ref": "node_start.query" }
     ],

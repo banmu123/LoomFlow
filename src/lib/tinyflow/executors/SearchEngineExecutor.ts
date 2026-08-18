@@ -7,11 +7,10 @@ import { createSearchProvider } from '@/lib/search/providers';
 
 // ===== 搜索节点执行器 =====
 // 通过 Search Provider 系统执行搜索（不再直接调用具体服务）：
-//   node.data.engine    → 已配置的搜索服务 id（画布内置面板字段，管理后台 → 搜索配置）
-//   node.data.provider  → 兼容旧配置（NodeConfigPanel / AI 生成）
-//   node.data.query     → 搜索关键词（支持 {{var}} 插值）
-//   node.data.maxResults→ 返回数量
-// 兼容旧配置：keyword/limit + SEARCH_API_URL 环境变量回退
+//   node.data.engine    → 已配置的搜索服务 id（管理后台 → 搜索配置）
+//   node.data.keyword   → 搜索关键词（画布内置面板字段，支持 {{var}} 插值）
+//   node.data.limit     → 返回数量（画布内置面板字段）
+// 兼容旧字段：query/maxResults（NodeConfigPanel/AI 生成）、provider、SEARCH_API_URL 环境变量回退
 export class SearchEngineExecutor extends BaseExecutor {
   constructor(paramResolver: ParameterResolver, exprEvaluator: ExpressionEvaluator) {
     super(paramResolver, exprEvaluator);
@@ -19,20 +18,25 @@ export class SearchEngineExecutor extends BaseExecutor {
 
   validate(node: FlowNode): string | null {
     const data = node.data as Record<string, unknown>;
-    if (!data.query && !data.keyword) return '搜索节点缺少搜索关键词（query）';
+    if (!data.keyword && !data.query) return '搜索节点缺少搜索关键词';
     return null;
   }
 
   async execute(node: FlowNode, context: FlowContext): Promise<Record<string, unknown>> {
     const data = node.data as Record<string, unknown>;
-    const rawQuery = (data.query ?? data.keyword) as string;
+    // keyword/limit = 画布内置面板写入的字段（优先）；
+    // query/maxResults = NodeConfigPanel / AI 生成旧字段（兜底）。
+    // 注意用 truthy 判断而非 ??——空字符串/0 不应遮蔽面板里填写的值。
+    const rawQuery = (data.keyword && String(data.keyword).trim()
+      ? data.keyword
+      : data.query ?? data.keyword) as string;
     const keyword = rawQuery
       ? this.paramResolver.interpolateTemplate(rawQuery, context)
       : '';
 
     if (!keyword) throw new Error('搜索节点缺少搜索关键词');
 
-    const maxResults = Number(data.maxResults ?? data.limit ?? 5) || 5;
+    const maxResults = Number(data.limit ?? data.maxResults ?? 5) || 5;
     // engine = 画布内置面板字段（tinyflow 约定）；provider = NodeConfigPanel/AI 生成旧字段
     const providerId = data.engine ? String(data.engine) : data.provider ? String(data.provider) : '';
 
