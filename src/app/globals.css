@@ -55,72 +55,75 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.488 0.243 264.376);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.96 0.02 264);
-  --secondary-foreground: oklch(0.35 0.15 264);
-  --muted: oklch(0.96 0.015 264);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.94 0.03 280);
-  --accent-foreground: oklch(0.35 0.17 280);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.488 0.243 264.376 / 40%);
-  --chart-1: oklch(0.546 0.245 262.881);
-  --chart-2: oklch(0.606 0.25 292.717);
-  --chart-3: oklch(0.4 0.13 250);
-  --chart-4: oklch(0.696 0.17 162.48);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.94 0.03 280);
-  --sidebar-accent-foreground: oklch(0.35 0.17 280);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.488 0.243 264.376 / 40%);
+  --radius: 0.75rem;
+  /* ===== LoomFlow Latte 主题（拿铁色系）=====
+     奶泡白背景 / 焦糖主色 / 深咖啡文字 / 奶咖强调 */
+  --background: #faf7f2; /* 奶泡白 */
+  --foreground: #3b2a20; /* 深咖啡 */
+  --card: #ffffff; /* Surface */
+  --card-foreground: #3b2a20;
+  --popover: #ffffff;
+  --popover-foreground: #3b2a20;
+  --primary: #b77945; /* 拿铁焦糖 */
+  --primary-foreground: #ffffff;
+  --secondary: #f3ece2; /* 浅米白 */
+  --secondary-foreground: #6b4a2f; /* 浅咖啡 */
+  --muted: #f1eae0; /* 米白 */
+  --muted-foreground: #8a7262; /* 浅咖啡灰 */
+  --accent: #d9b38c; /* 奶咖 */
+  --accent-foreground: #4a2e17; /* 深焦糖 */
+  --destructive: #c25e4a; /* 柔化砖红（低饱和警示） */
+  --border: #e9e0d4; /* 奶咖浅边框 */
+  --input: #e9e0d4;
+  --ring: rgb(183 121 69 / 40%); /* 焦糖聚焦环 */
+  --chart-1: #b77945; /* 焦糖 */
+  --chart-2: #d9b38c; /* 奶咖 */
+  --chart-3: #8a7262; /* 浅咖啡 */
+  --chart-4: #e8d9c5; /* 奶泡 */
+  --chart-5: #c25e4a; /* 砖红 */
+  --sidebar: #f7f2ea; /* 侧边栏米白（比背景略深） */
+  --sidebar-foreground: #3b2a20;
+  --sidebar-primary: #b77945;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f1e7da; /* 奶咖底 */
+  --sidebar-accent-foreground: #4a2e17;
+  --sidebar-border: #e9e0d4;
+  --sidebar-ring: rgb(183 121 69 / 40%);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.623 0.214 259.815);
-  --primary-foreground: oklch(0.17 0.06 264);
-  --secondary: oklch(0.3 0.06 264);
-  --secondary-foreground: oklch(0.9 0.03 264);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.3 0.06 280);
-  --accent-foreground: oklch(0.9 0.04 280);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.623 0.214 259.815 / 50%);
-  --chart-1: oklch(0.623 0.214 259.815);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.623 0.214 259.815);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.3 0.06 280);
-  --sidebar-accent-foreground: oklch(0.9 0.04 280);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.623 0.214 259.815 / 50%);
+  /* ===== LoomFlow 深拿铁（热巧克力底）===== */
+  --background: #1c1512; /* 深咖啡 */
+  --foreground: #f5ede3; /* 奶泡白文字 */
+  --card: #26201a; /* 深一层 */
+  --card-foreground: #f5ede3;
+  --popover: #26201a;
+  --popover-foreground: #f5ede3;
+  --primary: #c98a56; /* 亮焦糖（暗底提升可读性） */
+  --primary-foreground: #1c1512;
+  --secondary: #2e2620;
+  --secondary-foreground: #e8d9c5;
+  --muted: #2e2620;
+  --muted-foreground: #b39c8a; /* 浅咖啡灰 */
+  --accent: #3a2b1e; /* 焦糖暗底 */
+  --accent-foreground: #e8d9c5;
+  --destructive: #d0745c;
+  --border: rgb(245 237 227 / 12%);
+  --input: rgb(245 237 227 / 15%);
+  --ring: rgb(201 138 86 / 50%);
+  --chart-1: #c98a56;
+  --chart-2: #d9b38c;
+  --chart-3: #8a7262;
+  --chart-4: #6b4a2f;
+  --chart-5: #d0745c;
+  --sidebar: #201a15;
+  --sidebar-foreground: #f5ede3;
+  --sidebar-primary: #c98a56;
+  --sidebar-primary-foreground: #1c1512;
+  --sidebar-accent: #2e2620;
+  --sidebar-accent-foreground: #e8d9c5;
+  --sidebar-border: rgb(245 237 227 / 10%);
+  --sidebar-ring: rgb(201 138 86 / 50%);
 }
 
 @layer base {
@@ -136,21 +139,13 @@ body {
   @apply font-sans;
 }
 
-/* ===== 品牌渐变工具 ===== */
+/* ===== 品牌渐变工具（低饱和焦糖 → 奶咖，克制不花哨）===== */
 @layer utilities {
   .bg-brand-gradient {
-    background-image: linear-gradient(
-      135deg,
-      oklch(0.546 0.245 262.881),
-      oklch(0.606 0.25 292.717)
-    );
+    background-image: linear-gradient(135deg, #b77945, #d9b38c);
   }
   .text-brand-gradient {
-    background-image: linear-gradient(
-      135deg,
-      oklch(0.546 0.245 262.881),
-      oklch(0.606 0.25 292.717)
-    );
+    background-image: linear-gradient(135deg, #b77945, #d9b38c);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -159,6 +154,6 @@ body {
     border: 1px solid transparent;
     background:
       linear-gradient(var(--card), var(--card)) padding-box,
-      linear-gradient(135deg, oklch(0.546 0.245 262.881), oklch(0.606 0.25 292.717)) border-box;
+      linear-gradient(135deg, #b77945, #d9b38c) border-box;
   }
 }

@@ -2,7 +2,7 @@
 
 import { useState, Suspense, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Video, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
@@ -97,9 +97,7 @@ function LoginForm() {
     return (
       <div className="w-full max-w-md space-y-6 rounded-2xl border-brand-gradient bg-card p-8 shadow-xl">
         <div className="flex flex-col items-center gap-4">
-          <div className="bg-brand-gradient flex h-16 w-16 items-center justify-center rounded-2xl shadow-lg shadow-indigo-500/30">
-            <Video className="h-8 w-8 text-white" />
-          </div>
+          <img src="/screenshots/logo.png" alt="LoomFlow" className="h-16 w-16 rounded-2xl object-contain shadow-lg shadow-[#b77945]/25" />
           <h1 className="text-2xl font-bold">{t('app.name')}</h1>
           <div className="flex flex-col items-center gap-2 text-primary">
             <Loader2 className="h-8 w-8 animate-spin" />
@@ -114,9 +112,7 @@ function LoginForm() {
     <div className="w-full max-w-md space-y-6 rounded-2xl border-brand-gradient bg-card p-8 shadow-xl">
       {/* Logo */}
       <div className="flex flex-col items-center gap-2">
-        <div className="bg-brand-gradient flex h-16 w-16 items-center justify-center rounded-2xl shadow-lg shadow-indigo-500/30">
-          <Video className="h-8 w-8 text-white" />
-        </div>
+        <img src="/screenshots/logo.png" alt="LoomFlow" className="h-16 w-16 rounded-2xl object-contain shadow-lg shadow-[#b77945]/25" />
         <h1 className="text-brand-gradient text-2xl font-bold">{t('app.name')}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {t('app.tagline')}
@@ -193,10 +189,10 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-indigo-950 via-background to-background">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-[#2a1e14] via-background to-background">
       {/* 品牌光晕 */}
-      <div className="pointer-events-none absolute -top-40 -left-40 h-96 w-96 rounded-full bg-indigo-500/20 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-40 -right-40 h-96 w-96 rounded-full bg-violet-500/20 blur-3xl" />
+      <div className="pointer-events-none absolute -top-40 -left-40 h-96 w-96 rounded-full bg-[#b77945]/20 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-40 -right-40 h-96 w-96 rounded-full bg-[#d9b38c]/25 blur-3xl" />
       <Suspense
         fallback={
           <div className="flex items-center justify-center">

@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { useT } from '@/lib/i18n';
 import { toast } from 'sonner';
-import { ArrowUp, Square, Paperclip, AtSign, X, Loader2, Mic } from 'lucide-react';
+import { ArrowUp, Square, Paperclip, AtSign, X, Loader2, Mic, Sparkles } from 'lucide-react';
 
 export interface SimpleChatInputProps {
   /** controlled value */
@@ -306,13 +306,20 @@ export function SimpleChatInput({
           <div className="flex items-center gap-2">
             {modelOptions.length > 0 && onModelChange && (
               <Select value={model} onValueChange={onModelChange}>
-                <SelectTrigger className="h-6 w-[110px] text-[11px]">
-                  <SelectValue placeholder="选择模型" />
+                {/* 柔和胶囊选择器：图标 + 自适应宽度 + 超长截断（完整名在下拉里） */}
+                <SelectTrigger className="h-7 min-w-[110px] max-w-[190px] gap-1.5 rounded-full border-border/70 bg-card/80 px-3 text-xs text-secondary-foreground shadow-sm transition-colors hover:border-[#b77945]/40 hover:text-foreground">
+                  <Sparkles className="h-3.5 w-3.5 shrink-0 text-[#b77945]" />
+                  <SelectValue placeholder="选择模型" className="truncate" />
                 </SelectTrigger>
                 <SelectContent>
                   {modelOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                      {opt.label}
+                    <SelectItem
+                      key={opt.value}
+                      value={opt.value}
+                      className="max-w-[260px] text-xs"
+                      title={opt.label}
+                    >
+                      <span className="truncate">{opt.label}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>

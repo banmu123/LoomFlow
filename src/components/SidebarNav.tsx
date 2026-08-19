@@ -187,16 +187,14 @@ export function SidebarNav() {
   return (
     <aside
       className={cn(
-        'flex shrink-0 flex-col border-r border-border bg-card transition-all',
+        'flex shrink-0 flex-col border-r border-border bg-sidebar transition-all',
         collapsed ? 'w-[52px]' : 'w-[210px]',
       )}
     >
       {/* Logo（点击回到对话）+ 折叠按钮 */}
       <div className={cn('flex items-center border-b border-border py-3', collapsed ? 'justify-center' : 'justify-between px-3')}>
         <button onClick={() => router.push('/chat')} className="flex items-center gap-2" title={t('app.name')}>
-          <div className="bg-brand-gradient flex h-7 w-7 items-center justify-center rounded-md shadow-md shadow-indigo-500/30">
-            <GitBranch className="h-4 w-4 text-white" />
-          </div>
+          <img src="/screenshots/logo.png" alt="LoomFlow" className="h-7 w-7 rounded-md object-contain shadow-md shadow-[#b77945]/25" />
           {!collapsed && <span className="text-brand-gradient truncate text-sm font-bold">{t('app.name')}</span>}
         </button>
         <button

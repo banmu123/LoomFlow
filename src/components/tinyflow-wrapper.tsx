@@ -754,7 +754,7 @@ export default function TinyflowWrapper() {
       case 'failed':
         return <XCircle className="h-4 w-4 text-red-500" />;
       case 'running':
-        return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
+        return <Loader2 className="h-4 w-4 animate-spin text-[#b77945]" />;
       default:
         return <Clock className="h-4 w-4 text-gray-400" />;
     }

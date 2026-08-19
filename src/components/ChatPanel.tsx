@@ -816,10 +816,10 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
   };
 
   return (
-    <div className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-gradient-to-br from-indigo-50 via-background to-violet-50 dark:from-indigo-950/40 dark:via-background dark:to-violet-950/40">
+    <div className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-gradient-to-br from-[#f7efe4] via-background to-[#f3e6d4] dark:from-[#3a2b1e]/40 dark:via-background dark:to-[#4a2e17]/35">
       {/* 品牌光晕：铺满整个对话页（空态与消息态统一背景） */}
-      <div className="pointer-events-none absolute -top-32 left-1/4 h-96 w-96 rounded-full bg-indigo-500/15 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-32 right-1/4 h-96 w-96 rounded-full bg-violet-500/15 blur-3xl" />
+      <div className="pointer-events-none absolute -top-32 left-1/4 h-96 w-96 rounded-full bg-[#b77945]/12 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-32 right-1/4 h-96 w-96 rounded-full bg-[#d9b38c]/18 blur-3xl" />
       {/* === Chat Main Area === */}
       <div className="relative z-10 flex flex-1 flex-col overflow-hidden">
         {/* header：仅已有对话时显示（空态不显示"新建对话"行） */}
@@ -874,7 +874,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
             <div className="w-full max-w-2xl">
               {/* 标题 + 输入框一体（同一容器） */}
               <div className="flex flex-col items-center gap-2">
-                <div className="bg-brand-gradient flex h-12 w-12 items-center justify-center rounded-2xl shadow-lg shadow-indigo-500/30">
+                <div className="bg-brand-gradient flex h-12 w-12 items-center justify-center rounded-2xl shadow-lg shadow-[#b77945]/25">
                   <Sparkles className="h-6 w-6 text-white" />
                 </div>
                 <p className="text-brand-gradient text-xl font-bold">{t('app.name')}</p>
