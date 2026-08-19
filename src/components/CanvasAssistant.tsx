@@ -1,15 +1,16 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import type { UIMessage } from 'ai';
-import { Bot, Send, Square, Loader2, CheckCircle2, Wand2 } from 'lucide-react';
+import { Bot, CheckCircle2, Wand2, Loader2 } from 'lucide-react';
 import { useT } from '@/lib/i18n';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import { SimpleChatInput } from '@/components/SimpleChatInput';
 import { SimpleChatMessage } from '@/components/SimpleChatMessage';
+import { uploadFileToOSS } from '@/lib/oss-upload-client';
 import { extractWorkflowJson } from '@/lib/agent/workflow-extract';
 import { toast } from 'sonner';
 
@@ -58,25 +59,72 @@ export function CanvasAssistant({
   const { messages, sendMessage, status, stop } = useChat({
     transport: new DefaultChatTransport({
       api: '/api/canvas-assistant',
-      // 发送请求时注入最新画布数据（transport 随渲染重建，闭包始终是最新 getCanvasData）
+      // 发送请求时注入最新画布数据/图片/模型（transport 随渲染重建，闭包始终是最新 state）
       prepareSendMessagesRequest: (options) => ({
         ...options,
-        body: { ...options.body, canvasData: getCanvasData() },
+        body: {
+          ...options.body,
+          canvasData: getCanvasData(),
+          images: images.map((img) => img.url),
+          model,
+        },
       }),
     }),
   });
 
   const [input, setInput] = useState('');
+  const [images, setImages] = useState<Array<{ url: string; name: string }>>([]);
+  const [uploading, setUploading] = useState(false);
+  const [model, setModel] = useState('');
+  const [modelOptions, setModelOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [appliedKey, setAppliedKey] = useState('');
 
+  // 加载模型列表（与聊天页一致的模型选择器）
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/ai/models');
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          const options = data.map((m: { id: string; label: string | null }) => ({
+            value: m.id,
+            label: m.label || m.id,
+          }));
+          setModelOptions(options);
+          setModel((prev) => (options.some((o) => o.value === prev) ? prev : options[0]?.value || ''));
+        }
+      } catch {
+        // 拉取失败保持空列表
+      }
+    })();
+  }, []);
+
+  // 图片上传（与聊天页一致：上传 OSS 后附加 URL）
+  const handleAttachImage = useCallback(async (file: File) => {
+    setUploading(true);
+    try {
+      const result = await uploadFileToOSS(file, { prefix: 'chat' });
+      const url = result.data?.url;
+      if (result.success && url) {
+        setImages((prev) => [...prev, { url, name: file.name }]);
+      } else {
+        toast.error(result.message || t('canvas.uploadFailed'));
+      }
+    } catch {
+      toast.error(t('canvas.uploadFailed'));
+    } finally {
+      setUploading(false);
+    }
+  }, [t]);
+
   const onSubmit = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      const text = input.trim();
-      if (!text || status === 'streaming' || status === 'submitted') return;
+    (text?: string) => {
+      const content = (text ?? input).trim();
+      if (!content || status === 'streaming' || status === 'submitted') return;
       setAppliedKey('');
       setInput('');
-      sendMessage({ text });
+      setImages([]);
+      sendMessage({ text: content });
     },
     [input, status, sendMessage],
   );
@@ -171,38 +219,24 @@ export function CanvasAssistant({
         </div>
       )}
 
-      {/* 输入区 */}
-      <form onSubmit={onSubmit} className="border-t border-border p-3">
-        <Textarea
+      {/* 输入区（复用 SimpleChatInput：模型选择 / 图片上传 / 语音输入，与聊天页一致） */}
+      <div className="border-t border-border p-3">
+        <SimpleChatInput
           value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              onSubmit(e);
-            }
-          }}
+          onChange={setInput}
+          onSubmit={onSubmit}
+          isGenerating={busy}
+          onStop={stop}
           placeholder={t('canvas.assistantPlaceholder')}
-          rows={3}
-          className="min-h-[70px] resize-none text-xs"
+          images={images}
+          onRemoveImage={(url) => setImages((prev) => prev.filter((img) => img.url !== url))}
+          onAttachImage={handleAttachImage}
+          uploading={uploading}
+          modelOptions={modelOptions}
+          model={model}
+          onModelChange={setModel}
         />
-        <div className="mt-2 flex items-center justify-between">
-          <span className="text-[10px] text-muted-foreground">{t('canvas.assistantEnter')}</span>
-          <div className="flex gap-1.5">
-            {busy ? (
-              <Button type="button" size="sm" variant="destructive" className="h-7" onClick={stop}>
-                <Square className="mr-1 h-3 w-3" />
-                {t('workflows.stopRun')}
-              </Button>
-            ) : (
-              <Button type="submit" size="sm" className="h-7" disabled={!input.trim()}>
-                <Send className="mr-1 h-3 w-3" />
-                {t('common.save')}
-              </Button>
-            )}
-          </div>
-        </div>
-      </form>
+      </div>
     </div>
   );
 }

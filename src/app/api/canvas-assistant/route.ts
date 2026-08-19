@@ -55,6 +55,8 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const rawMessages = body?.messages as Array<{ role: string; content: unknown }> | undefined;
   const canvasData = body?.canvasData;
+  const images = Array.isArray(body?.images) ? (body.images as string[]) : [];
+  const requestedModel = body?.model as string | undefined;
 
   if (!rawMessages || !Array.isArray(rawMessages) || rawMessages.length === 0) {
     return Response.json({ error: 'messages 参数缺失' }, { status: 400 });
@@ -67,7 +69,6 @@ export async function POST(request: NextRequest) {
       { status: 400 },
     );
   }
-  const requestedModel = body?.model as string | undefined;
   const modelId =
     requestedModel && allModels.some((m) => m.id === requestedModel)
       ? requestedModel
@@ -94,6 +95,22 @@ export async function POST(request: NextRequest) {
       return { role: (m.role === 'assistant' ? 'assistant' : 'user') as 'user' | 'assistant', content };
     })
     .filter((m) => m.content.trim().length > 0);
+
+  // 多模态：最后一条用户消息附带图片（仅视觉模型；deepseek 等非视觉模型忽略）
+  const supportsVision =
+    Array.isArray(activeModel.capabilities) && activeModel.capabilities.includes('vision');
+  if (supportsVision && images.length > 0 && promptMessages.length > 0) {
+    const last = promptMessages[promptMessages.length - 1];
+    if (last.role === 'user') {
+      promptMessages[promptMessages.length - 1] = {
+        role: 'user',
+        content: [
+          { type: 'text', text: String(last.content) },
+          ...images.map((url) => ({ type: 'image' as const, image: url })),
+        ],
+      };
+    }
+  }
 
   const result = streamText({
     model: provider(modelId),
