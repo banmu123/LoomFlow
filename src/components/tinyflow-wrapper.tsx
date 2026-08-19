@@ -191,7 +191,7 @@ export default function TinyflowWrapper() {
       },
     };
     instanceRef.current?.setData({ ...data, nodes: [...data.nodes, newNode] });
-    toast.success(`已添加节点：${def.label}`);
+    toast.success(t('canvas.nodeAdded', { label: def.label }));
   };
 
   // 读取画布当前节点（配置面板/删除用）
@@ -205,7 +205,7 @@ export default function TinyflowWrapper() {
     setConfigTarget({ id: node.id, type: node.type, data: (node.data as Record<string, unknown>) || {} });
   };
 
-  // 保存节点配置（按 configSchema 合并回 node.data，全量写回画布）
+  // t('common.save')节点配置（按 configSchema 合并回 node.data，全量写回画布）
   const handleSaveNodeConfig = (nodeId: string, values: Record<string, unknown>) => {
     const data = instanceRef.current?.getData() as TinyflowData | undefined;
     if (!data) return;
@@ -217,7 +217,7 @@ export default function TinyflowWrapper() {
         n.id === nodeId ? { ...n, data: mergeConfig(n.data as Record<string, unknown>, schema, values) } : n,
       ),
     });
-    toast.success('节点配置已保存');
+    toast.success(t('canvas.configSaved'));
   };
 
   // 删除画布节点
@@ -229,7 +229,7 @@ export default function TinyflowWrapper() {
       nodes: data.nodes.filter((n) => n.id !== nodeId),
       edges: data.edges.filter((e) => e.source !== nodeId && e.target !== nodeId),
     });
-    toast.success('节点已删除');
+    toast.success(t('canvas.nodeDeleted'));
   };
 
   // 启用/禁用节点类型（Tinyflow 库面板按 hiddenNodes 隐藏）
@@ -376,9 +376,9 @@ export default function TinyflowWrapper() {
           instanceRef.current.setData(pending.data as TinyflowData);
           // 从列表打开时携带工作流 id：后续保存=更新当前记录并记录版本
           setCurrentWorkflowId(pending.id);
-          toast.success('工作流已加载到画布');
+          toast.success(t('canvas.workflowLoaded'));
         } catch {
-          toast.error('工作流数据格式无效');
+          toast.error(t('canvas.workflowInvalid'));
         }
       }
     })();
@@ -396,9 +396,9 @@ export default function TinyflowWrapper() {
       if (!detail || !instanceRef.current) return;
       try {
         instanceRef.current.setData(detail);
-        toast.success('工作流已加载到画布');
+        toast.success(t('canvas.workflowLoaded'));
       } catch {
-        toast.error('工作流数据格式无效');
+        toast.error(t('canvas.workflowInvalid'));
       }
     };
     window.addEventListener('tinyflow-load-data', handler);
@@ -479,7 +479,7 @@ export default function TinyflowWrapper() {
       const data = instanceRef.current.getData();
       setFlowJsonText(JSON.stringify(data, null, 2));
     } catch {
-      setFlowJsonText('获取数据失败');
+      setFlowJsonText(t('canvas.saveFailed'));
     }
     setJsonDialogOpen(true);
   }, []);
@@ -537,12 +537,12 @@ export default function TinyflowWrapper() {
         if (result?.id) setCurrentWorkflowId(result.id);
         toast.success(
           currentWorkflowId
-            ? `工作流已更新（版本 v${formatVersion(result?.version ?? 0)}）`
-            : '工作流已保存到历史记录',
+            ? t('workflows.updated', { version: formatVersion(result?.version ?? 0) })
+            : t('workflows.saved'),
           {
             duration: 4000,
             action: {
-              label: '查看历史',
+              label: t('workflows.viewHistory'),
               onClick: () => router.push('/workflows/history'),
             },
           },
@@ -550,10 +550,10 @@ export default function TinyflowWrapper() {
         // 1.5s 后恢复按钮状态
         setTimeout(() => setSavedFlash(false), 1500);
       } else {
-        toast.error(result?.error || '保存失败');
+        toast.error(result?.error || t('canvas.saveFailed'));
       }
     } catch {
-      toast.error('保存失败');
+      toast.error(t('canvas.saveFailed'));
     } finally {
       setSavingWorkflow(false);
     }
@@ -578,9 +578,9 @@ export default function TinyflowWrapper() {
       const res = await fetch(`/api/workflow-history/${currentWorkflowId}/versions`);
       const data = await res.json();
       if (Array.isArray(data)) setVersions(data);
-      else toast.error(data?.error || '加载版本历史失败');
+      else toast.error(data?.error || t('canvas.versionLoadFailed'));
     } catch {
-      toast.error('加载版本历史失败');
+      toast.error(t('canvas.versionLoadFailed'));
     } finally {
       setVersionsLoading(false);
     }
@@ -593,7 +593,7 @@ export default function TinyflowWrapper() {
       instanceRef.current.setData(v.data);
       toast.success(t('workflows.versionPreviewed', { version: formatVersion(v.version), title: v.title }));
     } catch {
-      toast.error('预览失败：版本数据格式无效');
+      toast.error(t('canvas.versionPreviewFailed'));
     }
   }, [t]);
 
@@ -608,9 +608,9 @@ export default function TinyflowWrapper() {
     if (!target) return;
     try {
       instanceRef.current.setData(target.data);
-      toast.success(`已还原到版本 v${formatVersion(target.version)}「${target.title}」（如需保留，请再次保存）`);
+      toast.success(t('canvas.versionRestored', { version: formatVersion(target.version), title: target.title }));
     } catch {
-      toast.error('还原失败：版本数据格式无效');
+      toast.error(t('canvas.versionRestoreFailed'));
     }
     setVersionToRestore(null);
   }, [versionToRestore, versions]);
@@ -629,10 +629,10 @@ export default function TinyflowWrapper() {
         toast.success(t('workflows.versionPublished', { version: publishTarget.version }));
         loadVersions();
       } else {
-        toast.error(data?.error || '发布失败');
+        toast.error(data?.error || t('canvas.publishFailed'));
       }
     } catch {
-      toast.error('发布失败');
+      toast.error(t('canvas.publishFailed'));
     } finally {
       setPublishTarget(null);
     }
@@ -644,7 +644,7 @@ export default function TinyflowWrapper() {
       try {
         return JSON.parse(jsonText);
       } catch {
-        throw new Error('JSON 格式错误，请检查输入');
+        throw new Error(t('canvas.jsonParseError'));
       }
     }
     return formValues;
@@ -658,7 +658,7 @@ export default function TinyflowWrapper() {
     try {
       inputs = buildInputs();
     } catch (e) {
-      setError(e instanceof Error ? e.message : '输入解析错误');
+      setError(e instanceof Error ? e.message : t('canvas.inputParseError'));
       setShowResults(true);
       return;
     }
@@ -694,10 +694,10 @@ export default function TinyflowWrapper() {
       } else if (data.status === 'completed') {
         setResult(data.outputs || {});
       } else if (data.status === 'failed') {
-        setError(data.error || '执行失败');
+        setError(data.error || t('canvas.executeFailed'));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '网络错误');
+      setError(err instanceof Error ? err.message : t('canvas.networkError'));
     } finally {
       setRunning(false);
     }
@@ -716,7 +716,7 @@ export default function TinyflowWrapper() {
       // ignore
     }
     setRunning(false);
-    setError('流程已被中止');
+    setError(t('canvas.flowStopped'));
   }, []);
 
   // ===== Confirm =====
@@ -742,10 +742,10 @@ export default function TinyflowWrapper() {
       } else if (data.status === 'completed') {
         setResult(data.outputs || {});
       } else if (data.status === 'failed') {
-        setError(data.error || '执行失败');
+        setError(data.error || t('canvas.executeFailed'));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '网络错误');
+      setError(err instanceof Error ? err.message : t('canvas.networkError'));
     } finally {
       setRunning(false);
     }
@@ -790,12 +790,12 @@ export default function TinyflowWrapper() {
           return { ...prev, [fieldKey]: url };
         });
 
-        toast.success(`${file.name} 上传成功`);
+        toast.success(t('canvas.uploadSuccess', { name: file.name }));
       } else {
-        toast.error(result.message || '上传失败');
+        toast.error(result.message || t('canvas.uploadFailed'));
       }
     } catch (error) {
-      toast.error('上传失败');
+      toast.error(t('canvas.uploadFailed'));
       console.error('Upload error:', error);
     } finally {
       setUploadingFiles(prev => ({ ...prev, [fieldKey]: false }));
@@ -868,7 +868,7 @@ export default function TinyflowWrapper() {
             {isUploading && (
               <div className="absolute inset-0 flex items-center justify-center bg-background/80">
                 <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                <span className="ml-2 text-xs">上传中...</span>
+                <span className="ml-2 text-xs">{t('canvas.uploading')}</span>
               </div>
             )}
           </div>
@@ -898,7 +898,7 @@ export default function TinyflowWrapper() {
                       }}
                       className="text-xs text-muted-foreground hover:text-destructive"
                     >
-                      删除
+                      {t('common.delete')}
                     </button>
                   </div>
                 );
@@ -923,7 +923,7 @@ export default function TinyflowWrapper() {
                 onClick={() => setVal('')}
                 className="text-xs text-muted-foreground hover:text-destructive"
               >
-                删除
+                {t('common.delete')}
               </button>
             </div>
           )}
@@ -1106,7 +1106,7 @@ export default function TinyflowWrapper() {
           >
             {/* Panel header */}
             <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-              <span className="text-sm font-semibold">{t('workflows.testRun')}配置</span>
+              <span className="text-sm font-semibold">{t('canvas.testRunConfig')}</span>
               <Tabs value={inputMode} onValueChange={(v) => v === 'form' ? switchToForm() : switchToJson()}>
                 <TabsList className="h-7">
                   <TabsTrigger value="form" className="text-xs px-2.5 py-0.5">{t('workflows.form')}</TabsTrigger>
@@ -1198,7 +1198,7 @@ export default function TinyflowWrapper() {
           ) : savedFlash ? (
             <>
               <CheckCircle2 className="mr-1 h-4 w-4 text-green-500" />
-              已保存
+              {t('workflows.saved')}
             </>
           ) : (
             <>
@@ -1414,12 +1414,12 @@ export default function TinyflowWrapper() {
       <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
         <DialogContent className="z-[1200] max-w-md">
           <DialogHeader>
-            <DialogTitle>保存到历史</DialogTitle>
-            <DialogDescription>为工作流命名并添加备注（可选）</DialogDescription>
+            <DialogTitle>{t('canvas.saveDialogTitle')}</DialogTitle>
+            <DialogDescription>{t('canvas.saveDialogDesc')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label>工作流名称 *</Label>
+              <Label>{t('canvas.name')} *</Label>
               <Input
                 value={saveTitle}
                 onChange={(e) => setSaveTitle(e.target.value)}
@@ -1427,18 +1427,18 @@ export default function TinyflowWrapper() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>备注</Label>
+              <Label>{t('canvas.remark')}</Label>
               <Textarea
                 value={saveDescription}
                 onChange={(e) => setSaveDescription(e.target.value)}
-                placeholder="描述这个工作流的用途（可选）"
+                placeholder={t('canvas.remarkPlaceholder')}
                 className="min-h-[80px]"
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>
-              取消
+              {t('common.cancel')}
             </Button>
             <Button
               onClick={() => {
@@ -1448,7 +1448,7 @@ export default function TinyflowWrapper() {
               disabled={savingWorkflow}
             >
               {savingWorkflow && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
-              保存
+              {t('common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1458,8 +1458,8 @@ export default function TinyflowWrapper() {
       <Dialog open={nodesOpen} onOpenChange={setNodesOpen}>
         <DialogContent className="z-[1200] max-w-md">
           <DialogHeader>
-            <DialogTitle>节点库</DialogTitle>
-            <DialogDescription>由 NodeRegistry 提供的内置节点（{nodeLibrary.length} 个）</DialogDescription>
+            <DialogTitle>{t('canvas.nodeLib')}</DialogTitle>
+            <DialogDescription>{t('canvas.nodeLibDesc', { count: nodeLibrary.length })}</DialogDescription>
           </DialogHeader>
           <div className="max-h-[50vh] space-y-4 overflow-y-auto py-2">
             {(['ai', 'logic', 'integration', 'core', 'data', 'custom'] as const)
@@ -1492,13 +1492,13 @@ export default function TinyflowWrapper() {
                             onClick={() => toggleNodeType(node.type, !enabledTypes.has(node.type))}
                             className="mt-1 text-[11px] text-muted-foreground hover:text-foreground"
                           >
-                            {enabledTypes.has(node.type) ? '已隐藏（点击启用）' : '已启用（点击隐藏）'}
+                            {enabledTypes.has(node.type) ? t('canvas.nodeHidden') : t('canvas.nodeShown')}
                           </button>
                         </div>
                         <div className="ml-2 flex shrink-0 flex-col items-end gap-1">
                           <Button size="sm" className="h-7 text-xs" onClick={() => handleAddNode(node as unknown as NodeDefinition)}>
                             <Plus className="mr-1 h-3 w-3" />
-                            添加
+                            {t('canvas.add')}
                           </Button>
                           {node.capabilities.length > 0 && (
                             <div className="flex gap-1">
@@ -1519,13 +1519,13 @@ export default function TinyflowWrapper() {
                 </div>
               ))}
             {nodeLibrary.length === 0 && (
-              <p className="py-8 text-center text-sm text-muted-foreground">节点库为空</p>
+              <p className="py-8 text-center text-sm text-muted-foreground">{t('canvas.nodeLibEmpty')}</p>
             )}
           </div>
 
           {/* 画布节点（配置 / 删除） */}
           <div className="border-t border-border pt-3">
-            <h4 className="mb-2 text-sm font-semibold text-muted-foreground">画布节点（{getCanvasNodes().length}）</h4>
+            <h4 className="mb-2 text-sm font-semibold text-muted-foreground">{t('canvas.canvasNodes', { count: getCanvasNodes().length })}</h4>
             <div className="space-y-1.5">
               {getCanvasNodes().map((n) => (
                 <div key={n.id} className="flex items-center justify-between rounded-md border border-border bg-card px-2.5 py-1.5 text-xs">
@@ -1535,16 +1535,16 @@ export default function TinyflowWrapper() {
                   </span>
                   <div className="flex shrink-0 gap-1">
                     <Button variant="outline" size="sm" className="h-6 px-2 text-[11px]" onClick={() => openNodeConfig(n)}>
-                      配置
+                      {t('canvas.configure')}
                     </Button>
                     <Button variant="ghost" size="sm" className="h-6 px-2 text-[11px] text-destructive" onClick={() => handleRemoveNode(n.id)}>
-                      删除
+                      {t('common.delete')}
                     </Button>
                   </div>
                 </div>
               ))}
               {getCanvasNodes().length === 0 && (
-                <p className="py-3 text-center text-xs text-muted-foreground">画布暂无节点，从上方节点库添加</p>
+                <p className="py-3 text-center text-xs text-muted-foreground">{t('canvas.canvasEmpty')}</p>
               )}
             </div>
           </div>
@@ -1596,7 +1596,7 @@ export default function TinyflowWrapper() {
               variant="outline"
               onClick={() => {
                 navigator.clipboard.writeText(flowJsonText);
-                toast.success('已复制到剪贴板');
+                toast.success(t('canvas.copied'));
               }}
             >
               {t('common.copy')}
