@@ -60,22 +60,20 @@ export function ChatLanding() {
       setSubmitting(true);
       setError(null);
       try {
+        // 创建对话（携带首条消息一次完成，减少一个串行请求——跳转更快）
         const res = await fetch('/api/conversations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: text.slice(0, 20) }),
+          body: JSON.stringify({
+            title: text.slice(0, 20),
+            content: text,
+          }),
         });
         const db = await res.json();
         if (!db?.id) {
           setError('创建对话失败，请重试');
           return;
         }
-        // 插入首条用户消息（对话页据此自动触发生成，不依赖 URL 参数传递文本）
-        await fetch(`/api/conversations/${db.id}/messages`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ role: 'user', content: text, status: 'done' }),
-        }).catch(() => {});
         // 通知侧边栏刷新对话历史（新对话立即可见）
         window.dispatchEvent(new Event('conversations-updated'));
         router.push(`/chat/${db.id}`);

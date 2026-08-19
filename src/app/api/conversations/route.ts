@@ -41,5 +41,23 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: error.message }, { status: 500 });
   }
 
+  // 可选：创建时携带首条用户消息（新聊天欢迎页跳转优化——减少一个串行请求）
+  // 内容来自欢迎页输入框/推荐模板，status=done（对话页检测到 user done 后自动触发生成）
+  const firstContent = body?.content?.trim();
+  if (firstContent && data?.id) {
+    await supabase
+      .from('messages')
+      .insert({
+        conversation_id: data.id,
+        role: 'user',
+        content: firstContent,
+        status: 'done',
+      })
+      .then(() => undefined)
+      .catch(() => {
+        // 首条消息写入失败不阻断对话创建（对话页会自动补发）
+      });
+  }
+
   return Response.json(data, { status: 201 });
 }
