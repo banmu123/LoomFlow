@@ -133,8 +133,9 @@ export const TINYFLOW_ZH_EN: Record<string, string> = {
 
 /**
  * 挂载到画布容器：locale=en 时把 tinyflow 内置中文替换为英文；
- * 切回中文或卸载时恢复原文。仅观察 childList（节点增删），
- * 文本替换通过 characterData 不触发自身观察，无递归风险。
+ * 切回中文或卸载时恢复原文。
+ * 性能：观察 childList + characterData，但替换采用**增量处理**——
+ * 只扫描本次变更新增的子树（含自身文本节点），避免画布交互时全量 TreeWalker 扫描。
  */
 export function useTinyflowLocale(
   rootRef: React.RefObject<HTMLElement | null>,
@@ -148,28 +149,45 @@ export function useTinyflowLocale(
     // 记录原文（切回中文/卸载时恢复）
     const originals = new Map<Text, string>();
 
-    const translate = () => {
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-      let node: Node | null = walker.nextNode();
-      while (node) {
-        const text = node as Text;
-        const raw = text.data;
-        if (!originals.has(text)) originals.set(text, raw);
-        // trim 匹配（tinyflow 部分文本带前导空格，如 " 开始节点"）
-        const trimmed = raw.trim();
-        const target = TINYFLOW_ZH_EN[trimmed];
-        if (target && raw !== target) {
-          const idx = raw.indexOf(trimmed);
-          text.data = `${raw.slice(0, idx)}${target}${raw.slice(idx + trimmed.length)}`;
-        }
-        node = walker.nextNode();
+    const translateText = (text: Text) => {
+      const raw = text.data;
+      if (!originals.has(text)) originals.set(text, raw);
+      // trim 匹配（tinyflow 部分文本带前导空格，如 " 开始节点"）
+      const trimmed = raw.trim();
+      const target = TINYFLOW_ZH_EN[trimmed];
+      if (target && raw !== target) {
+        const idx = raw.indexOf(trimmed);
+        text.data = `${raw.slice(0, idx)}${target}${raw.slice(idx + trimmed.length)}`;
       }
     };
 
-    // 首次同步替换 + 观察后续渲染
-    translate();
-    const observer = new MutationObserver(() => translate());
-    observer.observe(root, { childList: true, subtree: true });
+    const walk = (node: Node) => {
+      const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+      let current: Node | null = walker.nextNode();
+      while (current) {
+        translateText(current as Text);
+        current = walker.nextNode();
+      }
+    };
+
+    // 首次全量替换 + 观察后续变更（增量）
+    walk(root);
+    const observer = new MutationObserver((records) => {
+      for (const rec of records) {
+        if (rec.type === 'characterData' && rec.target.nodeType === Node.TEXT_NODE) {
+          translateText(rec.target as Text);
+          continue;
+        }
+        for (const node of rec.addedNodes) {
+          if (node.nodeType === Node.TEXT_NODE) {
+            translateText(node as Text);
+          } else if (node.nodeType === Node.ELEMENT_NODE) {
+            walk(node);
+          }
+        }
+      }
+    });
+    observer.observe(root, { childList: true, subtree: true, characterData: true });
 
     return () => {
       observer.disconnect();

@@ -264,13 +264,17 @@ export default function TinyflowWrapper() {
   useEffect(() => {
     let destroyed = false;
     (async () => {
-      // 并行拉取画布所需数据（此前串行 4 个接口累计 ~1.6s，并行后仅需最慢的一个 ~0.5s）
-      const [llmRes, kbRes, searchRes, nodesRes] = await Promise.all([
+      // 并行拉取画布所需数据 + 预加载 loomflow-ui 包（此前串行：4 接口 ~1.6s + import ~0.3s，
+      // 现在全部并行，总耗时 ≈ 最慢一项 ~0.5s）
+      const [llmRes, kbRes, searchRes, nodesRes, uiModule] = await Promise.all([
         fetch('/api/ai/models'),
         fetch('/api/knowledge-bases'),
         fetch('/api/search-providers'),
         fetch('/api/nodes'),
+        import('loomflow-ui'),
       ]);
+      const { Tinyflow } = uiModule;
+      if (destroyed || !containerRef.current) return;
 
       // 模型列表严格来自模型配置（/api/ai/models），实例化前先拉取：
       // provider.llm 闭包持有局部变量（每次渲染/打开面板都能拿到最新配置，未配置时为空）
@@ -347,8 +351,6 @@ export default function TinyflowWrapper() {
       }
       if (destroyed || !containerRef.current) return;
 
-      const { Tinyflow } = await import('loomflow-ui');
-      if (destroyed || !containerRef.current) return;
       instanceRef.current = new Tinyflow({
         element: containerRef.current,
         defaultTheme: 'light',
