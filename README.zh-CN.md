@@ -147,7 +147,9 @@ flowchart LR
 ```bash
 git clone https://github.com/banmu123/LoomFlow.git
 cd LoomFlow
-cp .env.example .env      # 填 POSTGRES_PASSWORD / PGRST_JWT_SECRET，生成 SERVICE_ROLE_KEY
+bash scripts/init-env.sh   # 一次性：自动生成 .env 全部密钥（随机强密码 + JWT 签名）
+# 1. 编辑 .env，填写 DEEPSEEK_API_KEY（AI 对话必需）
+# 2. 可选：配置 OSS（图片上传）等
 docker compose up -d      # 自动初始化数据库（含默认 admin 账号）
 ```
 

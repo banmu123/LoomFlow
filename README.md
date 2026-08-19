@@ -164,12 +164,9 @@ Includes **PostgreSQL + PostgREST + Nginx** — fully self-contained, no Supabas
 ```bash
 git clone https://github.com/banmu123/LoomFlow.git
 cd LoomFlow
-cp .env.example .env
-# Required env setup:
-#   POSTGRES_PASSWORD  → your strong password (openssl rand -hex 12)
-#   PGRST_JWT_SECRET   → random string (openssl rand -hex 32)
-#   COZE_SUPABASE_SERVICE_ROLE_KEY → generated via:
-#     node docker/generate-service-role-key.mjs $PGRST_JWT_SECRET
+bash scripts/init-env.sh   # one-time: creates .env with random passwords & JWT keys
+# 1. Edit .env → set DEEPSEEK_API_KEY (required for AI)
+# 2. Optional: configure OSS in .env for image uploads
 docker compose up -d   # auto-initializes database (tables + default admin)
 ```
 
