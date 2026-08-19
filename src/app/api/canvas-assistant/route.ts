@@ -103,5 +103,8 @@ export async function POST(request: NextRequest) {
     maxOutputTokens: 4096,
   });
 
-  return result.toUIMessageStreamResponse();
+  // 与 /api/chat-ai 一致：发送 reasoning（思考过程在 UI 折叠展示）
+  return result.toUIMessageStreamResponse({
+    sendReasoning: true,
+  });
 }

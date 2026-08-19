@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import type { UIMessage } from 'ai';
@@ -9,12 +9,14 @@ import { useT } from '@/lib/i18n';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { SimpleChatMessage } from '@/components/SimpleChatMessage';
 import { extractWorkflowJson } from '@/lib/agent/workflow-extract';
 import { toast } from 'sonner';
 
 // ===== 画布 AI 助手 =====
 // 在画布编辑器内协助用户分析/修改当前工作流：
 // - 消息随画布数据发送（每次发送取最新画布状态）
+// - 消息展示复用 SimpleChatMessage（与新聊天对话样式一致）
 // - AI 回复含 ```json 工作流时，提供「应用修改」按钮（前端解析后写回画布）
 // - 会话在组件内存中，无持久化
 
@@ -26,6 +28,16 @@ function getMessageText(msg: UIMessage): string {
       .join('');
   }
   return String((msg as { content?: unknown }).content ?? '');
+}
+
+function getMessageReasoning(msg: UIMessage): string {
+  if (Array.isArray(msg.parts)) {
+    return msg.parts
+      .filter((p) => p.type === 'reasoning')
+      .map((p) => (p as { text?: string }).text ?? '')
+      .join('');
+  }
+  return '';
 }
 
 export function CanvasAssistant({
@@ -101,9 +113,9 @@ export function CanvasAssistant({
         </Button>
       </div>
 
-      {/* 消息区 */}
+      {/* 消息区（复用 SimpleChatMessage，与新聊天对话样式一致） */}
       <ScrollArea className="min-h-0 flex-1">
-        <div className="space-y-3 p-4">
+        <div className="space-y-4 p-4">
           {messages.length === 0 && (
             <div className="space-y-2">
               <p className="rounded-md border border-border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
@@ -111,24 +123,22 @@ export function CanvasAssistant({
               </p>
             </div>
           )}
-          {messages.map((msg) => {
+          {messages.map((msg, idx) => {
             const text = getMessageText(msg);
-            if (!text) return null;
-            const isUser = msg.role === 'user';
+            const isLast = idx === messages.length - 1;
+            const busy = status === 'streaming' || status === 'submitted';
+            const msgStatus = msg.role === 'assistant' && isLast && busy ? 'streaming' : 'done';
             return (
-              <div
+              <SimpleChatMessage
                 key={msg.id}
-                className={`max-w-[90%] whitespace-pre-wrap break-words rounded-lg px-3 py-2 text-xs leading-relaxed ${
-                  isUser
-                    ? 'ml-auto bg-primary/10 text-foreground'
-                    : 'border border-border bg-card text-foreground'
-                }`}
-              >
-                {text}
-              </div>
+                role={msg.role as 'user' | 'assistant'}
+                content={text}
+                reasoning={getMessageReasoning(msg)}
+                status={msgStatus}
+              />
             );
           })}
-          {busy && (
+          {busy && messages.length === 0 && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               {t('common.loading')}
