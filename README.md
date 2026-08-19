@@ -165,10 +165,14 @@ Includes **PostgreSQL + PostgREST + Nginx** — fully self-contained, no Supabas
 git clone https://github.com/banmu123/LoomFlow.git
 cd LoomFlow
 bash scripts/init-env.sh   # one-time: creates .env with random passwords & JWT keys
-# 1. Edit .env → set DEEPSEEK_API_KEY (required for AI)
-# 2. Optional: configure OSS in .env for image uploads
 docker compose up -d   # auto-initializes database (tables + default admin)
 ```
+
+After deployment, add your AI model in the UI (no env keys needed):
+
+1. Open http://localhost:5000 → sign in (`admin` / `123456`, change immediately)
+2. **Admin → Model Settings → Add Model** (e.g. DeepSeek: model ID + API Key, or any OpenAI-compatible endpoint)
+3. Optional: Search Providers / Storage settings in Admin
 
 - Access: http://localhost:5000
 - Default admin: `admin` / `123456`（⚠️ change after first login）

@@ -148,10 +148,14 @@ flowchart LR
 git clone https://github.com/banmu123/LoomFlow.git
 cd LoomFlow
 bash scripts/init-env.sh   # 一次性：自动生成 .env 全部密钥（随机强密码 + JWT 签名）
-# 1. 编辑 .env，填写 DEEPSEEK_API_KEY（AI 对话必需）
-# 2. 可选：配置 OSS（图片上传）等
 docker compose up -d      # 自动初始化数据库（含默认 admin 账号）
 ```
+
+部署后在界面添加 AI 模型（无需在 .env 填 key）：
+
+1. 打开 http://localhost:5000 → 登录（`admin` / `123456`，请立即修改）
+2. **管理后台 → 模型配置 → 添加模型**（如 DeepSeek：填模型 ID + API Key，或任意 OpenAI 兼容端点）
+3. 可选：管理后台 → 搜索配置 / 存储设置 等
 
 - 访问：http://localhost:5000
 - 默认账号：`admin` / `123456`（⚠️ 首次登录后请立即修改）
