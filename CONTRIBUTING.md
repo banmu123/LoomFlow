@@ -41,7 +41,7 @@ src/
 3. 不写死绝对路径，用 `path.resolve(__dirname, ...)` / `process.cwd()`
 4. 动态内容（`typeof window` / `Date.now()`）必须在 `'use client'` + `useEffect` 中使用，禁止在 JSX 渲染逻辑里直接调用
 5. UI 组件优先复用 `src/components/ui/`（shadcn/ui），不引入新的样式体系
-6. 新增面向用户的文案需同步更新 `src/messages/zh.ts` 与 `en.ts`
+6. **所有用户可见文案必须走 i18n**：通过 `useT()` 渲染（`t('命名空间.key')`），禁止在 JSX/toast/对话框硬编码中文；新增文案同步更新 `src/messages/zh.ts` 与 `en.ts`（画布内置文本例外，走 `src/lib/tinyflow-locale.ts` 映射表）
 7. 新增节点：遵循「NodeDefinition（nodes/builtin.ts）+ Executor（executors/）+ 注册」三步，不要绕过 NodeRegistry
 
 ## 数据库变更
