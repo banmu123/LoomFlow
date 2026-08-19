@@ -161,6 +161,13 @@ export const en: ZhMessages = {
     placeholder: 'Describe what you want to do, e.g. collect AI industry news into a daily report',
     recommend: 'Recommended',
     start: 'Start',
+    templates: {
+      dailyNews: '📰 Daily News Assistant',
+      content: '✍️ Content Assistant',
+      customer: '👤 Customer Assistant',
+      weeklyReport: '📝 Weekly Report Assistant',
+      translator: '🌐 Translation Assistant',
+    },
   },
   workflows: {
     title: 'Workflows',

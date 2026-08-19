@@ -157,6 +157,13 @@ export const zh = {
     placeholder: '描述你想做的事，比如：帮我每天整理 AI 行业新闻并生成日报',
     recommend: '推荐',
     start: '开始',
+    templates: {
+      dailyNews: '📰 每日资讯助手',
+      content: '✍️ 内容助手',
+      customer: '👤 客户助手',
+      weeklyReport: '📝 周报助手',
+      translator: '🌐 翻译助手',
+    },
   },
   workflows: {
     title: 'Workflows 工作流',

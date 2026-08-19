@@ -54,13 +54,13 @@ const CHAT_PANEL_WIDTH = 440;
 
 type MessageRole = 'user' | 'assistant';
 
-// 新建对话的模板推荐（欢迎页 ChatLanding 复用）
+// 新建对话的模板推荐（欢迎页 ChatLanding 复用）——i18n key，页面用 t() 渲染
 export const RECOMMENDATIONS = [
-  '📰 每日资讯助手',
-  '✍️ 内容助手',
-  '👤 客户助手',
-  '📝 周报助手',
-  '🌐 翻译助手',
+  'home.templates.dailyNews',
+  'home.templates.content',
+  'home.templates.customer',
+  'home.templates.weeklyReport',
+  'home.templates.translator',
 ];
 
 // 工具名 → 可读标签（对话中的执行日志展示）
@@ -908,10 +908,10 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
                 {RECOMMENDATIONS.map((rec) => (
                   <button
                     key={rec}
-                    onClick={() => startEmptyChat(rec.replace(/^[^\s]+\s*/, ''))}
+                    onClick={() => startEmptyChat(t(rec).replace(/^[^\s]+\s*/, ''))}
                     className="rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
                   >
-                    {rec}
+                    {t(rec)}
                   </button>
                 ))}
               </div>

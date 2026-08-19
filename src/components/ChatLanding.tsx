@@ -133,10 +133,10 @@ export function ChatLanding() {
             {RECOMMENDATIONS.map((rec) => (
               <button
                 key={rec}
-                onClick={() => handleSend(rec.replace(/^[^\s]+\s*/, ''))}
+                onClick={() => handleSend(t(rec).replace(/^[^\s]+\s*/, ''))}
                 className="rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
               >
-                {rec}
+                {t(rec)}
               </button>
             ))}
           </div>
