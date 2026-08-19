@@ -11,14 +11,14 @@
 浏览器 / 外部系统
       │
       ▼
-Nginx（可选，80/443）──▶ Node 应用（dist/server.js，pm2 守护，端口 5000）
+Nginx（可选，80/443）──▶ Docker 应用容器（loomflow-app，端口 5000）
                               │
                               ▼
-                    Supabase 云端数据库（数据不落在服务器）
+                    PostgreSQL（Docker 容器，PostgREST 数据层）
 ```
 
-- **服务器**：只跑应用代码（Node 进程）
-- **数据**：在 Supabase 云端 → 换服务器/换数据库时分别处理（见第六章/附录 A）
+- **部署方式**：Docker Compose（唯一方式）——应用/PostgreSQL/PostgREST/Nginx/migration 全容器化
+- **数据**：PostgreSQL 数据卷持久化（`loomflow-pgdata`）
 - **外部调用**：已发布工作流通过 API Key 对外提供 HTTP 接口（`docs/api-external.md`）
 
 ---
@@ -43,17 +43,17 @@ cp .env.example .env.local
 #    scripts/supabase-init.sql → supabase-users.sql → supabase-updates.sql
 
 # 4. Build & start (production)
-pnpm build
-COZE_PROJECT_ENV=PROD PORT=5000 pm2 start dist/server.js --name loomflow
+# Docker Compose 一键部署（推荐，自动初始化数据库 + 启动全部容器）
+docker compose up -d --build
 ```
 
 ### Documentation Map
 
 | Section | Topic |
 |---------|-------|
-| 1-3 | Server preparation, code upload, process management (pm2) |
+| 1-3 | Server preparation, code upload, Docker deployment & operations |
 | 4 | Nginx reverse proxy, domain, HTTPS (certbot) — **must disable buffering for SSE** |
-| 5 | Deployment updates (one-click script `deploy.sh`) |
+| 5 | Deployment updates (one-click script `scripts/deploy-docker.sh`) |
 | 6 | **Server migration** — copy `.env.local` (keep `AUTH_SECRET`!), database needs no action |
 | 7-9 | App-specific config: Supabase SQL init, environment variables, build commands |
 | 10 | Publish workflows as external HTTP APIs (API Key auth) |
@@ -92,26 +92,22 @@ COZE_PROJECT_ENV=PROD PORT=5000 pm2 start dist/server.js --name loomflow
 |------|------|
 | 系统 | Ubuntu 20.04+ / Debian 11+ |
 | Node.js | ≥ 20.9（当前项目要求，其他技术按需） |
-| pnpm / pm2 | 按需安装 |
+| pnpm / docker | 按需安装（Docker 为唯一部署方式） |
 | 内存 | ≥ 1GB（推荐 2GB） |
 
 ### 1.2 安装基础环境
 
 ```bash
-# Node.js 20 LTS（推荐 nvm）
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
-source ~/.bashrc
-nvm install 20
+# Docker（唯一部署方式，应用/数据库/反代全容器化）
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER   # 当前用户免 sudo 执行 docker（重新登录生效）
 
-# pnpm / pm2
-npm install -g pnpm pm2
+# pnpm（本地构建/开发用；服务器上如需构建也需安装）
+npm install -g pnpm
 ```
 
-> ⚠️ nvm 多版本时，非交互 SSH 会话找不到 pnpm/pm2（PATH 问题）。
-> 一键部署脚本已内置处理；手动操作时先执行：
-> ```bash
-> for d in ~/.nvm/versions/node/*/bin; do export PATH="$d:$PATH"; done
-> ```
+> ⚠️ Docker 部署不依赖 nvm/Node 版本管理——构建在容器内完成（node:20-slim）。
+> 一键部署脚本（`scripts/deploy-docker.sh`）本地执行，自动同步代码 + 构建 + 重启。
 
 ### 1.3 防火墙放行端口
 
@@ -154,24 +150,32 @@ git clone {仓库地址} {APP_DIR}
 
 ---
 
-## 三、进程管理（pm2）
+## 三、Docker 部署与运维（唯一方式）
+
+> 部署流程：首次 `docker compose up -d`（自动初始化数据库）；更新用一键脚本 `scripts/deploy-docker.sh`（本地执行）。
 
 ```bash
-# 启动（按应用实际命令，如 node dist/server.js）
+# 首次部署（服务器上，仓库根目录）
 cd {APP_DIR}
-PORT={PORT} pm2 start dist/server.js --name app-name
-pm2 save                 # 保存进程列表
-pm2 startup              # 按提示执行输出的命令，实现开机自启
+cp .env.example .env        # 填 POSTGRES_PASSWORD / PGRST_JWT_SECRET，生成 SERVICE_ROLE_KEY
+docker compose up -d        # 自动：初始化数据库（含默认 admin）+ 启动全部容器
+
+# 更新部署（本地执行，自动同步代码 + 迁移 + 权限自检 + 构建 + 健康验证）
+SERVER_IP={SERVER_IP} ./scripts/deploy-docker.sh
 ```
 
-常用命令：
+常用运维命令：
 
 ```bash
-pm2 status                       # 状态
-pm2 logs app-name --lines 30     # 日志
-pm2 restart app-name             # 重启
-pm2 delete app-name              # 删除进程
+docker compose logs -f loomflow     # 应用日志
+docker compose ps                   # 容器状态
+docker compose restart loomflow     # 重启应用
+docker compose down                 # 停止（数据保留在卷中）
+docker compose down -v              # 停止并删除数据卷（⚠️ 清空数据库）
+docker exec -it loomflow-postgres psql -U postgres -d loomflow   # 进入数据库
 ```
+
+> 部署时自动执行：SQL 迁移（幂等，migration 容器）→ 权限自检（`scripts/check-grants.sh`）→ 重建镜像 → 健康验证。
 
 ---
 
@@ -294,12 +298,10 @@ sudo certbot renew
 
 ### 方式一：一键脚本（推荐）
 
-项目根目录 `deploy.sh`（Mac 本地执行）。换服务器时修改脚本顶部配置区：
+`scripts/deploy-docker.sh`（Mac 本地执行）。脚本顶部通过环境变量指定服务器：
 
 ```bash
-SERVER_USER="{SERVER_USER}"
-SERVER_IP="{SERVER_IP}"
-APP_DIR="{APP_DIR}"
+SERVER_USER=ubuntu SERVER_IP="{SERVER_IP}" APP_DIR="{APP_DIR}" ./scripts/deploy-docker.sh
 ```
 
 使用（需先配置 SSH 免密，一次性）：
@@ -308,8 +310,8 @@ APP_DIR="{APP_DIR}"
 ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519   # 如已有密钥则跳过
 ssh-copy-id {SERVER_USER}@{SERVER_IP}              # 输入一次密码
 
-chmod +x deploy.sh    # 只需一次
-./deploy.sh           # 打包 → 上传 → 构建 → 重启，1-2 分钟
+SERVER_IP={SERVER_IP} ./scripts/deploy-docker.sh
+# 自动：同步代码 → 数据库迁移 → 权限自检 → 构建镜像 → 健康验证
 ```
 
 ### 方式二：手动
@@ -318,9 +320,7 @@ chmod +x deploy.sh    # 只需一次
 # Mac 本地打包上传（命令同第二章）
 # 服务器：
 cd {APP_DIR} && tar -xzf /tmp/app-deploy.tar.gz --overwrite
-pnpm install --prefer-frozen-lockfile
-pnpm build
-pm2 restart app-name
+docker compose up -d --build
 ```
 
 ---
@@ -344,13 +344,11 @@ pm2 restart app-name
    尤其 `AUTH_SECRET` 必须与旧服务器一致——换了它，所有已登录用户的 token 全部失效，需要重新登录。直接 `scp` 旧服务器的 `.env.local` 过来即可。
 
 2. **数据库不用做任何事**
-   表和数据都在 Supabase 云端，三个 SQL 脚本**只有全新数据库才需要执行**。换服务器 ≠ 新数据库。
+   数据在 PostgreSQL 数据卷（Docker），随服务器迁移时需**同步数据卷**（见下方提示）；全新部署则自动初始化。
 
-3. **`deploy.sh` 修改三个配置项**
+3. **一键脚本环境变量指向新服务器**
    ```bash
-   SERVER_USER="新用户"
-   SERVER_IP="新IP"
-   APP_DIR="新目录"
+   SERVER_USER=ubuntu SERVER_IP="新IP" APP_DIR="/opt/loomflow" ./scripts/deploy-docker.sh
    ```
    Mac 的 SSH 密钥**不用重新生成**，直接对新服务器执行 `ssh-copy-id {新用户}@{新IP}` 即可。
 
@@ -359,13 +357,10 @@ pm2 restart app-name
    - **证书绑定域名不绑定服务器**：新服务器上重新执行 `sudo certbot --nginx -d {DOMAIN}` 签发即可（旧服务器的证书删不删随意，不影响）
    - 切换期间旧服务器可继续服务（DNS 生效前流量仍走旧服务器），实现平滑迁移
 
-5. **pm2 开机自启要重新配置**
-   ```bash
-   pm2 save && pm2 startup
-   ```
-   新服务器上必须重新执行，否则重启后应用不会自动起来。
+5. **Docker 开机自启**
+   compose 中已配置 `restart: unless-stopped`，新服务器 `docker compose up -d` 后无需额外配置。
 
-> 检查清单：Node 版本、.env.local 完整（含密钥）、pm2 开机自启、防火墙、DNS、数据源连通性。
+> 检查清单：Docker 环境、.env 完整（含密钥）、容器全部 healthy、防火墙、DNS、数据源连通性。
 
 ---
 
@@ -408,11 +403,7 @@ AUTH_SECRET=$(openssl rand -hex 32)
 
 ```bash
 cd {APP_DIR}
-pnpm install --prefer-frozen-lockfile
-pnpm build          # = next build + tsup 打包 server.ts → dist/server.js
-
-COZE_PROJECT_ENV=PROD PORT={PORT} pm2 start dist/server.js --name loomflow
-pm2 save
+docker compose up -d --build
 ```
 
 验证：
@@ -538,7 +529,7 @@ COZE_SUPABASE_SERVICE_ROLE_KEY=你的SERVICE_ROLE_KEY
 重启应用：
 
 ```bash
-pm2 restart loomflow --update-env
+docker compose restart loomflow
 ```
 
 **⑥ 验证**：登录、对话、工作流列表、执行历史均正常；数据可在自托管 Studio 查看。

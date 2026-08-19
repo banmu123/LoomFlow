@@ -213,8 +213,6 @@ SERVER_IP=你的服务器 ./scripts/deploy-docker.sh
 
 最低服务器：1 核 CPU / 1GB 内存 / Ubuntu 20.04+ / Node ≥ 20.9。
 
-> 备选（pm2）：`pnpm build` 后执行 `COZE_PROJECT_ENV=PROD PORT=5000 pm2 start dist/server.js --name loomflow && pm2 save`
-
 ### 🗄️ 自建 PostgreSQL
 
 通过 **Docker 自托管 Supabase** 从云切换到自己的 PostgreSQL——**代码零改动**。见[部署手册第十一章](docs/config/Deployment-Manual.md)。

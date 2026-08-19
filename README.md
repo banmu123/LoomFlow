@@ -235,8 +235,6 @@ SERVER_IP=your-server ./scripts/deploy-docker.sh
 
 Minimum server: 1 CPU / 1 GB RAM / Ubuntu 20.04+ / Node ≥ 20.9.
 
-> Alternative (pm2): `pnpm build` then `COZE_PROJECT_ENV=PROD PORT=5000 pm2 start dist/server.js --name loomflow && pm2 save`
-
 ### 🗄️ Self-Hosted PostgreSQL
 
 Switch from Supabase cloud to your own PostgreSQL via **Docker self-hosted Supabase** — zero code changes. See [Deployment Manual §11](docs/config/Deployment-Manual.md).
