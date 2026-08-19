@@ -2,6 +2,10 @@
 
 > English | [中文](README.zh-CN.md)
 
+<p align="center">
+  <img src="public/screenshots/logo.png" alt="LoomFlow Logo" width="120" />
+</p>
+
 **A lightweight AI workflow builder for individuals and small teams.**
 
 Describe your idea in natural language → generate a runnable workflow → customize it on a visual canvas → publish it as an API.

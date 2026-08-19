@@ -2,6 +2,10 @@
 
 > [English](README.md) | 中文
 
+<p align="center">
+  <img src="public/screenshots/logo.png" alt="LoomFlow Logo" width="120" />
+</p>
+
 **为个人和小团队打造的轻量级 AI 工作流构建器。**
 
 用自然语言描述想法 → 生成可运行的工作流 → 画布上自由调整 → 一键发布为 API。
