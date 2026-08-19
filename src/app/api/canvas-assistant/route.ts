@@ -15,7 +15,9 @@ export const runtime = 'nodejs';
 
 const MAX_CANVAS_CHARS = 6000;
 
-function summarizeCanvas(canvasData: unknown): string {
+/** 画布数据 → 注入提示词的摘要（超长截断，防 token 爆炸） */
+export function summarizeCanvas(canvasData: unknown): string {
+  if (canvasData === null || canvasData === undefined) return '（无数据）';
   try {
     const raw = JSON.stringify(canvasData);
     if (!raw) return '（无数据）';
@@ -42,7 +44,8 @@ const SYSTEM_PROMPT = `你是 LoomFlow 画布中的 AI 工作流助手，协助�
 5. 用户只提问不要求修改时，直接分析回答（结构、问题、优化建议），不要输出 JSON
 6. 回复使用用户的语言`;
 
-function buildSystemPrompt(canvasData: unknown): string {
+/** 组装系统提示词（画布数据注入） */
+export function buildSystemPrompt(canvasData: unknown): string {
   return SYSTEM_PROMPT.replace('{cCanvas}', summarizeCanvas(canvasData));
 }
 
