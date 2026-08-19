@@ -37,7 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Play, Square, Loader2, CheckCircle2, XCircle, Clock, Settings2, ArrowLeft, Braces, Upload, Save, Boxes, History, RotateCcw, Plus } from 'lucide-react';
+import { Play, Square, Loader2, CheckCircle2, XCircle, Clock, Settings2, ArrowLeft, Braces, Upload, Save, Boxes, History, RotateCcw, Plus, Bot } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useT } from '@/lib/i18n';
 import { useTinyflowLocale } from '@/lib/tinyflow-locale';
@@ -47,6 +47,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { formatVersion } from '@/lib/version';
 import { uploadFileToOSS } from '@/lib/oss-upload-client';
 import { NodeConfigPanel } from '@/components/NodeConfigPanel';
+import { CanvasAssistant } from '@/components/CanvasAssistant';
 import { getConfigDefaults, mergeConfig } from '@/lib/tinyflow/node-config';
 import type { NodeDefinition } from '@/lib/tinyflow/node-definition';
 
@@ -259,6 +260,8 @@ export default function TinyflowWrapper() {
   const [jsonText, setJsonText] = useState('{}');
   const [jsonDialogOpen, setJsonDialogOpen] = useState(false);
   const [flowJsonText, setFlowJsonText] = useState('');
+  // 画布 AI 助手面板
+  const [assistantOpen, setAssistantOpen] = useState(false);
 
   // ===== Init Tinyflow =====
   useEffect(() => {
@@ -1169,6 +1172,15 @@ export default function TinyflowWrapper() {
           {t('workflows.viewJson')}
         </Button>
 
+        <Button
+          size="sm"
+          variant={assistantOpen ? 'default' : 'outline'}
+          onClick={() => setAssistantOpen((v) => !v)}
+        >
+          <Bot className="mr-1 h-4 w-4" />
+          {t('canvas.assistant')}
+        </Button>
+
         {currentWorkflowId && (
           <Button
             size="sm"
@@ -1228,6 +1240,16 @@ export default function TinyflowWrapper() {
         <div
           ref={containerRef}
           className="h-full min-h-0 min-w-0 flex-1 [&_.tf-node-wrapper-title]:hidden"
+        />
+
+        {/* AI 助手面板（协助分析/修改工作流） */}
+        <CanvasAssistant
+          open={assistantOpen}
+          onClose={() => setAssistantOpen(false)}
+          getCanvasData={() => instanceRef.current?.getData()}
+          onApplyWorkflow={(data) => {
+            instanceRef.current?.setData(data as never);
+          }}
         />
 
         {/* Results panel（宽度随屏幕自适应） */}

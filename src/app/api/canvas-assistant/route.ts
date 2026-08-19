@@ -1,0 +1,107 @@
+import { NextRequest } from 'next/server';
+import { streamText } from 'ai';
+import type { ModelMessage } from 'ai';
+import { getCurrentUser } from '@/lib/server-auth';
+import { getProviderClientForModel } from '@/lib/ai';
+import { getAllModels } from '@/lib/ai/db-models';
+
+export const runtime = 'nodejs';
+
+// ===== 画布 AI 助手 =====
+// 在画布编辑器内协助用户分析/修改当前工作流：
+// - 前端把画布数据（nodes/edges）随消息发送，注入系统提示作为上下文
+// - AI 可输出 ```json 工作流 JSON（前端解析后提供「应用修改」）
+// - 无持久化（会话在客户端组件内存中）
+
+const MAX_CANVAS_CHARS = 6000;
+
+function summarizeCanvas(canvasData: unknown): string {
+  try {
+    const raw = JSON.stringify(canvasData);
+    if (!raw) return '（无数据）';
+    return raw.length > MAX_CANVAS_CHARS ? `${raw.slice(0, MAX_CANVAS_CHARS)}…（已截断）` : raw;
+  } catch {
+    return '（无法序列化）';
+  }
+}
+
+const SYSTEM_PROMPT = `你是 LoomFlow 画布中的 AI 工作流助手，协助用户查看、分析和修改当前画布上的工作流。
+
+## 当前工作流数据（JSON：nodes / edges / viewport）
+
+\`\`\`json
+{cCanvas}
+\`\`\`
+
+## 规则
+
+1. **节点类型**（type 字段）：startNode 开始、endNode 结束、llmNode 大模型、httpNode HTTP 请求、codeNode 动态代码、knowledgeNode 知识库、searchEngineNode 网络搜索、templateNode 模板、conditionNode 条件、confirmNode 人工确认、loopNode 循环、excelNode Excel 导出
+2. **修改工作流**：当用户要求修改时，输出修改后的**完整工作流 JSON**（包含全部 nodes/edges/viewport，与上面格式一致），放在 \`\`\`json 代码块中，并在代码块外简要说明改了什么
+3. 只改用户要求的部分：保持已有节点 id 不变；新增节点用新的 id（如 node_ai_1）；删除/合并节点时同步修正 edges 引用
+4. **配置字段**：llmNode 用 llmId（模型 ID）/systemPrompt/userPrompt/temperature；searchEngineNode 用 engine（搜索服务名）/keyword/limit；excelNode 用 sheetName/fileName/outputType（数据来自上游 parameters）
+5. 用户只提问不要求修改时，直接分析回答（结构、问题、优化建议），不要输出 JSON
+6. 回复使用用户的语言`;
+
+function buildSystemPrompt(canvasData: unknown): string {
+  return SYSTEM_PROMPT.replace('{cCanvas}', summarizeCanvas(canvasData));
+}
+
+export async function POST(request: NextRequest) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return Response.json({ error: '未登录，请先登录' }, { status: 401 });
+  }
+
+  const body = await request.json().catch(() => null);
+  const rawMessages = body?.messages as Array<{ role: string; content: unknown }> | undefined;
+  const canvasData = body?.canvasData;
+
+  if (!rawMessages || !Array.isArray(rawMessages) || rawMessages.length === 0) {
+    return Response.json({ error: 'messages 参数缺失' }, { status: 400 });
+  }
+
+  const allModels = await getAllModels();
+  if (allModels.length === 0) {
+    return Response.json(
+      { error: '尚未配置模型，请先在「模型配置」中添加（管理后台 → 模型配置）' },
+      { status: 400 },
+    );
+  }
+  const requestedModel = body?.model as string | undefined;
+  const modelId =
+    requestedModel && allModels.some((m) => m.id === requestedModel)
+      ? requestedModel
+      : allModels[0].id;
+  const activeModel = allModels.find((m) => m.id === modelId);
+  if (!activeModel) {
+    return Response.json({ error: `未知模型: ${modelId}` }, { status: 400 });
+  }
+  const provider = getProviderClientForModel(activeModel);
+  if (!provider) {
+    return Response.json({ error: `未知 provider: ${activeModel.provider}` }, { status: 500 });
+  }
+
+  // 前端 useChat 发送 UIMessage 结构（含 parts）；提取纯文本消息给模型
+  const promptMessages: ModelMessage[] = rawMessages
+    .slice(-12)
+    .map((m) => {
+      const content = Array.isArray(m.content)
+        ? (m.content as Array<{ type?: string; text?: string }>)
+            .filter((p) => p.type === 'text')
+            .map((p) => p.text ?? '')
+            .join('')
+        : String(m.content ?? '');
+      return { role: (m.role === 'assistant' ? 'assistant' : 'user') as 'user' | 'assistant', content };
+    })
+    .filter((m) => m.content.trim().length > 0);
+
+  const result = streamText({
+    model: provider(modelId),
+    system: buildSystemPrompt(canvasData),
+    messages: promptMessages,
+    temperature: 0.6,
+    maxOutputTokens: 4096,
+  });
+
+  return result.toUIMessageStreamResponse();
+}

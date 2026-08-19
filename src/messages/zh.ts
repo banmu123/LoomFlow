@@ -280,6 +280,12 @@ export const zh = {
     canvasNodes: '画布节点（{count}）',
     configure: '配置',
     canvasEmpty: '画布暂无节点，从上方节点库添加',
+    assistant: 'AI 助手',
+    assistantHint: '描述你想对当前工作流做的修改，例如「给搜索结果加一个 LLM 总结节点」「把 Excel 输出改成上传 OSS」。AI 会结合当前画布数据分析并给出建议；需要修改时会输出可应用的完整工作流 JSON。',
+    assistantPlaceholder: '描述你的修改需求…',
+    assistantApply: '应用修改到画布',
+    assistantApplied: '已应用到画布',
+    assistantEnter: 'Enter 发送',
   },
   history: {
     title: '执行历史',
