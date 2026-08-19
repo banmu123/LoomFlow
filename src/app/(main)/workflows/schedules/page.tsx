@@ -92,7 +92,7 @@ export default function WorkflowSchedulesPage() {
         setWorkflows(wfs.map((w: WorkflowOption) => ({ id: w.id, title: w.title })));
       }
     } catch {
-      toast.error('加载失败');
+      toast.error(t('schedules.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -122,7 +122,7 @@ export default function WorkflowSchedulesPage() {
 
   const handleSave = async () => {
     if (!form.workflow_id || !form.cron_expr.trim()) {
-      toast.error('请选择工作流并填写 cron 表达式');
+      toast.error(t('schedules.selectWorkflowAndCron'));
       return;
     }
     setSaving(true);
@@ -131,7 +131,7 @@ export default function WorkflowSchedulesPage() {
       try {
         inputs = JSON.parse(form.inputs || '{}');
       } catch {
-        toast.error('输入参数 JSON 格式错误');
+        toast.error(t('schedules.invalidInputsJson'));
         setSaving(false);
         return;
       }
@@ -154,14 +154,14 @@ export default function WorkflowSchedulesPage() {
       );
       const data = await res.json();
       if (res.ok) {
-        toast.success(editingId ? '定时任务已更新' : '定时任务已创建');
+        toast.success(editingId ? t('schedules.updated') : t('schedules.created'));
         setDialogOpen(false);
         loadData();
       } else {
-        toast.error(data?.error || '保存失败');
+        toast.error(data?.error || t('schedules.saveFailed'));
       }
     } catch {
-      toast.error('保存失败');
+      toast.error(t('schedules.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -175,13 +175,13 @@ export default function WorkflowSchedulesPage() {
         body: JSON.stringify({ enabled }),
       });
       if (res.ok) {
-        toast.success(enabled ? '已启用' : '已停用');
+        toast.success(enabled ? t('schedules.enabledOn') : t('schedules.enabledOff'));
         loadData();
       } else {
-        toast.error('操作失败');
+        toast.error(t('schedules.operationFailed'));
       }
     } catch {
-      toast.error('操作失败');
+      toast.error(t('schedules.operationFailed'));
     }
   };
 
@@ -192,13 +192,13 @@ export default function WorkflowSchedulesPage() {
     try {
       const res = await fetch(`/api/schedules/${s.id}`, { method: 'DELETE' });
       if (res.ok) {
-        toast.success('已删除');
+        toast.success(t('schedules.deleted'));
         loadData();
       } else {
-        toast.error('删除失败');
+        toast.error(t('schedules.deleteFailed'));
       }
     } catch {
-      toast.error('删除失败');
+      toast.error(t('schedules.deleteFailed'));
     } finally {
       setDeleteTarget(null);
     }
@@ -212,28 +212,28 @@ export default function WorkflowSchedulesPage() {
           <Link href="/workflows">
             <Button variant="ghost" size="sm">
               <ArrowLeft className="mr-1 h-4 w-4" />
-              返回
+              {t('common.back')}
             </Button>
           </Link>
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
             <Clock className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold text-foreground">定时任务</h1>
+            <h1 className="text-lg font-semibold text-foreground">{t('schedules.title')}</h1>
             <p className="text-sm text-muted-foreground">
-              按 cron 表达式定时执行工作流，支持 Webhook 回调
-              （按服务器时区执行：Asia/Shanghai）
+              {t('schedules.subtitle')}
+              {t('schedules.timezoneHint')}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={loadData} disabled={loading}>
             <RefreshCw className={`mr-1 h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-            刷新
+            {t('common.refresh')}
           </Button>
           <Button size="sm" onClick={openCreate}>
             <Plus className="mr-1 h-3.5 w-3.5" />
-            新建定时任务
+            {t('schedules.newTask')}
           </Button>
         </div>
       </div>
@@ -244,12 +244,12 @@ export default function WorkflowSchedulesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>工作流</TableHead>
-                <TableHead>Cron 表达式</TableHead>
-                <TableHead>Webhook</TableHead>
-                <TableHead>状态</TableHead>
-                <TableHead>上次运行</TableHead>
-                <TableHead className="text-right">操作</TableHead>
+                <TableHead>{t('schedules.workflow')}</TableHead>
+                <TableHead>{t('schedules.cronExpr')}</TableHead>
+                <TableHead>{t('schedules.webhook')}</TableHead>
+                <TableHead>{t('schedules.status')}</TableHead>
+                <TableHead>{t('schedules.lastRun')}</TableHead>
+                <TableHead className="text-right">{t('schedules.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -257,14 +257,14 @@ export default function WorkflowSchedulesPage() {
                 <TableRow>
                   <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                     <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
-                    加载中...
+                    {t('common.loading')}
                   </TableCell>
                 </TableRow>
               )}
               {!loading && schedules.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
-                    暂无定时任务
+                    {t('schedules.noTasks')}
                   </TableCell>
                 </TableRow>
               )}
@@ -272,7 +272,7 @@ export default function WorkflowSchedulesPage() {
                 schedules.map((s) => (
                   <TableRow key={s.id}>
                     <TableCell className="max-w-[180px] truncate font-medium">
-                      {s.workflow_history?.title || '（已删除）'}
+                      {s.workflow_history?.title || t('schedules.deletedWorkflow')}
                     </TableCell>
                     <TableCell>
                       <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">
@@ -297,7 +297,7 @@ export default function WorkflowSchedulesPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="inline-flex items-center gap-2">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(s)} title="编辑">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(s)} title={t('common.edit')}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
                         <Button
@@ -305,7 +305,7 @@ export default function WorkflowSchedulesPage() {
                           size="icon"
                           className="h-7 w-7 hover:text-destructive"
                           onClick={() => setDeleteTarget(s)}
-                          title="删除"
+                          title={t('common.delete')}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -322,17 +322,17 @@ export default function WorkflowSchedulesPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editingId ? '编辑定时任务' : '新建定时任务'}</DialogTitle>
+            <DialogTitle>{editingId ? t('schedules.editTask') : t('schedules.newTask')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label>工作流 *</Label>
+              <Label>{t('schedules.workflow')} *</Label>
               <Select
                 value={form.workflow_id}
                 onValueChange={(v) => setForm((f) => ({ ...f, workflow_id: v }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="选择工作流" />
+                  <SelectValue placeholder={t('schedules.selectWorkflow')} />
                 </SelectTrigger>
                 <SelectContent>
                   {workflows.map((w) => (
@@ -344,7 +344,7 @@ export default function WorkflowSchedulesPage() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>执行频率 *</Label>
+              <Label>{t('schedules.frequency')} *</Label>
               <div className="flex flex-wrap gap-1.5">
                 {FREQUENCY_PRESETS.map((p) => (
                   <button
@@ -358,23 +358,23 @@ export default function WorkflowSchedulesPage() {
                         : 'border-border text-muted-foreground hover:border-primary/40 hover:text-primary',
                     )}
                   >
-                    {p.label}
+                    {t(p.labelKey)}
                   </button>
                 ))}
               </div>
-              <Label>Cron 表达式 *</Label>
+              <Label>{t('schedules.cronExpr')} *</Label>
               <Input
                 value={form.cron_expr}
                 onChange={(e) => setForm((f) => ({ ...f, cron_expr: e.target.value }))}
-                placeholder="*/5 * * * *（每 5 分钟）"
+                placeholder={t('schedules.cronPlaceholder')}
                 className="font-mono text-sm"
               />
               <p className="text-[11px] text-muted-foreground">
-                点选上方频率即可，也可手动填写（高级）。格式：分 时 日 月 周，例：0 9 * * 1-5 = 工作日 9:00
+                {t('schedules.cronHint')}
               </p>
             </div>
             <div className="space-y-1.5">
-              <Label>输入参数（JSON）</Label>
+              <Label>{t('schedules.inputs')}</Label>
               <Textarea
                 value={form.inputs}
                 onChange={(e) => setForm((f) => ({ ...f, inputs: e.target.value }))}
@@ -383,14 +383,14 @@ export default function WorkflowSchedulesPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Webhook 回调 URL（可选）</Label>
+              <Label>{t('schedules.webhookUrl')}</Label>
               <Input
                 value={form.webhook_url}
                 onChange={(e) => setForm((f) => ({ ...f, webhook_url: e.target.value }))}
                 placeholder="https://your-server.com/webhook"
               />
               <p className="text-[11px] text-muted-foreground">
-                执行完成后 POST 结果到此地址：{'{ workflowId, status, outputs, error }'}
+                {t('schedules.webhookHint')}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -398,16 +398,16 @@ export default function WorkflowSchedulesPage() {
                 checked={form.enabled}
                 onCheckedChange={(v) => setForm((f) => ({ ...f, enabled: v }))}
               />
-              <span className="text-sm">启用</span>
+              <span className="text-sm">{t('schedules.enabled')}</span>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              取消
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
-              保存
+              {t('common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>
