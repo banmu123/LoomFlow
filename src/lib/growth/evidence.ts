@@ -1,43 +1,24 @@
 import { supabase } from '@/lib/supabase/server';
 
 // ===== Evidence Service =====
+// 类型/常量/纯函数见 evidence-shared.ts（client 组件复用）
 // 成长证据全部从现有系统真实行为推导（不依赖 AI 判断，不新增事件表）：
 //   workflow_history / flow_runs / workflow_versions / scheduled_runs / workflow_notes
 // 各模块不得直接修改 Capability——状态变更统一走 Growth Engine（engine.ts）。
 
-export type EvidenceSource =
-  | 'workflow_created' // 保存过工作流
-  | 'workflow_generated' // AI 生成过工作流（带 conversation 关联）
-  | 'workflow_edited' // 工作流产生过版本（v2+）
-  | 'workflow_executed' // 执行过工作流（含失败）
-  | 'workflow_executed_success' // 成功执行过
-  | 'api_published' // 发布过 API
-  | 'schedule_created' // 创建过定时任务
-  | 'practice_completed' // 成功完成过练习（单节点/整体成功执行）
-  | 'notes' // 写过 Brew Notes
+import {
+  EVIDENCE_SOURCES,
+  emptyEvidence,
+  evidenceRuleLabel,
+} from './evidence-shared';
+import type { EvidenceRule, EvidenceSummary, EvidenceSource } from './evidence-shared';
 
-export const EVIDENCE_SOURCES: EvidenceSource[] = [
-  'workflow_created',
-  'workflow_generated',
-  'workflow_edited',
-  'workflow_executed',
-  'workflow_executed_success',
-  'api_published',
-  'schedule_created',
-  'practice_completed',
-  'notes',
-];
-
-export interface EvidenceRule {
-  source: EvidenceSource;
-  threshold: number;
-}
-
-export type EvidenceSummary = Record<EvidenceSource, number>;
-
-export function emptyEvidence(): EvidenceSummary {
-  return Object.fromEntries(EVIDENCE_SOURCES.map((s) => [s, 0])) as EvidenceSummary;
-}
+export {
+  EVIDENCE_SOURCES,
+  emptyEvidence,
+  evidenceRuleLabel,
+};
+export type { EvidenceRule, EvidenceSummary, EvidenceSource } from './evidence-shared';
 
 /** 从现有表聚合用户全部行为证据（一次并行查询） */
 export async function collectEvidence(userId: string): Promise<EvidenceSummary> {
@@ -82,9 +63,4 @@ export async function collectEvidence(userId: string): Promise<EvidenceSummary> 
     // 任一数据源失败不阻断（返回已统计部分）
   }
   return summary;
-}
-
-/** 证据规则 → 可读文本（i18n key 由前端映射） */
-export function evidenceRuleLabel(rule: EvidenceRule): string {
-  return `${rule.source}:${rule.threshold}`;
 }

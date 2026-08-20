@@ -1,19 +1,21 @@
 import { supabase } from '@/lib/supabase/server';
 
 // ===== Milestone：真实行为首次达成的里程碑（非 XP）=====
+// 类型/常量见 milestones-shared.ts（client 组件复用）
 // 从现有数据推导（workflow_history / flow_runs / scheduled_runs / workflow_notes），
 // 幂等奖励：UNIQUE(user_id, type)，每次 check 只插入缺失的。
 
-export const MILESTONE_TYPES = [
-  'first_brew',
-  'first_recipe',
-  'ai_creator',
-  'workflow_builder',
-  'debugger',
-  'automator',
-] as const;
+import {
+  MILESTONE_TYPES,
+  MILESTONE_LABEL_KEY,
+} from './milestones-shared';
+import type { MilestoneType } from './milestones-shared';
 
-export type MilestoneType = (typeof MILESTONE_TYPES)[number];
+export {
+  MILESTONE_TYPES,
+  MILESTONE_LABEL_KEY,
+};
+export type { MilestoneType } from './milestones-shared';
 
 export interface Milestone {
   id: string;
@@ -24,15 +26,6 @@ export interface Milestone {
   ref_evidence: string | null;
   created_at: string;
 }
-
-export const MILESTONE_LABEL_KEY: Record<MilestoneType, string> = {
-  first_brew: 'growth.milestoneFirstBrew',
-  first_recipe: 'growth.milestoneFirstRecipe',
-  ai_creator: 'growth.milestoneAiCreator',
-  workflow_builder: 'growth.milestoneWorkflowBuilder',
-  debugger: 'growth.milestoneDebugger',
-  automator: 'growth.milestoneAutomator',
-};
 
 /** 判定输入（从现有数据推导的真实行为） */
 export interface MilestoneContext {

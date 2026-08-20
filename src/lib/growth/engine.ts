@@ -1,5 +1,5 @@
 import type { Capability, CapabilityStatus } from './types';
-import type { EvidenceRule, EvidenceSummary } from './evidence';
+import type { EvidenceRule, EvidenceSummary } from './evidence-shared';
 
 // ===== Growth Engine =====
 // 纯函数模块：Evidence → Capability Progress → Status（可被 client 组件安全引用）

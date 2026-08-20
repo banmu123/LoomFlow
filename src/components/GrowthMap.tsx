@@ -16,7 +16,7 @@ import {
 import type { Journey, Capability } from '@/lib/growth/types';
 import { CAPABILITY_STATUSES } from '@/lib/growth/types';
 import { getEvidenceRule } from '@/lib/growth/engine';
-import type { EvidenceSource } from '@/lib/growth/evidence';
+import type { EvidenceSource } from '@/lib/growth/evidence-shared';
 
 // ===== Growth Map：Journey 可视化路线图 =====
 // 纵向节点链（Goal → 阶段 → 阶段 → …），点击节点查看详情/推进状态

@@ -19,8 +19,8 @@ import {
 } from '@/components/ui/dialog';
 import type { Goal, Journey, Capability } from '@/lib/growth/types';
 import { GrowthMap } from '@/components/GrowthMap';
-import { MILESTONE_TYPES } from '@/lib/growth/milestones';
-import type { MilestoneType } from '@/lib/growth/milestones';
+import { MILESTONE_TYPES } from '@/lib/growth/milestones-shared';
+import type { MilestoneType } from '@/lib/growth/milestones-shared';
 
 // ===== Growth System：Goal & Journey 基础管理 =====
 
