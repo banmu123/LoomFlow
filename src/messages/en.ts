@@ -288,6 +288,8 @@ export const en: ZhMessages = {
     canvasEmpty: 'No nodes on canvas yet. Add from the library above.',
     assistant: 'AI Assistant',
     assistantHint: 'Describe what you want to change in the current workflow, e.g. "add an LLM summarize node after the search results" or "switch the Excel output to upload to OSS". The AI analyzes the current canvas and suggests changes; when a modification is needed it outputs a complete workflow JSON you can apply.',
+    debugRun: '🔍 Analyze the latest run failure',
+    debugRunPrompt: 'Analyze why the most recent run of this workflow failed or misbehaved. Identify the failed node, the error, and where it got stuck, then give fixable recommendations.',
     assistantPlaceholder: 'Describe your change request…',
     assistantApply: 'Apply changes to canvas',
     assistantApplied: 'Applied to canvas',

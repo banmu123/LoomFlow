@@ -31,11 +31,16 @@ describe('summarizeCanvas 画布数据摘要', () => {
 });
 
 describe('buildSystemPrompt 系统提示词', () => {
-  it('画布数据注入到提示词中', () => {
-    const prompt = buildSystemPrompt({ nodes: [{ id: 'n1', type: 'llmNode' }], edges: [] });
+  it('画布数据与运行摘要注入到提示词中', async () => {
+    const prompt = await buildSystemPrompt(
+      { nodes: [{ id: 'n1', type: 'llmNode' }], edges: [] },
+      '- Run #abc | 状态: failed | 节点 HTTP: failed, 错误: ETIMEDOUT',
+    );
     expect(prompt).toContain('llmNode');
     expect(prompt).toContain('excelNode'); // 节点类型说明包含 excel
+    expect(prompt).toContain('ETIMEDOUT'); // 运行摘要注入
     expect(prompt).not.toContain('{cCanvas}'); // 占位符已被替换
+    expect(prompt).not.toContain('{cRuns}');
   });
 });
 

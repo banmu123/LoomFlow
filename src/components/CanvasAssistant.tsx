@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import type { UIMessage } from 'ai';
-import { Bot, CheckCircle2, Wand2, Loader2 } from 'lucide-react';
+import { Bot, CheckCircle2, Wand2, Loader2, Bug } from 'lucide-react';
 import { useT } from '@/lib/i18n';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -46,6 +46,7 @@ export function CanvasAssistant({
   onClose,
   getCanvasData,
   onApplyWorkflow,
+  workflowId,
 }: {
   open: boolean;
   onClose: () => void;
@@ -53,13 +54,15 @@ export function CanvasAssistant({
   getCanvasData: () => unknown;
   /** 应用 AI 返回的工作流 JSON 到画布 */
   onApplyWorkflow: (data: { nodes: unknown[]; edges: unknown[]; [key: string]: unknown }) => void;
+  /** 当前工作流 id（Debug 分析按工作流过滤运行历史） */
+  workflowId?: string | null;
 }) {
   const t = useT();
 
   const { messages, sendMessage, status, stop } = useChat({
     transport: new DefaultChatTransport({
       api: '/api/canvas-assistant',
-      // 发送请求时注入最新画布数据/图片/模型（transport 随渲染重建，闭包始终是最新 state）
+      // 发送请求时注入最新画布数据/图片/模型/工作流 id（transport 随渲染重建，闭包始终是最新 state）
       prepareSendMessagesRequest: (options) => ({
         ...options,
         body: {
@@ -67,6 +70,7 @@ export function CanvasAssistant({
           canvasData: getCanvasData(),
           images: images.map((img) => img.url),
           model,
+          workflowId,
         },
       }),
     }),
@@ -135,6 +139,14 @@ export function CanvasAssistant({
   const extracted = lastAssistantText ? extractWorkflowJson(lastAssistantText) : null;
   const busy = status === 'streaming' || status === 'submitted';
 
+  // Debug 快捷按钮：分析最近运行失败（配合后端注入的运行历史摘要）
+  const debugAnalyze = () => {
+    if (busy) return;
+    setAppliedKey('');
+    setInput('');
+    sendMessage({ text: t('canvas.debugRunPrompt') });
+  };
+
   const handleApply = () => {
     if (!extracted) return;
     try {
@@ -169,12 +181,20 @@ export function CanvasAssistant({
               <p className="rounded-md border border-border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
                 {t('canvas.assistantHint')}
               </p>
+              {workflowId && (
+                <button
+                  onClick={debugAnalyze}
+                  className="flex w-full items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-left text-xs text-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                >
+                  <Bug className="h-3.5 w-3.5 shrink-0 text-[#b77945]" />
+                  {t('canvas.debugRun')}
+                </button>
+              )}
             </div>
           )}
           {messages.map((msg, idx) => {
             const text = getMessageText(msg);
             const isLast = idx === messages.length - 1;
-            const busy = status === 'streaming' || status === 'submitted';
             const msgStatus = msg.role === 'assistant' && isLast && busy ? 'streaming' : 'done';
             return (
               <SimpleChatMessage

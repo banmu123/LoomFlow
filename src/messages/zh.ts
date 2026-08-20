@@ -282,6 +282,8 @@ export const zh = {
     canvasEmpty: '画布暂无节点，从上方节点库添加',
     assistant: 'AI 助手',
     assistantHint: '描述你想对当前工作流做的修改，例如「给搜索结果加一个 LLM 总结节点」「把 Excel 输出改成上传 OSS」。AI 会结合当前画布数据分析并给出建议；需要修改时会输出可应用的完整工作流 JSON。',
+    debugRun: '🔍 分析最近运行失败',
+    debugRunPrompt: '请分析这个工作流最近一次运行失败（或异常）的原因，指出失败节点、错误信息与卡点，并给出修复建议。',
     assistantPlaceholder: '描述你的修改需求…',
     assistantApply: '应用修改到画布',
     assistantApplied: '已应用到画布',

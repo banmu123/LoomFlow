@@ -4,6 +4,7 @@ import type { ModelMessage } from 'ai';
 import { getCurrentUser } from '@/lib/server-auth';
 import { getProviderClientForModel } from '@/lib/ai';
 import { getAllModels } from '@/lib/ai/db-models';
+import { buildRunsSummaryText } from '@/lib/flow-runs-summary';
 
 export const runtime = 'nodejs';
 
@@ -42,11 +43,28 @@ const SYSTEM_PROMPT = `你是 LoomFlow 画布中的 AI 工作流助手，协助�
 3. 只改用户要求的部分：保持已有节点 id 不变；新增节点用新的 id（如 node_ai_1）；删除/合并节点时同步修正 edges 引用
 4. **配置字段**：llmNode 用 llmId（模型 ID）/systemPrompt/userPrompt/temperature；searchEngineNode 用 engine（搜索服务名）/keyword/limit；excelNode 用 sheetName/fileName/outputType（数据来自上游 parameters）
 5. 用户只提问不要求修改时，直接分析回答（结构、问题、优化建议），不要输出 JSON
-6. 回复使用用户的语言`;
+6. 回复使用用户的语言
 
-/** 组装系统提示词（画布数据注入） */
-export function buildSystemPrompt(canvasData: unknown): string {
-  return SYSTEM_PROMPT.replace('{cCanvas}', summarizeCanvas(canvasData));
+## 最近运行记录（Debug 数据源）
+
+{cRuns}
+
+## Debug 分析规则
+
+当用户问"为什么失败/报错/超时/排查"等调试问题时：
+1. **优先依据上面的运行记录**分析：失败节点、耗时（卡住=耗时长的节点）、具体错误信息
+2. 指出失败原因 + 给出可执行的修复建议（如"检查搜索服务连接测试""模型配置是否正确"）
+3. 如果记录里有多次失败，指出失败频率/趋势（如"最近 5 次运行中该节点 4 次失败"）
+4. 运行记录不完整时如实说明，不要编造`;
+
+/** 组装系统提示词（画布数据 + 最近运行摘要注入） */
+export async function buildSystemPrompt(
+  canvasData: unknown,
+  runsSummary: string,
+): Promise<string> {
+  return SYSTEM_PROMPT
+    .replace('{cCanvas}', summarizeCanvas(canvasData))
+    .replace('{cRuns}', runsSummary);
 }
 
 export async function POST(request: NextRequest) {
@@ -60,6 +78,7 @@ export async function POST(request: NextRequest) {
   const canvasData = body?.canvasData;
   const images = Array.isArray(body?.images) ? (body.images as string[]) : [];
   const requestedModel = body?.model as string | undefined;
+  const workflowId = body?.workflowId as string | null | undefined;
 
   if (!rawMessages || !Array.isArray(rawMessages) || rawMessages.length === 0) {
     return Response.json({ error: 'messages 参数缺失' }, { status: 400 });
@@ -117,7 +136,11 @@ export async function POST(request: NextRequest) {
 
   const result = streamText({
     model: provider(modelId),
-    system: buildSystemPrompt(canvasData),
+    // Debug Assistant：注入最近运行摘要（当前工作流或最近画布运行）
+    system: await buildSystemPrompt(
+      canvasData,
+      await buildRunsSummaryText(user.id, workflowId, 5),
+    ),
     messages: promptMessages,
     temperature: 0.6,
     maxOutputTokens: 4096,

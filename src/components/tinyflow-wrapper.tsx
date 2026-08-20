@@ -1335,11 +1335,12 @@ export default function TinyflowWrapper() {
           className="h-full min-h-0 min-w-0 flex-1 [&_.tf-node-wrapper-title]:hidden"
         />
 
-        {/* AI 助手面板（协助分析/修改工作流） */}
+        {/* AI 助手面板（协助分析/修改工作流 + Debug 运行失败） */}
         <CanvasAssistant
           open={assistantOpen}
           onClose={() => setAssistantOpen(false)}
           getCanvasData={() => instanceRef.current?.getData()}
+          workflowId={currentWorkflowId}
           onApplyWorkflow={(data) => {
             instanceRef.current?.setData(data as never);
           }}
