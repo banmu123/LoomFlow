@@ -286,6 +286,12 @@ export const zh = {
     assistantApply: '应用修改到画布',
     assistantApplied: '已应用到画布',
     assistantEnter: 'Enter 发送',
+    nodeRun: '运行节点',
+    nodeRunTitle: '运行节点',
+    nodeRunHint: '仅执行该节点（不运行整个工作流），输入参数可在此调整',
+    nodeRunInput: '输入参数（JSON）',
+    nodeRunOutput: '运行结果',
+    nodeRunNotApplicable: '该节点不适用于单节点运行',
   },
   history: {
     title: '执行历史',

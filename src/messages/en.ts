@@ -292,6 +292,12 @@ export const en: ZhMessages = {
     assistantApply: 'Apply changes to canvas',
     assistantApplied: 'Applied to canvas',
     assistantEnter: 'Enter to send',
+    nodeRun: 'Run Node',
+    nodeRunTitle: 'Run Node',
+    nodeRunHint: 'Executes only this node (not the whole workflow). Adjust input parameters here.',
+    nodeRunInput: 'Input (JSON)',
+    nodeRunOutput: 'Result',
+    nodeRunNotApplicable: 'This node type is not applicable for single-node run',
   },
   history: {
     title: 'Execution History',

@@ -221,17 +221,23 @@ export default function TinyflowWrapper() {
     toast.success(t('canvas.configSaved'));
   };
 
+  // 单节点运行：构建默认输入（节点参数 defaultValue；ref 参数无上游时用默认值）
+
+  // ===== 删除节点 =====
   // 删除画布节点
-  const handleRemoveNode = (nodeId: string) => {
-    const data = instanceRef.current?.getData() as TinyflowData | undefined;
-    if (!data) return;
-    instanceRef.current?.setData({
-      ...data,
-      nodes: data.nodes.filter((n) => n.id !== nodeId),
-      edges: data.edges.filter((e) => e.source !== nodeId && e.target !== nodeId),
-    });
-    toast.success(t('canvas.nodeDeleted'));
-  };
+  const handleRemoveNode = useCallback(
+    (nodeId: string) => {
+      const data = instanceRef.current?.getData() as TinyflowData | undefined;
+      if (!data) return;
+      instanceRef.current?.setData({
+        ...data,
+        nodes: data.nodes.filter((n) => n.id !== nodeId),
+        edges: data.edges.filter((e) => e.source !== nodeId && e.target !== nodeId),
+      });
+      toast.success(t('canvas.nodeDeleted'));
+    },
+    [t],
+  );
 
   // 启用/禁用节点类型（Tinyflow 库面板按 hiddenNodes 隐藏）
   const toggleNodeType = (type: string, enabled: boolean) => {
@@ -262,6 +268,55 @@ export default function TinyflowWrapper() {
   const [flowJsonText, setFlowJsonText] = useState('');
   // 画布 AI 助手面板
   const [assistantOpen, setAssistantOpen] = useState(false);
+  // 单节点运行对话框
+  const [nodeRunTarget, setNodeRunTarget] = useState<FlowNode | null>(null);
+  const [nodeRunInputs, setNodeRunInputs] = useState('{}');
+  const [nodeRunResult, setNodeRunResult] = useState<unknown>(null);
+  const [nodeRunError, setNodeRunError] = useState<string | null>(null);
+  const [nodeRunLoading, setNodeRunLoading] = useState(false);
+  const openNodeRun = useCallback((node: FlowNode) => {
+    const params = (Array.isArray(node.data.parameters) ? node.data.parameters : []) as Parameter[];
+    const defaults: Record<string, unknown> = {};
+    for (const p of params) {
+      const key = p.name || p.id;
+      if (key && p.defaultValue !== undefined) defaults[key] = p.defaultValue;
+    }
+    setNodeRunTarget(node);
+    setNodeRunInputs(JSON.stringify(defaults, null, 2));
+    setNodeRunResult(null);
+    setNodeRunError(null);
+  }, []);
+
+  const handleNodeRun = useCallback(async () => {
+    if (!nodeRunTarget || nodeRunLoading) return;
+    let inputs: Record<string, unknown>;
+    try {
+      inputs = JSON.parse(nodeRunInputs || '{}');
+    } catch {
+      setNodeRunError(t('canvas.jsonParseError'));
+      return;
+    }
+    setNodeRunLoading(true);
+    setNodeRunError(null);
+    setNodeRunResult(null);
+    try {
+      const res = await fetch('/api/flow/execute-node', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ node: nodeRunTarget, inputs }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setNodeRunError(data?.error || t('canvas.executeFailed'));
+        return;
+      }
+      setNodeRunResult(data.result);
+    } catch {
+      setNodeRunError(t('canvas.networkError'));
+    } finally {
+      setNodeRunLoading(false);
+    }
+  }, [nodeRunTarget, nodeRunLoading, nodeRunInputs, t]);
 
   // ===== Init Tinyflow =====
   useEffect(() => {
@@ -365,6 +420,16 @@ export default function TinyflowWrapper() {
         customNodes: customNodeMap,
         // 节点库启用控制：隐藏未启用的节点类型（勾选后才在面板显示）
         hiddenNodes: () => [...enabledTypesRef.current],
+        // 节点工具栏「运行」按钮：单节点运行（不执行整个工作流）
+        onNodeExecute: (node: unknown) => {
+          const n = node as FlowNode;
+          if (!n?.id || !n?.type) return;
+          if (n.type === 'startNode' || n.type === 'endNode') {
+            toast.error(t('canvas.nodeRunNotApplicable'));
+            return;
+          }
+          openNodeRun(n);
+        },
         onDataChange: (data) => {
           // 数据变化时触发重新计算 startParams
           console.log('Tinyflow data changed:', data);
@@ -1582,6 +1647,65 @@ export default function TinyflowWrapper() {
         initialData={configTarget?.data ?? {}}
         onSave={handleSaveNodeConfig}
       />
+
+      {/* 单节点运行对话框 */}
+      <Dialog open={!!nodeRunTarget} onOpenChange={(open) => !open && setNodeRunTarget(null)}>
+        <DialogContent className="z-[1200] max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t('canvas.nodeRunTitle')}</DialogTitle>
+            <DialogDescription>
+              {nodeRunTarget && (
+                <span>
+                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                    {String((nodeRunTarget.data as Record<string, unknown>).title || nodeRunTarget.type)}
+                  </code>
+                  <span className="ml-2 text-xs text-muted-foreground">{nodeRunTarget.type}</span>
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="rounded-md bg-muted/40 p-2 text-[11px] text-muted-foreground">
+              {t('canvas.nodeRunHint')}
+            </p>
+            <div className="space-y-1.5">
+              <Label className="text-xs">{t('canvas.nodeRunInput')}</Label>
+              <Textarea
+                value={nodeRunInputs}
+                onChange={(e) => setNodeRunInputs(e.target.value)}
+                rows={5}
+                className="font-mono text-xs"
+              />
+            </div>
+            {nodeRunError && (
+              <div className="rounded-md border border-red-300 bg-red-50 p-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+                {nodeRunError}
+              </div>
+            )}
+            {nodeRunResult !== null && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">{t('canvas.nodeRunOutput')}</Label>
+                <pre className="max-h-60 overflow-y-auto whitespace-pre-wrap break-all rounded bg-muted p-2 text-xs">
+                  {JSON.stringify(nodeRunResult, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNodeRunTarget(null)}>
+              {t('common.close')}
+            </Button>
+            <Button onClick={handleNodeRun} disabled={nodeRunLoading}>
+              {nodeRunLoading ? (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="mr-1 h-4 w-4" />
+              )}
+              {t('canvas.nodeRun')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!confirmReq} onOpenChange={(open) => !open && !running && setConfirmReq(null)}>
         <DialogContent className="z-[1200]">
