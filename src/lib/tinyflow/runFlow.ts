@@ -55,6 +55,8 @@ export async function saveFlowRun(
     outputs?: Record<string, unknown> | null;
     events?: Array<{ type: string; data: unknown; timestamp: number }> | null;
     error?: string | null;
+    /** 画布数据快照（历史回看 trace 时映射节点名） */
+    flowData?: unknown | null;
   },
 ): Promise<void> {
   try {
@@ -68,6 +70,7 @@ export async function saveFlowRun(
       outputs: data.outputs ?? null,
       events: data.events ?? null,
       error: data.error ?? null,
+      flow_data: data.flowData ?? null,
     };
 
     if (exists.data) {
@@ -84,6 +87,7 @@ export async function saveFlowRun(
       if (data.outputs !== undefined) patch.outputs = data.outputs;
       if (data.events !== undefined) patch.events = data.events;
       if (data.error !== undefined) patch.error = data.error;
+      if (data.flowData !== undefined) patch.flow_data = data.flowData;
       await supabase.from('flow_runs').update(patch).eq('id', flowId);
     } else {
       await supabase.from('flow_runs').insert({ id: flowId, ...row });
@@ -147,6 +151,7 @@ export async function runFlow(
     source: options.source,
     status: 'running',
     inputs,
+    flowData: flowData,
   });
 
   try {

@@ -94,13 +94,16 @@ export class LLMExecutor extends BaseExecutor {
       }
     }
 
-        const { text } = await generateText({
+        const { text, usage } = await generateText({
       model: provider(modelId),
       messages,
       system: systemPrompt || undefined,
       temperature,
       maxOutputTokens: Number(data.maxTokens) || 8192,
     });
+
+    // tokens 随输出附带（节点级 trace 展示 + 下游可引用）
+    const tokens = usage?.totalTokens ?? 0;
 
     if (outType === 'json') {
       let jsonResult: unknown = {};
@@ -109,9 +112,9 @@ export class LLMExecutor extends BaseExecutor {
       } catch {
         jsonResult = text;
       }
-      return { root: jsonResult, output: text };
+      return { root: jsonResult, output: text, tokens };
     }
 
-    return { output: text };
+    return { output: text, tokens };
   }
 }

@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { useT } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { FlowTraceView } from '@/components/FlowTraceView';
 import {
   Dialog,
   DialogContent,
@@ -33,6 +34,11 @@ interface FlowRun {
   created_at: string;
 }
 
+interface FlowRunDetail extends FlowRun {
+  events: Array<{ type: string; data: unknown; timestamp: number }> | null;
+  flow_data: { nodes?: Array<{ id: string; type: string; data?: Record<string, unknown> }> } | null;
+}
+
 const STATUS_LABELS: Record<string, string> = {
   running: '执行中',
   completed: '成功',
@@ -57,6 +63,25 @@ export default function WorkflowHistoryPage() {
   const [runs, setRuns] = useState<FlowRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<FlowRun | null>(null);
+  const [detailData, setDetailData] = useState<FlowRunDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  // 查看详情：拉取节点级 trace（events + flow_data 快照）
+  const openDetail = useCallback(async (run: FlowRun) => {
+    setDetail(run);
+    setDetailData(null);
+    setDetailLoading(true);
+    try {
+      const res = await fetch(`/api/flow-runs/${run.id}`);
+      const data = await res.json();
+      if (res.ok) setDetailData(data as FlowRunDetail);
+      else toast.error(data?.error || '加载详情失败');
+    } catch {
+      toast.error(t('errors.networkError'));
+    } finally {
+      setDetailLoading(false);
+    }
+  }, [t]);
 
   const loadRuns = useCallback(async () => {
     setLoading(true);
@@ -151,7 +176,7 @@ export default function WorkflowHistoryPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <button
-                        onClick={() => setDetail(run)}
+                        onClick={() => openDetail(run)}
                         className="text-xs text-primary hover:underline"
                       >
                         {t('history.viewDetail')}
@@ -190,6 +215,25 @@ export default function WorkflowHistoryPage() {
                 {detail.error}
               </div>
             )}
+
+            {/* 节点级执行追踪 */}
+            {detailLoading ? (
+              <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {t('common.loading')}
+              </div>
+            ) : detailData?.events && detailData.events.length > 0 ? (
+              <div className="space-y-1.5">
+                <h4 className="text-sm font-medium">{t('canvas.traceTitle')}</h4>
+                <div className="rounded-md border border-border p-3">
+                  <FlowTraceView
+                    events={detailData.events as never}
+                    flowData={detailData.flow_data}
+                    flowStatus={detailData.status}
+                  />
+                </div>
+              </div>
+            ) : null}
 
             <div className="space-y-1.5">
               <h4 className="text-sm font-medium">{t('history.inputs')}</h4>

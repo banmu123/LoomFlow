@@ -235,3 +235,9 @@ UPDATE user_api_keys
 
 -- 33. 迁移完成后刷新 PostgREST schema 缓存
 NOTIFY pgrst, 'reload schema';
+
+-- 34. 执行记录保存画布数据快照（历史回看节点级 trace 时映射 nodeId → 节点名/类型）
+ALTER TABLE flow_runs ADD COLUMN IF NOT EXISTS flow_data JSONB;
+
+-- 35. 迁移完成后刷新 PostgREST schema 缓存
+NOTIFY pgrst, 'reload schema';

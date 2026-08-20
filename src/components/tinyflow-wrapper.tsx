@@ -48,6 +48,7 @@ import { formatVersion } from '@/lib/version';
 import { uploadFileToOSS } from '@/lib/oss-upload-client';
 import { NodeConfigPanel } from '@/components/NodeConfigPanel';
 import { CanvasAssistant } from '@/components/CanvasAssistant';
+import { FlowTraceView } from '@/components/FlowTraceView';
 import { getConfigDefaults, mergeConfig } from '@/lib/tinyflow/node-config';
 import type { NodeDefinition } from '@/lib/tinyflow/node-definition';
 
@@ -139,6 +140,8 @@ export default function TinyflowWrapper() {
   const [confirmReq, setConfirmReq] = useState<ConfirmRequest | null>(null);
   const [confirmData, setConfirmData] = useState<Record<string, string>>({});
   const [showResults, setShowResults] = useState(false);
+  // 执行时的画布数据快照（节点级 trace 的节点名映射）
+  const [flowDataSnapshot, setFlowDataSnapshot] = useState<TinyflowData | null>(null);
 
   // 节点库
   const [nodesOpen, setNodesOpen] = useState(false);
@@ -763,6 +766,7 @@ export default function TinyflowWrapper() {
     setShowResults(true);
 
     const flowData = instanceRef.current.getData() as TinyflowData;
+    setFlowDataSnapshot(flowData);
 
     try {
       const response = await fetch('/api/flow/execute', {
@@ -1346,50 +1350,19 @@ export default function TinyflowWrapper() {
           <div className="h-full min-h-0 w-80 shrink-0 border-l border-border bg-background xl:w-96">
             <ScrollArea className="h-full">
               <div className="space-y-3 p-4">
-                <h3 className="text-sm font-semibold">{t('workflows.executionLog')}</h3>
+                <h3 className="text-sm font-semibold">{t('canvas.traceTitle')}</h3>
 
                 {events.length === 0 && !error && !result && (
                   <p className="text-sm text-muted-foreground">{t('workflows.noExecutionRecords')}</p>
                 )}
 
-                {events.map((event, idx) => (
-                  <div
-                    key={idx}
-                    className="min-w-0 rounded-md border border-border p-3 text-sm"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="min-w-0 break-all font-medium">{event.type}</span>
-                      <span className="shrink-0 text-xs text-muted-foreground">
-                        {formatTime(event.timestamp)}
-                      </span>
-                    </div>
-                    {event.data.nodeId && (
-                      <div className="mt-1 flex items-center gap-2">
-                        {renderNodeStatus(event.data.status)}
-                        <span className="break-all text-xs text-muted-foreground">
-                          {event.data.nodeId}
-                        </span>
-                        {event.data.duration != null && (
-                          <span className="shrink-0 text-xs text-muted-foreground">
-                            {event.data.duration}ms
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    {event.data.error && (
-                      <p className="mt-1 break-all text-xs text-red-500">
-                        {event.data.error}
-                      </p>
-                    )}
-                    {event.data.outputs &&
-                      typeof event.data.outputs === 'object' &&
-                      Object.keys(event.data.outputs).length > 0 && (
-                        <pre className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap break-all rounded bg-muted p-2 text-xs">
-                          {JSON.stringify(event.data.outputs, null, 2)}
-                        </pre>
-                      )}
-                  </div>
-                ))}
+                {events.length > 0 && (
+                  <FlowTraceView
+                    events={events as never}
+                    flowData={flowDataSnapshot}
+                    flowStatus={running ? 'running' : result ? 'completed' : error ? 'failed' : undefined}
+                  />
+                )}
 
                 {error && (
                   <div className="min-w-0 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
