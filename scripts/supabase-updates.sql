@@ -263,3 +263,66 @@ END $$;
 
 -- 36. 迁移完成后刷新 PostgREST schema 缓存
 NOTIFY pgrst, 'reload schema';
+
+-- 37. Growth System：成长目标（Goal）
+CREATE TABLE IF NOT EXISTS goals (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title       TEXT NOT NULL,
+  description TEXT,
+  status      TEXT NOT NULL DEFAULT 'active',  -- active / paused / done
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_goals_user ON goals(user_id);
+
+-- 38. Growth System：学习路径（Journey，属于 Goal）
+CREATE TABLE IF NOT EXISTS journeys (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  goal_id     UUID NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title       TEXT NOT NULL,
+  description TEXT,
+  status      TEXT NOT NULL DEFAULT 'active',  -- active / archived
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_journeys_goal ON journeys(goal_id);
+CREATE INDEX IF NOT EXISTS idx_journeys_user ON journeys(user_id);
+
+-- 39. Growth System：路径阶段（Journey Capability）
+CREATE TABLE IF NOT EXISTS journey_capabilities (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  journey_id    UUID NOT NULL REFERENCES journeys(id) ON DELETE CASCADE,
+  user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title         TEXT NOT NULL,
+  description   TEXT,
+  "order"       INTEGER NOT NULL DEFAULT 0,
+  status        TEXT NOT NULL DEFAULT 'locked', -- locked / exploring / developing / mastered
+  prerequisites JSONB NOT NULL DEFAULT '[]',    -- 前置能力（title 列表）
+  metadata      JSONB NOT NULL DEFAULT '{}',
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_capabilities_journey ON journey_capabilities(journey_id, "order");
+CREATE INDEX IF NOT EXISTS idx_capabilities_user ON journey_capabilities(user_id);
+
+-- 40. Growth 表 RLS + 权限（GRANT 由第 30 节每轮执行覆盖）
+ALTER TABLE goals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE journeys ENABLE ROW LEVEL SECURITY;
+ALTER TABLE journey_capabilities ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_policies WHERE policyname = 'Allow all on goals' AND tablename = 'goals') THEN
+    CREATE POLICY "Allow all on goals" ON goals FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT FROM pg_policies WHERE policyname = 'Allow all on journeys' AND tablename = 'journeys') THEN
+    CREATE POLICY "Allow all on journeys" ON journeys FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT FROM pg_policies WHERE policyname = 'Allow all on journey_capabilities' AND tablename = 'journey_capabilities') THEN
+    CREATE POLICY "Allow all on journey_capabilities" ON journey_capabilities FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+
+-- 41. 迁移完成后刷新 PostgREST schema 缓存
+NOTIFY pgrst, 'reload schema';

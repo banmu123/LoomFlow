@@ -17,6 +17,7 @@ import {
   KeyRound,
   Library,
   CloudCog,
+  Sprout,
   MessageSquare,
   ChevronDown,
   ChevronRight,
@@ -54,6 +55,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/workflows/api-keys', labelKey: 'sidebar.apiKeys', icon: KeyRound },
   { href: '/workflows/custom-nodes', labelKey: 'sidebar.customNodes', icon: Boxes },
   { href: '/knowledge', labelKey: 'sidebar.knowledge', icon: Library },
+  { href: '/growth', labelKey: 'sidebar.growth', icon: Sprout },
 ];
 
 const ADMIN_ITEMS: NavItem[] = [
