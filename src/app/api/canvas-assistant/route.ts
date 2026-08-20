@@ -5,6 +5,7 @@ import { getCurrentUser } from '@/lib/server-auth';
 import { getProviderClientForModel } from '@/lib/ai';
 import { getAllModels } from '@/lib/ai/db-models';
 import { buildRunsSummaryText } from '@/lib/flow-runs-summary';
+import { listWorkflowNotes, notesToPromptText } from '@/lib/workflow-notes';
 
 export const runtime = 'nodejs';
 
@@ -49,22 +50,32 @@ const SYSTEM_PROMPT = `你是 LoomFlow 画布中的 AI 工作流助手，协助�
 
 {cRuns}
 
+## 工作流笔记（Brew Notes）
+
+{cNotes}
+
 ## Debug 分析规则
 
 当用户问"为什么失败/报错/超时/排查"等调试问题时：
 1. **优先依据上面的运行记录**分析：失败节点、耗时（卡住=耗时长的节点）、具体错误信息
 2. 指出失败原因 + 给出可执行的修复建议（如"检查搜索服务连接测试""模型配置是否正确"）
 3. 如果记录里有多次失败，指出失败频率/趋势（如"最近 5 次运行中该节点 4 次失败"）
-4. 运行记录不完整时如实说明，不要编造`;
+4. 运行记录不完整时如实说明，不要编造
 
-/** 组装系统提示词（画布数据 + 最近运行摘要注入） */
+## 笔记引用规则
+
+用户问"为什么这样设计/为什么选 X/当时怎么想的"等设计问题时，优先依据上面的工作流笔记回答（如 "According to your notes, Exa was chosen because..."）；笔记中没有时如实说明"笔记中没有记录"。`;
+
+/** 组装系统提示词（画布数据 + 最近运行摘要 + 工作流笔记注入） */
 export async function buildSystemPrompt(
   canvasData: unknown,
   runsSummary: string,
+  notesText: string,
 ): Promise<string> {
   return SYSTEM_PROMPT
     .replace('{cCanvas}', summarizeCanvas(canvasData))
-    .replace('{cRuns}', runsSummary);
+    .replace('{cRuns}', runsSummary)
+    .replace('{cNotes}', notesText);
 }
 
 export async function POST(request: NextRequest) {
@@ -136,10 +147,13 @@ export async function POST(request: NextRequest) {
 
   const result = streamText({
     model: provider(modelId),
-    // Debug Assistant：注入最近运行摘要（当前工作流或最近画布运行）
+    // Debug Assistant + Brew Notes：注入最近运行摘要与工作流笔记
     system: await buildSystemPrompt(
       canvasData,
       await buildRunsSummaryText(user.id, workflowId, 5),
+      workflowId
+        ? notesToPromptText(await listWorkflowNotes(workflowId, user.id))
+        : '（未保存的工作流，无笔记）',
     ),
     messages: promptMessages,
     temperature: 0.6,

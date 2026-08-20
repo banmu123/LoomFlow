@@ -88,6 +88,9 @@ App, data, and storage can all be deployed on your own server. Database can be s
 ### 🧩 Extensible Node System
 `NodeRegistry` + `NodeDefinition` — a single source of truth for nodes. Custom nodes can be registered with one entry, with automated validation (executor binding, start/end singleton).
 
+### 📝 Brew Notes (Workflow Notes)
+Record **why** a workflow is designed this way — decisions, problems, solutions, optimizations and usage. AI can summarize design intent, suggest notes from run history, and the canvas AI assistant answers "why did I choose X" from your notes.
+
 ### 🧠 Bring Your Own Model
 Add **any model** (DeepSeek / Ark / any OpenAI-compatible endpoint) through the admin UI — **no code changes**:
 

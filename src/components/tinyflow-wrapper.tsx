@@ -37,7 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Play, Square, Loader2, CheckCircle2, XCircle, Clock, Settings2, ArrowLeft, Braces, Upload, Save, Boxes, History, RotateCcw, Plus, Bot } from 'lucide-react';
+import { Play, Square, Loader2, CheckCircle2, XCircle, Clock, Settings2, ArrowLeft, Braces, Upload, Save, Boxes, History, RotateCcw, Plus, Bot, NotebookPen } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useT } from '@/lib/i18n';
 import { useTinyflowLocale } from '@/lib/tinyflow-locale';
@@ -49,6 +49,7 @@ import { uploadFileToOSS } from '@/lib/oss-upload-client';
 import { NodeConfigPanel } from '@/components/NodeConfigPanel';
 import { CanvasAssistant } from '@/components/CanvasAssistant';
 import { FlowTraceView } from '@/components/FlowTraceView';
+import { BrewNotesPanel } from '@/components/BrewNotesPanel';
 import { getConfigDefaults, mergeConfig } from '@/lib/tinyflow/node-config';
 import type { NodeDefinition } from '@/lib/tinyflow/node-definition';
 
@@ -271,6 +272,8 @@ export default function TinyflowWrapper() {
   const [flowJsonText, setFlowJsonText] = useState('');
   // 画布 AI 助手面板
   const [assistantOpen, setAssistantOpen] = useState(false);
+  // Brew Notes 面板
+  const [notesOpen, setNotesOpen] = useState(false);
   // 单节点运行对话框
   const [nodeRunTarget, setNodeRunTarget] = useState<FlowNode | null>(null);
   const [nodeRunInputs, setNodeRunInputs] = useState('{}');
@@ -1277,6 +1280,17 @@ export default function TinyflowWrapper() {
         {currentWorkflowId && (
           <Button
             size="sm"
+            variant={notesOpen ? 'default' : 'outline'}
+            onClick={() => setNotesOpen((v) => !v)}
+          >
+            <NotebookPen className="mr-1 h-4 w-4" />
+            {t('canvas.notes')}
+          </Button>
+        )}
+
+        {currentWorkflowId && (
+          <Button
+            size="sm"
             variant="outline"
             onClick={() => {
               setShowVersions(true);
@@ -1345,6 +1359,16 @@ export default function TinyflowWrapper() {
             instanceRef.current?.setData(data as never);
           }}
         />
+
+        {/* Brew Notes 笔记面板 */}
+        {notesOpen && currentWorkflowId && (
+          <BrewNotesPanel
+            workflowId={currentWorkflowId}
+            workflowVersion={
+              versions.find((v) => v.is_current)?.version ?? versions[0]?.version ?? null
+            }
+          />
+        )}
 
         {/* Results panel（宽度随屏幕自适应） */}
         {showResults && (

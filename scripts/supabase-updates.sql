@@ -239,5 +239,27 @@ NOTIFY pgrst, 'reload schema';
 -- 34. 执行记录保存画布数据快照（历史回看节点级 trace 时映射 nodeId → 节点名/类型）
 ALTER TABLE flow_runs ADD COLUMN IF NOT EXISTS flow_data JSONB;
 
--- 35. 迁移完成后刷新 PostgREST schema 缓存
+-- 35. Brew Notes：工作流设计笔记（决策/问题/方案/优化/用途）
+-- Note 属于 Workflow（user 隔离），version 可选绑定（不破坏版本系统）
+CREATE TABLE IF NOT EXISTS workflow_notes (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workflow_id UUID NOT NULL REFERENCES workflow_history(id) ON DELETE CASCADE,
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  version     INTEGER,                          -- 可选：绑定的工作流版本（v{version}）
+  type        TEXT NOT NULL DEFAULT 'general', -- general/decision/problem/solution/optimization/usage
+  content     TEXT NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_workflow_notes_workflow ON workflow_notes(workflow_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_workflow_notes_user ON workflow_notes(user_id);
+ALTER TABLE workflow_notes ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_policies WHERE policyname = 'Allow all on workflow_notes' AND tablename = 'workflow_notes') THEN
+    CREATE POLICY "Allow all on workflow_notes" ON workflow_notes FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+
+-- 36. 迁移完成后刷新 PostgREST schema 缓存
 NOTIFY pgrst, 'reload schema';

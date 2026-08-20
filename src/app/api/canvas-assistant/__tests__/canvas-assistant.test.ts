@@ -31,16 +31,19 @@ describe('summarizeCanvas 画布数据摘要', () => {
 });
 
 describe('buildSystemPrompt 系统提示词', () => {
-  it('画布数据与运行摘要注入到提示词中', async () => {
+  it('画布数据、运行摘要与笔记注入到提示词中', async () => {
     const prompt = await buildSystemPrompt(
       { nodes: [{ id: 'n1', type: 'llmNode' }], edges: [] },
       '- Run #abc | 状态: failed | 节点 HTTP: failed, 错误: ETIMEDOUT',
+      '- [Decision] 选择 Exa 因为 Tavily 超时',
     );
     expect(prompt).toContain('llmNode');
     expect(prompt).toContain('excelNode'); // 节点类型说明包含 excel
     expect(prompt).toContain('ETIMEDOUT'); // 运行摘要注入
+    expect(prompt).toContain('Exa'); // 笔记注入
     expect(prompt).not.toContain('{cCanvas}'); // 占位符已被替换
     expect(prompt).not.toContain('{cRuns}');
+    expect(prompt).not.toContain('{cNotes}');
   });
 });
 
