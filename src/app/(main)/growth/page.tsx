@@ -18,16 +18,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import type { Goal, Journey, Capability } from '@/lib/growth/types';
-import { CAPABILITY_STATUSES } from '@/lib/growth/types';
+import { GrowthMap } from '@/components/GrowthMap';
 
 // ===== Growth System：Goal & Journey 基础管理 =====
-
-const CAP_STATUS_STYLE: Record<string, string> = {
-  locked: 'bg-muted text-muted-foreground',
-  exploring: 'bg-blue-500/10 text-blue-600',
-  developing: 'bg-amber-500/10 text-amber-600',
-  mastered: 'bg-green-500/10 text-green-600',
-};
 
 interface GeneratedJourneyData {
   title: string;
@@ -428,46 +421,27 @@ export default function GrowthPage() {
                         </p>
                       )}
                       {journeys.map((journey) => (
-                        <div key={journey.id} className="rounded-md border border-border p-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium">{journey.title}</p>
-                              {journey.description && (
-                                <p className="mt-0.5 text-xs text-muted-foreground">
-                                  {journey.description}
-                                </p>
-                              )}
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 text-destructive"
-                              title={t('common.delete')}
-                              onClick={() =>
-                                setDeleteTarget({ kind: 'journey', id: journey.id, title: journey.title })
-                              }
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                          <div className="mt-2 space-y-1">
-                            {journey.capabilities.map((cap, idx) => (
-                              <div
-                                key={cap.id}
-                                className="flex items-center gap-2 rounded px-2 py-1 hover:bg-muted/40"
-                              >
-                                <span className="w-4 shrink-0 text-[10px] text-muted-foreground">
-                                  {idx + 1}
-                                </span>
-                                <span className="min-w-0 flex-1 truncate text-xs">{cap.title}</span>
-                                <span
-                                  className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] ${CAP_STATUS_STYLE[cap.status] || CAP_STATUS_STYLE.locked}`}
-                                >
-                                  {t(`growth.capStatus${cap.status.charAt(0).toUpperCase()}${cap.status.slice(1)}`)}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
+                        <div key={journey.id} className="relative">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-2 top-2 z-10 h-6 w-6 text-destructive"
+                            title={t('common.delete')}
+                            onClick={() =>
+                              setDeleteTarget({ kind: 'journey', id: journey.id, title: journey.title })
+                            }
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                          <GrowthMap
+                            journey={journey}
+                            onUpdate={() => {
+                              const goalId = Object.keys(journeysByGoal).find((gid) =>
+                                journeysByGoal[gid]?.some((j) => j.id === journey.id),
+                              );
+                              if (goalId) loadJourneys(goalId);
+                            }}
+                          />
                         </div>
                       ))}
                     </div>
