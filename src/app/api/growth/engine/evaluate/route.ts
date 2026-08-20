@@ -2,7 +2,8 @@ import { NextRequest } from 'next/server';
 import { supabase } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/server-auth';
 import { collectEvidence } from '@/lib/growth/evidence';
-import { evaluateJourneyCapabilities, applyCapabilityStatus } from '@/lib/growth/engine';
+import { evaluateJourneyCapabilities } from '@/lib/growth/engine';
+import { applyCapabilityStatus } from '@/lib/growth/growth-service';
 import type { Capability } from '@/lib/growth/types';
 
 export const runtime = 'nodejs';

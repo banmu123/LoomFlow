@@ -1,12 +1,10 @@
-import { supabase } from '@/lib/supabase/server';
 import type { Capability, CapabilityStatus } from './types';
-import { isValidCapabilityStatus } from './types';
 import type { EvidenceRule, EvidenceSummary } from './evidence';
 
 // ===== Growth Engine =====
-// 唯一允许修改 Capability 状态的入口。
-// Evidence → Capability Progress → Status：
-//   rule.source 的计数达标即推进状态（阈值→mastered，半阈值→developing，有记录→exploring）
+// 纯函数模块：Evidence → Capability Progress → Status（可被 client 组件安全引用）
+// 唯一允许修改 Capability 状态的入口：applyCapabilityStatus（位于 growth-service.ts，server 侧）
+// 规则：rule.source 的计数达标即推进状态（阈值→mastered，半阈值→developing，有记录→exploring）
 // 已掌握不倒退（避免噪声误降级）。
 
 const STATUS_RANK: Record<CapabilityStatus, number> = {
@@ -59,21 +57,6 @@ export function evaluateCapability(
 }
 
 /** 统一状态写入（Growth Engine 唯一写入口） */
-export async function applyCapabilityStatus(
-  capabilityId: string,
-  userId: string,
-  status: CapabilityStatus,
-): Promise<{ error?: string }> {
-  if (!isValidCapabilityStatus(status)) return { error: '状态不合法' };
-  const { error } = await supabase
-    .from('journey_capabilities')
-    .update({ status, updated_at: new Date().toISOString() })
-    .eq('id', capabilityId)
-    .eq('user_id', userId);
-  if (error) return { error: error.message };
-  return {};
-}
-
 /** 评估整个 Journey 的所有 Capability（返回变更列表） */
 export function evaluateJourneyCapabilities(
   capabilities: Capability[],

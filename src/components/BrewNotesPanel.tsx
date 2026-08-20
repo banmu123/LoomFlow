@@ -26,8 +26,8 @@ import {
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { toast } from 'sonner';
-import { NOTE_TYPES } from '@/lib/workflow-notes';
-import type { WorkflowNote } from '@/lib/workflow-notes';
+import { NOTE_TYPES } from '@/lib/workflow-notes-shared';
+import type { WorkflowNote } from '@/lib/workflow-notes-shared';
 
 // ===== Brew Notes 面板（Workflow 设计笔记）=====
 // 挂在画布侧边：记录决策/问题/方案/优化/用途 + AI 总结 + AI 建议

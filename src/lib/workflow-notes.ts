@@ -1,43 +1,23 @@
 import { supabase } from '@/lib/supabase/server';
 
-// ===== Brew Notes：工作流设计笔记 =====
+// ===== Brew Notes：工作流设计笔记（server 服务）=====
+// 类型/常量见 workflow-notes-shared.ts（client 组件复用）
 // 记录 Workflow 为什么这样设计（决策/问题/方案/优化/用途），
 // AI 可总结设计意图、基于运行记录建议新笔记、助手可读取笔记回答问题。
 
-export const NOTE_TYPES = [
-  'general',
-  'decision',
-  'problem',
-  'solution',
-  'optimization',
-  'usage',
-] as const;
+import {
+  NOTE_TYPES,
+  isValidNoteType,
+  NOTE_TYPE_LABELS,
+} from './workflow-notes-shared';
+import type { NoteType, WorkflowNote } from './workflow-notes-shared';
 
-export type NoteType = (typeof NOTE_TYPES)[number];
-
-export interface WorkflowNote {
-  id: string;
-  workflow_id: string;
-  user_id: string;
-  version: number | null;
-  type: string;
-  content: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export const NOTE_TYPE_LABELS: Record<string, string> = {
-  general: 'General',
-  decision: 'Decision',
-  problem: 'Problem',
-  solution: 'Solution',
-  optimization: 'Optimization',
-  usage: 'Usage',
+export {
+  NOTE_TYPES,
+  isValidNoteType,
+  NOTE_TYPE_LABELS,
 };
-
-export function isValidNoteType(type: string): type is NoteType {
-  return (NOTE_TYPES as readonly string[]).includes(type);
-}
+export type { NoteType, WorkflowNote } from './workflow-notes-shared';
 
 /** 校验工作流归属（note 必须属于本人工作流） */
 export async function ensureWorkflowOwnership(

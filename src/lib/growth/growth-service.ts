@@ -316,3 +316,19 @@ export async function updateCapability(
   if (error || !data) return { error: error?.message || '更新失败' };
   return { capability: data as Capability };
 }
+
+/** 统一状态写入（Growth Engine 唯一写入口——仅供 Engine 评估流程调用） */
+export async function applyCapabilityStatus(
+  capabilityId: string,
+  userId: string,
+  status: string,
+): Promise<{ error?: string }> {
+  if (!isValidCapabilityStatus(status)) return { error: '状态不合法' };
+  const { error } = await supabase
+    .from('journey_capabilities')
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq('id', capabilityId)
+    .eq('user_id', userId);
+  if (error) return { error: error.message };
+  return {};
+}
