@@ -18,6 +18,7 @@ import {
   Library,
   CloudCog,
   Sprout,
+  FlaskConical,
   MessageSquare,
   ChevronDown,
   ChevronRight,
@@ -55,6 +56,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/workflows/api-keys', labelKey: 'sidebar.apiKeys', icon: KeyRound },
   { href: '/workflows/custom-nodes', labelKey: 'sidebar.customNodes', icon: Boxes },
   { href: '/knowledge', labelKey: 'sidebar.knowledge', icon: Library },
+  { href: '/lab', labelKey: 'sidebar.lab', icon: FlaskConical },
   { href: '/growth', labelKey: 'sidebar.growth', icon: Sprout },
 ];
 
