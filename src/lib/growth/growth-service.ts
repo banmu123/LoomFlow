@@ -165,6 +165,12 @@ export async function createJourney(
     const prerequisites = Array.isArray(c.prerequisites)
       ? c.prerequisites.map(String)
       : [];
+    // evidence_rule（AI 生成推断）持久化到 metadata，供 Growth Engine 评估
+    const rule = (c as { evidence_rule?: unknown }).evidence_rule;
+    const metadata =
+      rule && typeof rule === 'object'
+        ? { evidence_rule: rule as Record<string, unknown> }
+        : {};
     const { data: capData } = await supabase
       .from('journey_capabilities')
       .insert({
@@ -174,6 +180,7 @@ export async function createJourney(
         description,
         order: i,
         prerequisites,
+        metadata,
       })
       .select()
       .single();

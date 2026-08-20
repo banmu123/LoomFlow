@@ -1,4 +1,5 @@
 import type { Goal } from './types';
+import type { EvidenceSource, EvidenceRule } from './evidence';
 
 // ===== Growth AI 生成：提示词组装 + JSON 解析（纯函数，可单测）=====
 
@@ -11,6 +12,8 @@ export interface GeneratedCapability {
   title: string;
   description: string;
   prerequisites: string[];
+  /** 证据规则（按标题关键词推断，Growth Engine 据此用真实行为推进状态） */
+  evidence_rule?: EvidenceRule;
 }
 
 export interface GeneratedJourney {
@@ -86,7 +89,31 @@ export function normalizeGeneratedGoal(raw: unknown): GeneratedGoal | null {
   return { title, description };
 }
 
-/** 规范化 AI 生成的 Journey（含阶段；过滤空阶段并补全 order） */
+/** 按能力标题推断证据规则（真实行为来源 + 阈值） */
+export function inferEvidenceRule(title: string): EvidenceRule | undefined {
+  const t = title.toLowerCase();
+  if (/workflow|composition|编排|自动化|流程|automation/.test(t)) {
+    return { source: 'workflow_executed_success', threshold: 3 };
+  }
+  if (/debug|排错|调试|排查/.test(t)) {
+    return { source: 'workflow_executed_success', threshold: 3 };
+  }
+  if (/api|发布|集成|deploy|publish/.test(t)) {
+    return { source: 'api_published', threshold: 1 };
+  }
+  if (/schedule|定时|调度|cron/.test(t)) {
+    return { source: 'schedule_created', threshold: 1 };
+  }
+  if (/rag|知识库|retrieval/.test(t)) {
+    return { source: 'notes', threshold: 3 };
+  }
+  if (/note|笔记|文档|document/.test(t)) {
+    return { source: 'notes', threshold: 2 };
+  }
+  return { source: 'workflow_created', threshold: 2 };
+}
+
+/** 规范化 AI 生成的 Journey（含阶段；过滤空阶段并补全 order + 证据规则） */
 export function normalizeGeneratedJourney(raw: unknown): GeneratedJourney | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
@@ -101,7 +128,7 @@ export function normalizeGeneratedJourney(raw: unknown): GeneratedJourney | null
           const cc = c as Record<string, unknown>;
           const cTitle = typeof cc.title === 'string' && cc.title.trim() ? cc.title.trim() : '';
           if (!cTitle) return null;
-          return {
+          const base = {
             title: cTitle,
             description:
               typeof cc.description === 'string' && cc.description.trim()
@@ -111,6 +138,8 @@ export function normalizeGeneratedJourney(raw: unknown): GeneratedJourney | null
               ? cc.prerequisites.map(String).filter((p) => p.trim().length > 0)
               : [],
           };
+          const rule = inferEvidenceRule(cTitle);
+          return rule ? { ...base, evidence_rule: rule } : base;
         })
         .filter((c): c is GeneratedCapability => c !== null)
     : [];

@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Lock, FlaskConical, Hammer, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Lock, FlaskConical, Hammer, CheckCircle2, ChevronDown, ChevronUp, Gauge, Loader2 } from 'lucide-react';
 import { useT } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
@@ -14,6 +15,8 @@ import {
 } from '@/components/ui/dialog';
 import type { Journey, Capability } from '@/lib/growth/types';
 import { CAPABILITY_STATUSES } from '@/lib/growth/types';
+import { getEvidenceRule } from '@/lib/growth/engine';
+import type { EvidenceSource } from '@/lib/growth/evidence';
 
 // ===== Growth Map：Journey 可视化路线图 =====
 // 纵向节点链（Goal → 阶段 → 阶段 → …），点击节点查看详情/推进状态
@@ -60,8 +63,39 @@ export function GrowthMap({
   const [selected, setSelected] = useState<Capability | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [evaluating, setEvaluating] = useState(false);
 
   const caps = journey.capabilities;
+
+  // 自动评估：Growth Engine 收集真实行为证据 → 统一推进状态
+  const runEvaluate = async () => {
+    if (evaluating) return;
+    setEvaluating(true);
+    try {
+      const res = await fetch('/api/growth/engine/evaluate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ journeyId: journey.id }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (data.changes?.length > 0) {
+          toast.success(
+            `${t('growth.evaluateDone')}（${data.applied}/${data.changes.length} ${t('growth.evaluateChanged')}）`,
+          );
+        } else {
+          toast.success(t('growth.evaluateNoChange'));
+        }
+        onUpdate();
+      } else {
+        toast.error(data?.error || t('growth.evaluateFailed'));
+      }
+    } catch {
+      toast.error(t('growth.evaluateFailed'));
+    } finally {
+      setEvaluating(false);
+    }
+  };
 
   const updateStatus = async (cap: Capability, status: Capability['status']) => {
     setUpdating(true);
@@ -98,6 +132,24 @@ export function GrowthMap({
         <Badge variant="outline" className="shrink-0">
           {caps.length} {t('growth.capability')}
         </Badge>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-6 shrink-0 text-xs"
+          onClick={(e) => {
+            e.stopPropagation();
+            runEvaluate();
+          }}
+          disabled={evaluating}
+          title={t('growth.evaluateHint')}
+        >
+          {evaluating ? (
+            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+          ) : (
+            <Gauge className="mr-1 h-3 w-3" />
+          )}
+          {t('growth.evaluate')}
+        </Button>
         {collapsed ? (
           <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
         ) : (
@@ -241,6 +293,23 @@ export function GrowthMap({
                   </p>
                 </div>
               )}
+
+              {/* 证据规则（Growth Engine 依据的真实行为） */}
+              {(() => {
+                const rule = getEvidenceRule(selected);
+                if (!rule) return null;
+                return (
+                  <div className="rounded-md border border-border bg-muted/30 p-2.5">
+                    <p className="mb-1 flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+                      <Gauge className="h-3 w-3" />
+                      {t('growth.evidenceRule')}
+                    </p>
+                    <p className="text-xs text-foreground">
+                      {t(`growth.evidenceSource_${rule.source}`)} ≥ {rule.threshold}
+                    </p>
+                  </div>
+                );
+              })()}
 
               {selected.prerequisites && selected.prerequisites.length > 0 && (
                 <div>
