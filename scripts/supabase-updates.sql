@@ -326,3 +326,26 @@ END $$;
 
 -- 41. 迁移完成后刷新 PostgREST schema 缓存
 NOTIFY pgrst, 'reload schema';
+
+-- 42. Growth System：里程碑（真实行为首次达成，唯一一次，非 XP）
+CREATE TABLE IF NOT EXISTS milestones (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type            TEXT NOT NULL,   -- first_brew / first_recipe / ai_creator / workflow_builder / debugger / automator
+  achieved_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ref_workflow_id UUID REFERENCES workflow_history(id) ON DELETE SET NULL,  -- 可关联工作流
+  ref_evidence    TEXT,            -- 触发证据摘要
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (user_id, type)           -- 只能达成一次
+);
+CREATE INDEX IF NOT EXISTS idx_milestones_user ON milestones(user_id);
+ALTER TABLE milestones ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_policies WHERE policyname = 'Allow all on milestones' AND tablename = 'milestones') THEN
+    CREATE POLICY "Allow all on milestones" ON milestones FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+
+-- 43. 迁移完成后刷新 PostgREST schema 缓存
+NOTIFY pgrst, 'reload schema';

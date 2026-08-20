@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Plus, Sparkles, Trash2, Pencil, Loader2, RefreshCw, ChevronDown, ChevronRight, Target, Route } from 'lucide-react';
+import { Plus, Sparkles, Trash2, Pencil, Loader2, RefreshCw, ChevronDown, ChevronRight, Target, Route, Award, CheckCircle2, Circle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useT } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,8 @@ import {
 } from '@/components/ui/dialog';
 import type { Goal, Journey, Capability } from '@/lib/growth/types';
 import { GrowthMap } from '@/components/GrowthMap';
+import { MILESTONE_TYPES } from '@/lib/growth/milestones';
+import type { MilestoneType } from '@/lib/growth/milestones';
 
 // ===== Growth System：Goal & Journey 基础管理 =====
 
@@ -51,6 +53,30 @@ export default function GrowthPage() {
   const [pendingJourneyGoal, setPendingJourneyGoal] = useState<string | null>(null);
 
   const [deleteTarget, setDeleteTarget] = useState<{ kind: 'goal' | 'journey'; id: string; title: string } | null>(null);
+  // 里程碑
+  const [milestones, setMilestones] = useState<Set<string>>(new Set());
+  const [milestoneLoading, setMilestoneLoading] = useState(true);
+
+  // 加载并检查里程碑（幂等，从真实行为推导）
+  const loadMilestones = useCallback(async () => {
+    setMilestoneLoading(true);
+    try {
+      const res = await fetch('/api/growth/milestones', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        setMilestones(new Set((data.milestones ?? []).map((m: { type: string }) => m.type)));
+        if (Array.isArray(data.awarded) && data.awarded.length > 0) {
+          data.awarded.forEach((type: string) => {
+            toast.success(`${t('growth.milestoneAchieved')}：${t(`growth.milestone${type.charAt(0).toUpperCase()}${type.slice(1).replace(/_./g, (s) => s[1].toUpperCase())}`)}`);
+          });
+        }
+      }
+    } catch {
+      // ignore（里程碑不影响主流程）
+    } finally {
+      setMilestoneLoading(false);
+    }
+  }, [t]);
 
   const loadGoals = useCallback(async () => {
     setLoading(true);
@@ -68,7 +94,8 @@ export default function GrowthPage() {
 
   useEffect(() => {
     loadGoals();
-  }, [loadGoals]);
+    loadMilestones();
+  }, [loadGoals, loadMilestones]);
 
   const loadJourneys = useCallback(async (goalId: string) => {
     try {
@@ -293,6 +320,43 @@ export default function GrowthPage() {
 
       {/* Content */}
       <div className="flex-1 p-6">
+        {/* 里程碑（真实行为首次达成，非 XP） */}
+        <div className="mb-5 rounded-lg border border-border bg-card p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+              <Award className="h-4 w-4" />
+              {t('growth.milestones')}
+            </p>
+            <span className="text-xs text-muted-foreground">
+              {milestoneLoading
+                ? t('common.loading')
+                : `${milestones.size}/${MILESTONE_TYPES.length}`}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {MILESTONE_TYPES.map((type) => {
+              const achieved = milestones.has(type);
+              const labelKey = `growth.milestone${type.charAt(0).toUpperCase()}${type
+                .slice(1)
+                .replace(/_./g, (s) => s[1].toUpperCase())}`;
+              return (
+                <span
+                  key={type}
+                  className={
+                    achieved
+                      ? 'inline-flex items-center gap-1 rounded-full border border-green-500/40 bg-green-500/10 px-2.5 py-1 text-[11px] text-green-600'
+                      : 'inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground opacity-60'
+                  }
+                  title={t(labelKey)}
+                >
+                  {achieved ? <CheckCircle2 className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
+                  {t(labelKey)}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+
         {loading ? (
           <div className="flex items-center gap-2 py-10 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
