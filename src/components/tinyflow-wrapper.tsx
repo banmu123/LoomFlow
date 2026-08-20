@@ -274,6 +274,9 @@ export default function TinyflowWrapper() {
   const [nodeRunResult, setNodeRunResult] = useState<unknown>(null);
   const [nodeRunError, setNodeRunError] = useState<string | null>(null);
   const [nodeRunLoading, setNodeRunLoading] = useState(false);
+  // 单节点运行：表单/JSON 输入模式
+  const [nodeRunMode, setNodeRunMode] = useState<InputMode>('form');
+  const [nodeRunFormValues, setNodeRunFormValues] = useState<Record<string, unknown>>({});
   const openNodeRun = useCallback((node: FlowNode) => {
     const params = (Array.isArray(node.data.parameters) ? node.data.parameters : []) as Parameter[];
     const defaults: Record<string, unknown> = {};
@@ -282,19 +285,40 @@ export default function TinyflowWrapper() {
       if (key && p.defaultValue !== undefined) defaults[key] = p.defaultValue;
     }
     setNodeRunTarget(node);
+    setNodeRunMode('form');
+    setNodeRunFormValues(defaults);
     setNodeRunInputs(JSON.stringify(defaults, null, 2));
     setNodeRunResult(null);
     setNodeRunError(null);
   }, []);
 
+  // 单节点运行：表单/JSON 切换（与试运行面板一致）
+  const switchNodeRunToForm = useCallback(() => {
+    try {
+      setNodeRunFormValues(JSON.parse(nodeRunInputs || '{}'));
+    } catch {
+      // JSON 非法时保留当前表单值
+    }
+    setNodeRunMode('form');
+  }, [nodeRunInputs]);
+
+  const switchNodeRunToJson = useCallback(() => {
+    setNodeRunInputs(JSON.stringify(nodeRunFormValues, null, 2));
+    setNodeRunMode('json');
+  }, [nodeRunFormValues]);
+
   const handleNodeRun = useCallback(async () => {
     if (!nodeRunTarget || nodeRunLoading) return;
     let inputs: Record<string, unknown>;
-    try {
-      inputs = JSON.parse(nodeRunInputs || '{}');
-    } catch {
-      setNodeRunError(t('canvas.jsonParseError'));
-      return;
+    if (nodeRunMode === 'json') {
+      try {
+        inputs = JSON.parse(nodeRunInputs || '{}');
+      } catch {
+        setNodeRunError(t('canvas.jsonParseError'));
+        return;
+      }
+    } else {
+      inputs = nodeRunFormValues;
     }
     setNodeRunLoading(true);
     setNodeRunError(null);
@@ -316,7 +340,7 @@ export default function TinyflowWrapper() {
     } finally {
       setNodeRunLoading(false);
     }
-  }, [nodeRunTarget, nodeRunLoading, nodeRunInputs, t]);
+  }, [nodeRunTarget, nodeRunLoading, nodeRunInputs, nodeRunMode, nodeRunFormValues, t]);
 
   // ===== Init Tinyflow =====
   useEffect(() => {
@@ -1668,15 +1692,102 @@ export default function TinyflowWrapper() {
             <p className="rounded-md bg-muted/40 p-2 text-[11px] text-muted-foreground">
               {t('canvas.nodeRunHint')}
             </p>
-            <div className="space-y-1.5">
-              <Label className="text-xs">{t('canvas.nodeRunInput')}</Label>
-              <Textarea
-                value={nodeRunInputs}
-                onChange={(e) => setNodeRunInputs(e.target.value)}
-                rows={5}
-                className="font-mono text-xs"
-              />
-            </div>
+
+            {/* 输入模式切换：表单 / JSON */}
+            <Tabs
+              value={nodeRunMode}
+              onValueChange={(v) => (v === 'form' ? switchNodeRunToForm() : switchNodeRunToJson())}
+            >
+              <TabsList className="h-7">
+                <TabsTrigger value="form" className="text-xs px-2.5 py-0.5">
+                  {t('workflows.form')}
+                </TabsTrigger>
+                <TabsTrigger value="json" className="text-xs px-2.5 py-0.5">
+                  {t('workflows.json')}
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            {nodeRunMode === 'form' ? (
+              <div className="space-y-3">
+                {(() => {
+                  const params = (Array.isArray(nodeRunTarget?.data?.parameters)
+                    ? (nodeRunTarget?.data as Record<string, unknown>).parameters
+                    : []) as Parameter[];
+                  if (params.length === 0) {
+                    return (
+                      <p className="rounded-md bg-muted/30 p-3 text-center text-xs text-muted-foreground">
+                        {t('workflows.noInputParams')}
+                      </p>
+                    );
+                  }
+                  return params.map((p, idx) => {
+                    const key = p.name || `field_${idx}`;
+                    const dt = (p.dataType || 'string').toLowerCase();
+                    const value = nodeRunFormValues[key];
+                    const setVal = (v: unknown) =>
+                      setNodeRunFormValues((prev) => ({ ...prev, [key]: v }));
+                    return (
+                      <div key={idx} className="space-y-1.5">
+                        <Label className="text-xs font-medium">
+                          {p.name || `字段 ${idx + 1}`}
+                          {p.required && <span className="ml-0.5 text-red-500">*</span>}
+                          <span className="ml-1.5 rounded bg-muted px-1 py-0.5 text-[10px] font-normal text-muted-foreground">
+                            {dt}
+                          </span>
+                        </Label>
+                        {p.description && (
+                          <p className="text-[11px] text-muted-foreground">{p.description}</p>
+                        )}
+                        {dt === 'number' && (
+                          <Input
+                            type="number"
+                            value={value as number}
+                            onChange={(e) => setVal(Number(e.target.value))}
+                            placeholder={String(p.defaultValue ?? '0')}
+                            className="h-8 text-sm"
+                          />
+                        )}
+                        {dt === 'boolean' && (
+                          <div className="flex items-center gap-2 py-1">
+                            <Switch checked={Boolean(value)} onCheckedChange={setVal} />
+                            <span className="text-xs text-muted-foreground">
+                              {value ? 'true' : 'false'}
+                            </span>
+                          </div>
+                        )}
+                        {(dt === 'object' || dt === 'array') && (
+                          <Textarea
+                            value={typeof value === 'string' ? value : JSON.stringify(value, null, 2)}
+                            onChange={(e) => setVal(e.target.value)}
+                            placeholder={dt === 'array' ? '[]' : '{}'}
+                            className="min-h-[70px] font-mono text-xs"
+                          />
+                        )}
+                        {dt === 'string' && (
+                          <Input
+                            value={(value as string) || ''}
+                            onChange={(e) => setVal(e.target.value)}
+                            placeholder={String(p.defaultValue ?? `请输入 ${p.name}`)}
+                            className="h-8 text-sm"
+                          />
+                        )}
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <Label className="text-xs">{t('canvas.nodeRunInput')}</Label>
+                <Textarea
+                  value={nodeRunInputs}
+                  onChange={(e) => setNodeRunInputs(e.target.value)}
+                  rows={5}
+                  className="font-mono text-xs"
+                />
+              </div>
+            )}
             {nodeRunError && (
               <div className="rounded-md border border-red-300 bg-red-50 p-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
                 {nodeRunError}
