@@ -72,7 +72,11 @@ export async function generateAssessmentQuestions(): Promise<AssessmentQuestion[
 
   try {
     const provider = getProviderClientForModel(model);
-    if (!provider) return [];
+    if (!provider) {
+      console.error('[ai-assessment] No provider for model:', model);
+      return [];
+    }
+    console.log('[ai-assessment] Generating questions with model:', model.id, 'baseURL:', model.baseURL);
     const result = await streamText({
       model: provider(model.id),
       prompt,
@@ -80,8 +84,10 @@ export async function generateAssessmentQuestions(): Promise<AssessmentQuestion[
       maxOutputTokens: 6000,
     });
     const text = await result.text;
+    console.log('[ai-assessment] Generated text length:', text.length);
     return parseQuestions(text);
-  } catch {
+  } catch (err) {
+    console.error('[ai-assessment] Error generating questions:', err);
     return [];
   }
 }
