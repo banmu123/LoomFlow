@@ -550,6 +550,7 @@ export const zh = {
     singleSelect: '单选',
     multiSelect: '可多选',
     aiAnalysis: 'AI 分析',
+    selectModel: '选择模型',
     // 六维
     dimensionThinking: '思维力',
     dimensionCreativity: '创造力',

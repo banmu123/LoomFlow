@@ -555,6 +555,7 @@ export const en: ZhMessages = {
     singleSelect: 'Single choice',
     multiSelect: 'Multiple choice',
     aiAnalysis: 'AI Analysis',
+    selectModel: 'Select model',
     dimensionThinking: 'Thinking',
     dimensionCreativity: 'Creativity',
     dimensionExecution: 'Execution',

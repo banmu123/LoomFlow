@@ -61,12 +61,14 @@ export function ChatLanding() {
       setError(null);
       try {
         // 创建对话（携带首条消息一次完成，减少一个串行请求——跳转更快）
+        // 同时携带所选模型，对话页加载时恢复同一模型
         const res = await fetch('/api/conversations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             title: text.slice(0, 20),
             content: text,
+            model: model || undefined,
           }),
         });
         const db = await res.json();

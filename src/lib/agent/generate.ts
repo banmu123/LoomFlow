@@ -7,6 +7,8 @@ import { getEnabledSearchProviders } from '@/lib/search/db-providers';
 import { agentTools, agentToolsPrompt, systemNavPrompt } from '@/lib/agent/tools';
 import { detectIntentFromMessages } from '@/lib/agent/intent';
 import { supabase } from '@/lib/supabase/server';
+import { getAbilityScores } from '@/lib/growth/ability-service';
+import type { AbilityScores } from '@/lib/growth/ability-types';
 
 // ===== 后台生成执行器 =====
 // 生成任务生命周期属于 conversation（数据库消息状态），不依赖客户端连接：
@@ -39,12 +41,52 @@ const CHAT_RULES = `你是一个AI助手，可以进行正常对话，也可以�
 function buildFullSystemPrompt(
   availableModels: Array<{ id: string; label?: string | null }>,
   availableSearchProviders: Array<{ id: string; label?: string | null }>,
+  userProfile?: {
+    role: string;
+    roleLabel: string;
+    scores: AbilityScores;
+    recommendedCareers: string[];
+  },
 ): string {
-  return `${CHAT_RULES}
+  let prompt = `${CHAT_RULES}
 
 ---
 
 ${buildSystemPrompt(availableModels, availableSearchProviders)}`;
+
+  if (userProfile) {
+    const dimensionLabels: Record<string, string> = {
+      thinking: '思维力',
+      creativity: '创造力',
+      execution: '行动力',
+      learning: '学习力',
+      communication: '连接力',
+      resilience: '韧性',
+    };
+
+    const scoreLines = Object.entries(userProfile.scores)
+      .map(([dim, score]) => `  - ${dimensionLabels[dim] || dim}: ${score}/100`)
+      .join('\n');
+
+    const careersStr = userProfile.recommendedCareers.length > 0
+      ? userProfile.recommendedCareers.join('、')
+      : '暂无';
+
+    prompt += `
+
+---
+
+## 用户人格画像（请基于此为用户提供个性化建议）
+
+用户定位：${userProfile.roleLabel}
+能力维度：
+${scoreLines}
+推荐职业方向：${careersStr}
+
+请根据用户的能力特征和定位，给出针对性的学习建议和发展方向。在对话中自然地融入对用户人格的理解，帮助用户找到适合自己的成长路径。`;
+  }
+
+  return prompt;
 }
 
 export interface ToolLog {
@@ -145,11 +187,20 @@ export async function runAiGeneration(opts: {
 
   try {
     // ===== 1. 读对话历史（不含当前 pending 的 assistant 消息）=====
-    const { data: history } = await supabase
-      .from('messages')
-      .select('id, role, content, created_at')
-      .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: true });
+    const [historyRes, convRes] = await Promise.all([
+      supabase
+        .from('messages')
+        .select('id, role, content, created_at')
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: true }),
+      supabase
+        .from('conversations')
+        .select('user_id')
+        .eq('id', conversationId)
+        .single(),
+    ]);
+    const history = historyRes.data;
+    const userId = convRes.data?.user_id;
     const dbHistory = (history ?? []).filter(
       (m: { id: string }) => m.id !== assistantMessageId,
     );
@@ -209,9 +260,20 @@ export async function runAiGeneration(opts: {
       id: s.id,
       label: s.label,
     }));
+
+    // 获取用户人格画像
+    const abilityProfile = userId ? await getAbilityScores(userId) : null;
+    const userProfile = abilityProfile ? {
+      role: abilityProfile.role,
+      roleLabel: abilityProfile.roleLabel,
+      scores: abilityProfile.scores,
+      recommendedCareers: abilityProfile.recommendedCareers,
+    } : undefined;
+
     const systemPrompt = buildFullSystemPrompt(
       allModels.map((m) => ({ id: m.id, label: m.label })),
       searchProviders,
+      userProfile,
     );
 
     // ===== 5. 流式生成（后台执行，边生成边写库）=====

@@ -101,6 +101,7 @@ interface Message {
 interface Conversation {
   id: string;
   title: string;
+  model?: string | null;
   messages: Message[];
 }
 
@@ -133,6 +134,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
   const [modelsLoaded, setModelsLoaded] = useState(false);
 
   // 加载已配置模型（从模型配置页返回或切回标签页时自动刷新）
+  // 优先使用当前对话绑定的模型（创建对话时选择的模型），否则保持当前选择，再回退第一个
   const loadModels = useCallback(async () => {
     try {
       const res = await fetch('/api/ai/models');
@@ -143,8 +145,14 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
           label: m.label || m.id,
         }));
         setModelOptions(options);
-        // 默认选中第一个
-        setModel((prev) => (options.some((o) => o.value === prev) ? prev : options[0]?.value || ''));
+        // 当前对话绑定的模型优先
+        const boundModel = conversations.find((c) => c.id === convId)?.model;
+        if (boundModel && options.some((o) => o.value === boundModel)) {
+          setModel(boundModel);
+        } else {
+          // 保持当前选择，不存在时回退第一个
+          setModel((prev) => (options.some((o) => o.value === prev) ? prev : options[0]?.value || ''));
+        }
       }
     } catch {
       // ignore
@@ -152,7 +160,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
       // 模型加载完成标记（避免加载中误判为"未配置模型"）
       setModelsLoaded(true);
     }
-  }, []);
+  }, [conversations, convId]);
 
   useEffect(() => {
     loadModels();
@@ -259,13 +267,14 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
 
       // Load messages for each conversation
       const convs: Conversation[] = await Promise.all(
-        data.map(async (dbConv: { id: string; title: string }) => {
+        data.map(async (dbConv: { id: string; title: string; model?: string | null }) => {
           try {
             const msgsRes = await fetch(`/api/conversations/${dbConv.id}/messages`);
             const msgs = await msgsRes.json();
             return {
               id: dbConv.id,
               title: dbConv.title,
+              model: dbConv.model ?? null,
               messages: Array.isArray(msgs)
                 ? msgs.map(
                     (m: {
@@ -293,7 +302,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
                 : [],
             };
           } catch {
-            return { id: dbConv.id, title: dbConv.title, messages: [] };
+            return { id: dbConv.id, title: dbConv.title, model: dbConv.model ?? null, messages: [] };
           }
         }),
       );
@@ -420,11 +429,11 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
         }
         return fetch(`/api/conversations/${convId}/messages`)
           .then((res) => res.json())
-          .then((msgs) => ({ title: meta.title, msgs }));
+          .then((msgs) => ({ title: meta.title, model: meta.model ?? null, msgs }));
       })
       .then((data) => {
         if (!data) return;
-        const { title, msgs } = data;
+        const { title, model, msgs } = data;
         if (!Array.isArray(msgs)) {
           router.replace('/chat');
           return;
@@ -434,6 +443,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
           {
             id: convId,
             title,
+            model,
             messages: msgs.map((m) => ({
               id: m.id,
               role: m.role,
@@ -454,6 +464,21 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
   }, [convId, conversations, router]);
 
   const activeConversation = conversations.find((c) => c.id === convId);
+
+  // 用户手动切换模型 → 持久化到当前对话（下次进入恢复同一模型）
+  const handleModelChange = useCallback(
+    (nextModel: string) => {
+      setModel(nextModel);
+      if (convId) {
+        fetch(`/api/conversations/${convId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: nextModel }),
+        }).catch(() => {});
+      }
+    },
+    [convId],
+  );
   const messages = activeConversation?.messages ?? [];
 
   // auto scroll：只滚动消息列表容器本身
@@ -480,13 +505,14 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
       const res = await fetch('/api/conversations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: '新建对话' }),
+        body: JSON.stringify({ title: '新建对话', model: model || undefined }),
       });
       const db = await res.json();
       if (!db?.id) return null;
       const newConv: Conversation = {
         id: db.id,
         title: db.title,
+        model: model || null,
         messages: [],
       };
       setConversations((prev) => [newConv, ...prev]);
@@ -496,7 +522,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
     } catch {
       return null;
     }
-  }, []);
+  }, [model]);
 
   // 自动生成检测：当前对话最后一条是 user 消息且没有 AI 回复 → 触发生成。
   // 以数据库状态驱动（欢迎页发送首条消息后跳转、或生成中断后重进），不依赖 URL 参数；
@@ -898,7 +924,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
                   placeholder={t('home.placeholder')}
                   modelOptions={modelOptions}
                   model={model}
-                  onModelChange={setModel}
+                  onModelChange={handleModelChange}
                 />
               </div>
 
@@ -984,7 +1010,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
               uploading={uploading}
               modelOptions={modelOptions}
               model={model}
-              onModelChange={setModel}
+              onModelChange={handleModelChange}
             />
           </div>
         )}

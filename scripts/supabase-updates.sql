@@ -453,3 +453,15 @@ END $$;
 
 -- 50. 迁移完成后刷新 PostgREST schema 缓存
 NOTIFY pgrst, 'reload schema';
+
+-- 51. 对话绑定模型：记录每个对话使用的模型（切换对话时恢复）
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS model TEXT;
+
+-- 52. 迁移完成后刷新 PostgREST schema 缓存
+NOTIFY pgrst, 'reload schema';
+
+-- 53. 用户能力画像增加推荐职业
+ALTER TABLE user_ability_scores ADD COLUMN IF NOT EXISTS recommended_careers JSONB NOT NULL DEFAULT '[]';
+
+-- 54. 迁移完成后刷新 PostgREST schema 缓存
+NOTIFY pgrst, 'reload schema';

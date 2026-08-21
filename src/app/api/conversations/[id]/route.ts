@@ -37,15 +37,26 @@ export async function PATCH(
   if (denied) return denied;
 
   const body = await request.json().catch(() => null);
-  const title = body?.title?.trim();
 
-  if (!title) {
-    return Response.json({ error: 'title 不能为空' }, { status: 400 });
+  const updates: Record<string, unknown> = {};
+  if (body?.title !== undefined) {
+    const title = body?.title?.trim();
+    if (!title) {
+      return Response.json({ error: 'title 不能为空' }, { status: 400 });
+    }
+    updates.title = title;
+  }
+  if (body?.model !== undefined) {
+    const model = typeof body?.model === 'string' && body.model.trim() ? body.model.trim() : null;
+    updates.model = model;
+  }
+  if (Object.keys(updates).length === 0) {
+    return Response.json({ error: '没有可更新的字段' }, { status: 400 });
   }
 
   const { data, error } = await supabase
     .from('conversations')
-    .update({ title })
+    .update(updates)
     .eq('id', id)
     .select()
     .single();

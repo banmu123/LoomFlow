@@ -30,10 +30,12 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => null);
   const title = body?.title?.trim() || '新建对话';
+  // 记录创建时的模型选择（ChatLanding 传入），对话页加载时恢复
+  const model = typeof body?.model === 'string' && body.model.trim() ? body.model.trim() : null;
 
   const { data, error } = await supabase
     .from('conversations')
-    .insert({ title, user_id: user.id })
+    .insert({ title, user_id: user.id, model })
     .select()
     .single();
 

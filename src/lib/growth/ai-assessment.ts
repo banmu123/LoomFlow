@@ -17,10 +17,10 @@ export interface AssessmentAnswer {
 }
 
 /** AI 生成 15 道自评题目 */
-export async function generateAssessmentQuestions(): Promise<AssessmentQuestion[]> {
+export async function generateAssessmentQuestions(modelId?: string): Promise<AssessmentQuestion[]> {
   const models = await getAllModels();
   if (models.length === 0) return [];
-  const model = models[0];
+  const model = modelId ? models.find((m) => m.id === modelId) ?? models[0] : models[0];
 
   const prompt = `你是一个专业的测评设计专家。请生成 15 道自我评估题目。
 
@@ -76,7 +76,7 @@ export async function generateAssessmentQuestions(): Promise<AssessmentQuestion[
       console.error('[ai-assessment] No provider for model:', model);
       return [];
     }
-    console.log('[ai-assessment] Generating questions with model:', model.id, 'baseURL:', model.baseURL);
+    console.log('[ai-assessment] Generating questions with model:', model.id, 'baseURL:', model.baseURL, 'hasKey:', !!model.apiKey);
     const result = await streamText({
       model: provider(model.id),
       prompt,
@@ -87,8 +87,10 @@ export async function generateAssessmentQuestions(): Promise<AssessmentQuestion[
     console.log('[ai-assessment] Generated text length:', text.length);
     return parseQuestions(text);
   } catch (err) {
-    console.error('[ai-assessment] Error generating questions:', err);
-    return [];
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error('[ai-assessment] Error generating questions:', errMsg);
+    // 抛出错误让调用方看到具体原因
+    throw new Error(`AI 调用失败: ${errMsg}`);
   }
 }
 
@@ -134,10 +136,11 @@ function normalizeQuestion(q: Record<string, unknown>, index: number): Assessmen
 export async function analyzeAssessmentResults(
   questions: AssessmentQuestion[],
   answers: AssessmentAnswer[],
-): Promise<{ scores: Record<string, number>; analysis: string } | null> {
+  modelId?: string,
+): Promise<{ scores: Record<string, number>; analysis: string; recommendedCareers: string[] } | null> {
   const models = await getAllModels();
   if (models.length === 0) return null;
-  const model = models[0];
+  const model = modelId ? models.find((m) => m.id === modelId) ?? models[0] : models[0];
 
   const answerSummary = questions.map((q) => {
     const answer = answers.find((a) => a.questionId === q.id);
@@ -147,7 +150,7 @@ export async function analyzeAssessmentResults(
     return `题目：${q.stem}\n选择：${selectedTexts.join('、') || '未作答'}`;
   }).join('\n\n');
 
-  const prompt = `你是一个专业的个人能力评估分析师。以下是一个用户的自评问卷回答，请分析其能力特征。
+  const prompt = `你是一个专业的个人能力评估分析师和职业规划顾问。以下是一个用户的自评问卷回答，请分析其能力特征并推荐适合的职业方向。
 
 ${answerSummary}
 
@@ -163,6 +166,7 @@ ${answerSummary}
 1. 不要所有维度都给 50-70 的中间分，要有区分度
 2. 基于用户的选择模式来判断，不要猜测
 3. 给出简短的分析说明（2-3 句话概括用户的特点）
+4. 根据用户的能力特征，推荐 3-5 个最适合的职业方向
 
 请返回纯 JSON：
 {
@@ -174,7 +178,8 @@ ${answerSummary}
     "communication": 55,
     "resilience": 80
   },
-  "analysis": "你是一个行动力很强的人，善于分析问题并快速采取行动。在创造力方面还有提升空间，可以尝试更多发散性思考。"
+  "analysis": "你是一个行动力很强的人，善于分析问题并快速采取行动。在创造力方面还有提升空间，可以尝试更多发散性思考。",
+  "recommendedCareers": ["产品经理", "项目经理", "运营总监"]
 }`;
 
   try {
@@ -184,7 +189,7 @@ ${answerSummary}
       model: provider(model.id),
       prompt,
       temperature: 0.5,
-      maxOutputTokens: 1000,
+      maxOutputTokens: 1500,
     });
     const text = await result.text;
     return parseAnalysis(text);
@@ -193,7 +198,7 @@ ${answerSummary}
   }
 }
 
-function parseAnalysis(text: string): { scores: Record<string, number>; analysis: string } | null {
+function parseAnalysis(text: string): { scores: Record<string, number>; analysis: string; recommendedCareers: string[] } | null {
   const cleaned = text
     .replace(/```json\n?/g, '')
     .replace(/```\n?/g, '')
@@ -212,7 +217,11 @@ function parseAnalysis(text: string): { scores: Record<string, number>; analysis
       scores[dim] = typeof val === 'number' ? Math.max(0, Math.min(100, Math.round(val))) : 50;
     }
 
-    return { scores, analysis: obj.analysis.trim() };
+    const recommendedCareers = Array.isArray(obj.recommendedCareers)
+      ? obj.recommendedCareers.filter((c: unknown) => typeof c === 'string' && c.trim()).map((c: string) => c.trim())
+      : [];
+
+    return { scores, analysis: obj.analysis.trim(), recommendedCareers };
   } catch {
     return null;
   }

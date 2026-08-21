@@ -11,7 +11,6 @@ import { AssessmentPanel } from '@/components/AssessmentPanel';
 import { DIMENSIONS, DIMENSION_META, emptyScores } from '@/lib/growth/ability-types';
 import type { AbilityScores } from '@/lib/growth/ability-types';
 import { determineRole } from '@/lib/growth/ability-roles';
-import { getWeakestDimension } from '@/lib/growth/ability-scoring';
 
 export default function HomePage() {
   const t = useT();
@@ -75,7 +74,6 @@ export default function HomePage() {
   }
 
   const currentRole = role || { id: 'explorer', labelKey: 'life.roleExplorer', icon: '🔍' };
-  const weakest = scores ? getWeakestDimension(scores) : null;
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">
@@ -129,13 +127,7 @@ export default function HomePage() {
           </div>
         )}
 
-        <div className="grid gap-3 sm:grid-cols-3">
-          <RecommendCard
-            icon="📝"
-            title={t('life.recommendQuestions')}
-            desc={weakest ? `${t(DIMENSION_META[weakest].labelKey)} ${t('life.weakDimension')}` : ''}
-            onClick={() => router.push('/questions')}
-          />
+        <div className="grid gap-3 sm:grid-cols-2">
           <RecommendCard
             icon="📊"
             title={t('life.viewFullPanel')}

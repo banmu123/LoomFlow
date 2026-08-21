@@ -82,6 +82,7 @@ export interface UserAbilityProfile {
   engagement: AbilityEngagement;
   role: string;
   roleLabel: string;
+  recommendedCareers: string[];
   analyzedAt: string;
 }
 

@@ -19,6 +19,7 @@ export async function getAbilityScores(userId: string): Promise<UserAbilityProfi
     engagement: (data.engagement as AbilityEngagement) ?? emptyEngagement(),
     role: data.role ?? 'explorer',
     roleLabel: data.role_label ?? '探索者',
+    recommendedCareers: Array.isArray(data.recommended_careers) ? data.recommended_careers : [],
     analyzedAt: data.analyzed_at ?? data.created_at,
   };
 }
@@ -30,6 +31,7 @@ export async function saveAbilityScores(
   engagement: AbilityEngagement,
   role: string,
   roleLabel: string,
+  recommendedCareers: string[] = [],
 ): Promise<void> {
   await supabase.from('user_ability_scores').upsert(
     {
@@ -38,6 +40,7 @@ export async function saveAbilityScores(
       engagement,
       role,
       role_label: roleLabel,
+      recommended_careers: recommendedCareers,
       analyzed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     },

@@ -19,10 +19,11 @@ export async function generateQuestions(
   dimension: AbilityDimension,
   difficulty: string,
   count: number,
+  modelId?: string,
 ): Promise<QuestionContent[]> {
   const models = await getAllModels();
   if (models.length === 0) return [];
-  const model = models[0];
+  const model = modelId ? models.find((m) => m.id === modelId) ?? models[0] : models[0];
 
   const desc = DIMENSION_DESCRIPTIONS[dimension];
   const prompt = buildPrompt(dimension, desc, difficulty, count);

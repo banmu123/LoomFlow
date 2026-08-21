@@ -52,7 +52,6 @@ interface ConversationItem {
 const LIFE_ITEMS: NavItem[] = [
   { href: '/', labelKey: 'sidebar.home', icon: Home },
   { href: '/ability', labelKey: 'sidebar.ability', icon: Target },
-  { href: '/questions', labelKey: 'sidebar.questions', icon: PenLine },
 ];
 
 const WORKFLOW_ITEMS: NavItem[] = [

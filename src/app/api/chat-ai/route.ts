@@ -3,6 +3,9 @@ import { streamText, isStepCount } from 'ai';
 import type { ModelMessage } from 'ai';
 import { buildSystemPrompt } from '@/lib/workflow-ai/prompts';
 import { getCurrentUser } from '@/lib/server-auth';
+import { getAbilityScores } from '@/lib/growth/ability-service';
+import { DIMENSION_META } from '@/lib/growth/ability-types';
+import type { AbilityScores } from '@/lib/growth/ability-types';
 
 export const runtime = 'nodejs';
 
@@ -55,12 +58,52 @@ const CHAT_RULES = `你是一个AI助手，可以进行正常对话，也可以�
 function buildFullSystemPrompt(
   availableModels: Array<{ id: string; label?: string | null }>,
   availableSearchProviders: Array<{ id: string; label?: string | null }>,
+  userProfile?: {
+    role: string;
+    roleLabel: string;
+    scores: AbilityScores;
+    recommendedCareers: string[];
+  },
 ): string {
-  return `${CHAT_RULES}
+  let prompt = `${CHAT_RULES}
 
 ---
 
 ${buildSystemPrompt(availableModels, availableSearchProviders)}`;
+
+  if (userProfile) {
+    const dimensionLabels: Record<string, string> = {
+      thinking: '思维力',
+      creativity: '创造力',
+      execution: '行动力',
+      learning: '学习力',
+      communication: '连接力',
+      resilience: '韧性',
+    };
+
+    const scoreLines = Object.entries(userProfile.scores)
+      .map(([dim, score]) => `  - ${dimensionLabels[dim] || dim}: ${score}/100`)
+      .join('\n');
+
+    const careersStr = userProfile.recommendedCareers.length > 0
+      ? userProfile.recommendedCareers.join('、')
+      : '暂无';
+
+    prompt += `
+
+---
+
+## 用户人格画像（请基于此为用户提供个性化建议）
+
+用户定位：${userProfile.roleLabel}
+能力维度：
+${scoreLines}
+推荐职业方向：${careersStr}
+
+请根据用户的能力特征和定位，给出针对性的学习建议和发展方向。在对话中自然地融入对用户人格的理解，帮助用户找到适合自己的成长路径。`;
+  }
+
+  return prompt;
 }
 
 // 解析响应中的 JSON
@@ -152,9 +195,20 @@ export async function POST(request: NextRequest) {
     id: s.id,
     label: s.label,
   }));
+
+  // 获取用户人格画像
+  const abilityProfile = await getAbilityScores(user.id);
+  const userProfile = abilityProfile ? {
+    role: abilityProfile.role,
+    roleLabel: abilityProfile.roleLabel,
+    scores: abilityProfile.scores,
+    recommendedCareers: abilityProfile.recommendedCareers,
+  } : undefined;
+
   const systemPrompt = buildFullSystemPrompt(
     allModels.map((m) => ({ id: m.id, label: m.label })),
     searchProviders,
+    userProfile,
   );
 
   // 确定性意图预分流：query=带工具查询/排错；generate、chat=不带工具（杜绝生成时误调工具）

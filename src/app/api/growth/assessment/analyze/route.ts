@@ -17,12 +17,13 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const questions = body?.questions as AssessmentQuestion[] | undefined;
   const answers = body?.answers as AssessmentAnswer[] | undefined;
+  const modelId = typeof body?.modelId === 'string' ? body.modelId : undefined;
 
   if (!Array.isArray(questions) || !Array.isArray(answers)) {
     return Response.json({ error: '缺少 questions 或 answers' }, { status: 400 });
   }
 
-  const result = await analyzeAssessmentResults(questions, answers);
+  const result = await analyzeAssessmentResults(questions, answers, modelId);
   if (!result) {
     return Response.json({ error: '分析失败，请稍后重试' }, { status: 500 });
   }
@@ -36,12 +37,13 @@ export async function POST(request: NextRequest) {
     resilience: result.scores.resilience ?? 50,
   };
   const role = determineRole(scores);
-  await saveAbilityScores(user.id, scores, emptyEngagement(), role.id, role.labelKey);
+  await saveAbilityScores(user.id, scores, emptyEngagement(), role.id, role.labelKey, result.recommendedCareers);
   await saveScoreHistory(user.id, scores, 'assessment');
 
   return Response.json({
     scores,
     analysis: result.analysis,
+    recommendedCareers: result.recommendedCareers,
     role: role.id,
     roleLabel: role.labelKey,
   });

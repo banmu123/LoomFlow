@@ -1,10 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ChevronRight, ChevronLeft, Loader2, Sparkles, CheckCircle2, RefreshCw } from 'lucide-react';
 import { useT } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import type { AbilityScores } from '@/lib/growth/ability-types';
 
 interface AssessmentQuestion {
@@ -17,6 +24,11 @@ interface AssessmentQuestion {
 interface AssessmentAnswer {
   questionId: string;
   selectedOptionIds: string[];
+}
+
+interface ModelOption {
+  value: string;
+  label: string;
 }
 
 interface Props {
@@ -33,6 +45,27 @@ export function AssessmentPanel({ onComplete, onSkip }: Props) {
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
   const [error, setError] = useState<string | null>(null);
+  const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
+  const [selectedModel, setSelectedModel] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/ai/models');
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          const options = data.map((m: { id: string; label: string | null }) => ({
+            value: m.id,
+            label: m.label || m.id,
+          }));
+          setModelOptions(options);
+          if (options.length > 0) setSelectedModel(options[0].value);
+        }
+      } catch {
+        // ignore
+      }
+    })();
+  }, []);
 
   const currentQuestion = questions[currentStep];
   const progress = questions.length > 0 ? ((currentStep + 1) / questions.length) * 100 : 0;
@@ -44,7 +77,9 @@ export function AssessmentPanel({ onComplete, onSkip }: Props) {
     setPhase('loading');
     setError(null);
     try {
-      const res = await fetch('/api/growth/assessment');
+      const params = new URLSearchParams();
+      if (selectedModel) params.set('modelId', selectedModel);
+      const res = await fetch(`/api/growth/assessment?${params}`);
       const data = await res.json();
       if (!res.ok) {
         setError(data?.error || t('life.generateAssessmentFailed'));
@@ -106,7 +141,7 @@ export function AssessmentPanel({ onComplete, onSkip }: Props) {
       const res = await fetch('/api/growth/assessment/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ questions, answers: answerList }),
+        body: JSON.stringify({ questions, answers: answerList, modelId: selectedModel }),
       });
 
       const data = await res.json();
@@ -133,7 +168,23 @@ export function AssessmentPanel({ onComplete, onSkip }: Props) {
           {error && (
             <p className="text-sm text-destructive">{error}</p>
           )}
-          <Button size="lg" onClick={handleGenerate} className="w-full">
+          {modelOptions.length > 0 && (
+            <div className="mx-auto max-w-xs">
+              <Select value={selectedModel} onValueChange={setSelectedModel}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={t('life.selectModel')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {modelOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <Button size="lg" onClick={handleGenerate} className="w-full" disabled={!selectedModel}>
             <Sparkles className="mr-2 h-4 w-4" />
             {t('life.generateQuestions')}
           </Button>
