@@ -85,6 +85,18 @@ curl -X POST https://your-host/api/publish/{workflowId}/execute \
 ### 📝 Brew Notes（工作流笔记）
 记录工作流**为什么这样设计**——决策、问题、方案、优化、用途。AI 可总结设计意图、基于运行记录建议新笔记，画布 AI 助手能根据笔记回答「为什么当时选 X」。
 
+### 🕵️ 节点级执行追踪 & Debug 助手
+每次运行后展示**节点级执行时间线**：每个节点的状态/耗时/模型/Tokens/错误——一眼看清卡在哪。**画布 AI 助手**读取运行历史，回答「为什么运行失败」并给出根因与修复建议。
+
+### 🤖 画布 AI 助手
+在画布上直接对话：询问当前工作流、描述修改需求（如"给搜索结果加一个总结节点"），AI 输出完整工作流 JSON，**一键应用到画布**。
+
+### 🌱 成长系统（Growth System）
+目标驱动的学习体系：用自然语言定义 **Goal** → AI 生成 **Journey** 能力路径 → 通过 Workflow 或 **Code Lab** 实践 → 真实行为驱动 **Evidence Engine** 推进能力状态（未开始 → 探索 → 学习中 → 已掌握）并解锁 **Milestone**。无 XP、无虚假数据——一切来自真实行为。
+
+### 🧑‍💻 Code Lab
+轻量代码练习环境（Monaco 编辑器 + 沙箱）：编写 JS/TS、运行**测试断言**、AI 导师提供**提示/讲解/审查/排错**（先引导思考，不直接给答案）。完全沙箱隔离：无法访问宿主、密钥、数据库与网络。
+
 ### 🔒 私有化部署
 应用 + 数据 + 存储都可部署在自己服务器；数据库可切换自建 PostgreSQL（详见部署手册）。
 
@@ -268,9 +280,9 @@ curl http://localhost:5000/api/health
 ```
 src/
 ├── app/                  # 页面与 API 路由
-│   ├── (main)/           # 主界面（对话 + 工作流 + 管理后台）
+│   ├── (main)/           # 主界面（对话 + 工作流 + 管理后台 + 成长 + 代码练习）
 │   ├── share/            # 工作流分享页
-│   └── api/              # 后端 API（auth / conversations / workflow-history / publish / admin / nodes / search-providers）
+│   └── api/              # 后端 API（auth / conversations / workflow-history / publish / admin / nodes / search-providers / growth / code-lab）
 ├── components/           # UI 组件
 ├── lib/
 │   ├── tinyflow/         # 工作流执行引擎（12 种节点执行器）
@@ -278,6 +290,8 @@ src/
 │   ├── ai/               # 模型注册表（providers / capabilities / models）
 │   ├── agent/            # AI 对话工具（create_custom_node、知识库、统计等）
 │   ├── workflow-ai/      # AI 生成工作流提示词
+│   ├── growth/           # 成长系统（Goal / Journey / 证据引擎 / 里程碑）
+│   ├── code-lab/         # Code Lab 沙箱（隔离 VM 执行）
 │   ├── secrets.ts        # 敏感配置加密（AES-256-GCM）
 │   └── i18n.tsx          # 国际化框架
 ├── messages/             # 中英文案
@@ -288,7 +302,7 @@ src/
 
 ## 🧪 测试与 CI
 
-- **Vitest** — 209 个单元测试（引擎、schema、沙箱、执行器、搜索适配层、密钥加密、模型注册表、节点注册表、Agent 工具、i18n）
+- **Vitest** — 266 个单元测试（引擎、schema、沙箱、执行器、搜索适配层、密钥加密、成长引擎与里程碑、Code Lab 沙箱、执行追踪、笔记、模型注册表、节点注册表、Agent 工具、i18n）
 - **GitHub Actions** — 每次推送自动执行 lint + 类型检查 + 测试 + 生产构建（Node 20/22 矩阵）
 
 ---

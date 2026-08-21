@@ -91,6 +91,18 @@ App, data, and storage can all be deployed on your own server. Database can be s
 ### 📝 Brew Notes (Workflow Notes)
 Record **why** a workflow is designed this way — decisions, problems, solutions, optimizations and usage. AI can summarize design intent, suggest notes from run history, and the canvas AI assistant answers "why did I choose X" from your notes.
 
+### 🕵️ Execution Trace & Debug Assistant
+**Node-level execution trace** after each run: per-node status, duration, model, tokens and errors in a timeline — see exactly where a workflow got stuck. The **canvas AI assistant** reads run history and answers "why did this run fail" with root cause and fix suggestions.
+
+### 🤖 Canvas AI Assistant
+Chat with the canvas: ask about the current workflow, describe a change ("add a summarizer after search"), and the AI outputs a complete workflow JSON you **apply to the canvas in one click**.
+
+### 🌱 Growth System
+Goal-driven learning: define a **Goal** in natural language → AI generates a **Journey** of capabilities → practice with Workflows or the **Code Lab** → real behavior feeds an **Evidence Engine** that advances capability status (Locked → Exploring → Developing → Mastered) and unlocks **Milestones**. No XP, no fake data — everything derives from real actions.
+
+### 🧑‍💻 Code Lab
+Lightweight practice environment (Monaco editor + sandbox): write JavaScript/TypeScript, run with **tests & assertions**, and get **Hint / Explain / Review / Debug** from the AI Mentor — which guides rather than gives away the answer. Fully sandboxed: no host, secrets, database or network access.
+
 ### 🧠 Bring Your Own Model
 Add **any model** (DeepSeek / Ark / any OpenAI-compatible endpoint) through the admin UI — **no code changes**:
 
@@ -285,9 +297,9 @@ Checklist:
 ```
 src/
 ├── app/                  # Pages & API routes
-│   ├── (main)/           # Main UI (chat + workflows + admin)
+│   ├── (main)/           # Main UI (chat + workflows + admin + growth + lab)
 │   ├── share/            # Public workflow share pages
-│   └── api/              # Backend APIs (auth / conversations / workflow-history / publish / admin / nodes / search-providers)
+│   └── api/              # Backend APIs (auth / conversations / workflow-history / publish / admin / nodes / search-providers / growth / code-lab)
 ├── components/           # UI components
 ├── lib/
 │   ├── tinyflow/         # Workflow execution engine + NodeRegistry/NodeDefinition
@@ -295,6 +307,8 @@ src/
 │   ├── ai/               # Model Registry (providers / capabilities / models)
 │   ├── agent/            # AI chat tools (create_custom_node, knowledge, stats...)
 │   ├── workflow-ai/      # AI workflow generation prompts
+│   ├── growth/           # Growth System (goals / journeys / evidence engine / milestones)
+│   ├── code-lab/         # Code Lab sandbox (isolated VM execution)
 │   ├── secrets.ts        # Sensitive config encryption (AES-256-GCM)
 │   └── i18n.tsx          # i18n framework
 ├── messages/             # zh/en translations
@@ -305,7 +319,7 @@ src/
 
 ## 🧪 Testing & CI
 
-- **Vitest** — 209 unit tests (engine, schema, sandbox, executors, search providers, secrets encryption, model registry, node registry, agent tools, i18n)
+- **Vitest** — 266 unit tests (engine, schema, sandbox, executors, search providers, secrets encryption, growth engine & milestones, code-lab sandbox, flow trace, notes, model registry, node registry, agent tools, i18n)
 - **GitHub Actions** — lint + typecheck + test + production build on every push (Node 20/22 matrix)
 
 ---
