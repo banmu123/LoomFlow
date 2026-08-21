@@ -376,5 +376,80 @@ BEGIN
   END IF;
 END $$;
 
--- 45. 迁移完成后刷新 PostgREST schema 缓存
+-- 46. 人生设计 - 能力分数缓存
+CREATE TABLE IF NOT EXISTS user_ability_scores (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+  scores      JSONB NOT NULL DEFAULT '{}',
+  engagement  JSONB NOT NULL DEFAULT '{}',
+  role        TEXT NOT NULL DEFAULT 'explorer',
+  role_label  TEXT NOT NULL DEFAULT '探索者',
+  analyzed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_ability_scores_user ON user_ability_scores(user_id);
+ALTER TABLE user_ability_scores ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT FROM pg_policies WHERE policyname = 'Allow all on user_ability_scores' AND tablename = 'user_ability_scores') THEN
+    CREATE POLICY "Allow all on user_ability_scores" ON user_ability_scores FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+
+-- 47. 人生设计 - 题库
+CREATE TABLE IF NOT EXISTS question_bank (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  dimension  TEXT NOT NULL,
+  difficulty TEXT NOT NULL DEFAULT 'beginner',
+  type       TEXT NOT NULL DEFAULT 'choice',
+  content    JSONB NOT NULL,
+  tags       JSONB NOT NULL DEFAULT '[]',
+  is_active  BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_question_bank_dimension ON question_bank(dimension, difficulty) WHERE is_active = true;
+ALTER TABLE question_bank ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT FROM pg_policies WHERE policyname = 'Allow all on question_bank' AND tablename = 'question_bank') THEN
+    CREATE POLICY "Allow all on question_bank" ON question_bank FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+
+-- 48. 人生设计 - 答题记录
+CREATE TABLE IF NOT EXISTS answer_records (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  question_id  UUID NOT NULL REFERENCES question_bank(id) ON DELETE CASCADE,
+  user_answer  TEXT NOT NULL,
+  is_correct   BOOLEAN NOT NULL,
+  score_gained INTEGER NOT NULL DEFAULT 0,
+  dimension    TEXT NOT NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_answer_records_user ON answer_records(user_id, created_at DESC);
+ALTER TABLE answer_records ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT FROM pg_policies WHERE policyname = 'Allow all on answer_records' AND tablename = 'answer_records') THEN
+    CREATE POLICY "Allow all on answer_records" ON answer_records FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+
+-- 49. 人生设计 - 能力变化历史
+CREATE TABLE IF NOT EXISTS ability_score_history (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id        UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  scores         JSONB NOT NULL,
+  source         TEXT NOT NULL,
+  source_detail  TEXT,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_ability_history_user ON ability_score_history(user_id, created_at DESC);
+ALTER TABLE ability_score_history ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT FROM pg_policies WHERE policyname = 'Allow all on ability_score_history' AND tablename = 'ability_score_history') THEN
+    CREATE POLICY "Allow all on ability_score_history" ON ability_score_history FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+
+-- 50. 迁移完成后刷新 PostgREST schema 缓存
 NOTIFY pgrst, 'reload schema';

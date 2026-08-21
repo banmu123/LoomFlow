@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import {
-  GitBranch,
   LayoutDashboard,
   History,
   Clock,
@@ -28,6 +27,9 @@ import {
   Trash2,
   Boxes,
   Search,
+  Home,
+  Target,
+  PenLine,
 } from 'lucide-react';
 import { cn, truncateTitle } from '@/lib/utils';
 import { useT } from '@/lib/i18n';
@@ -39,7 +41,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 interface NavItem {
   href: string;
   labelKey: string;
-  icon: typeof GitBranch;
+  icon: typeof Home;
 }
 
 interface ConversationItem {
@@ -47,8 +49,13 @@ interface ConversationItem {
   title: string;
 }
 
-// 左侧栏：工作区 + 管理（可展开收起）+ 对话历史；可折叠为图标条
-const NAV_ITEMS: NavItem[] = [
+const LIFE_ITEMS: NavItem[] = [
+  { href: '/', labelKey: 'sidebar.home', icon: Home },
+  { href: '/ability', labelKey: 'sidebar.ability', icon: Target },
+  { href: '/questions', labelKey: 'sidebar.questions', icon: PenLine },
+];
+
+const WORKFLOW_ITEMS: NavItem[] = [
   { href: '/workflows', labelKey: 'sidebar.workflows', icon: Workflow },
   { href: '/workflows/editor', labelKey: 'sidebar.editor', icon: LayoutDashboard },
   { href: '/workflows/history', labelKey: 'sidebar.history', icon: History },
@@ -78,13 +85,10 @@ export function SidebarNav() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [username, setUsername] = useState('');
   const [role, setRole] = useState('');
-  // 管理菜单展开/收起
   const [adminOpen, setAdminOpen] = useState(false);
-  // 对话历史
+  const [workflowOpen, setWorkflowOpen] = useState(false);
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
-  // 删除对话确认
   const [deleteTarget, setDeleteTarget] = useState<ConversationItem | null>(null);
-  // 当前活跃对话由路由推导：/chat（无 id）= 新聊天；/chat/[id] = 该对话
   const activeConvId = pathname.startsWith('/chat/') ? pathname.slice('/chat/'.length) : '';
 
   useEffect(() => {
@@ -103,7 +107,6 @@ export function SidebarNav() {
     })();
   }, []);
 
-  // 加载对话历史
   const loadConversations = useCallback(async () => {
     try {
       const res = await fetch('/api/conversations');
@@ -125,7 +128,6 @@ export function SidebarNav() {
     loadConversations();
   }, [loadConversations]);
 
-  // 对话更新（新建/删除后由 ChatPanel 触发）时刷新
   useEffect(() => {
     const handler = () => loadConversations();
     window.addEventListener('conversations-updated', handler);
@@ -141,7 +143,6 @@ export function SidebarNav() {
     router.push('/login');
   };
 
-  // 删除对话：直接调 API；若删除的是当前对话（/chat/[id]）则回到新聊天
   const handleDeleteConversation = async (conv: ConversationItem) => {
     setDeleteTarget(null);
     try {
@@ -155,7 +156,7 @@ export function SidebarNav() {
   };
 
   const isActive = (href: string) =>
-    pathname === href || (href !== '/workflows' && pathname.startsWith(href + '/'));
+    pathname === href || (href !== '/' && href !== '/workflows' && pathname.startsWith(href + '/'));
 
   const renderItem = (item: NavItem) => {
     const Icon = item.icon;
@@ -179,7 +180,47 @@ export function SidebarNav() {
     );
   };
 
-  // 打开对话：路由带 id（/chat/[id]），新聊天：/chat（无 id）
+  const renderCollapsibleSection = (
+    labelKey: string,
+    icon: typeof Home,
+    items: NavItem[],
+    open: boolean,
+    onToggle: () => void,
+  ) => {
+    if (collapsed) {
+      return (
+        <button
+          onClick={() => setCollapsed(false)}
+          className="flex w-full items-center justify-center rounded-md px-2.5 py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          title={t(labelKey)}
+        >
+          {(() => {
+            const Icon = icon;
+            return <Icon className="h-4 w-4" />;
+          })()}
+        </button>
+      );
+    }
+    return (
+      <>
+        <button
+          onClick={onToggle}
+          className="flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <span className="flex items-center gap-2">
+            {(() => {
+              const Icon = icon;
+              return <Icon className="h-4 w-4" />;
+            })()}
+            <span className="truncate">{t(labelKey)}</span>
+          </span>
+          {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+        </button>
+        {open && <div className="space-y-0.5 pb-1 pl-2">{items.map(renderItem)}</div>}
+      </>
+    );
+  };
+
   const openConversation = (id: string) => {
     if (pathname !== `/chat/${id}`) router.push(`/chat/${id}`);
   };
@@ -191,82 +232,68 @@ export function SidebarNav() {
   return (
     <aside
       className={cn(
-        'flex shrink-0 flex-col border-r border-border bg-sidebar transition-all',
+        'flex h-full shrink-0 flex-col border-r border-border bg-sidebar transition-all',
         collapsed ? 'w-[52px]' : 'w-[210px]',
       )}
     >
-      {/* Logo（点击回到对话）+ 折叠按钮 */}
-      <div className={cn('flex items-center border-b border-border py-3', collapsed ? 'justify-center' : 'justify-between px-3')}>
-        <button onClick={() => router.push('/chat')} className="flex items-center gap-2" title={t('app.name')}>
-          <img src="/screenshots/logo.png" alt="LoomFlow" className="h-7 w-7 rounded-md object-contain shadow-md shadow-[#b77945]/25" />
-          {!collapsed && <span className="text-brand-gradient truncate text-sm font-bold">{t('app.name')}</span>}
-        </button>
-        <button
-          onClick={() => setCollapsed((v) => !v)}
-          className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          title={collapsed ? '展开侧边栏' : '收起侧边栏'}
-        >
-          {collapsed ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
-        </button>
+      {/* 顶部固定：Logo + 新聊天 */}
+      <div className="shrink-0">
+        <div className={cn('flex items-center border-b border-border py-3', collapsed ? 'justify-center' : 'justify-between px-3')}>
+          <button onClick={() => router.push('/chat')} className="flex items-center gap-2" title={t('app.name')}>
+            <img src="/screenshots/logo.png" alt="LoomFlow" className="h-7 w-7 rounded-md object-contain shadow-md shadow-[#b77945]/25" />
+            {!collapsed && <span className="text-brand-gradient truncate text-sm font-bold">{t('app.name')}</span>}
+          </button>
+          <button
+            onClick={() => setCollapsed((v) => !v)}
+            className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            title={collapsed ? '展开侧边栏' : '收起侧边栏'}
+          >
+            {collapsed ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
+          </button>
+        </div>
+
+        <div className="border-b border-border p-2">
+          <button
+            onClick={newConversation}
+            className={cn(
+              'flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm font-medium transition-all',
+              pathname === '/chat'
+                ? 'bg-primary/10 text-primary'
+                : 'text-foreground hover:bg-muted',
+            )}
+          >
+            <MessageSquare className="h-4 w-4 shrink-0" />
+            <span className="truncate">{t('sidebar.chat')}</span>
+          </button>
+        </div>
       </div>
 
-      {/* 置顶：新聊天 */}
-      <div className="border-b border-border p-2">
-        <button
-          onClick={newConversation}
-          className={cn(
-            'flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm font-medium transition-all',
-            pathname === '/chat'
-              ? 'bg-primary/10 text-primary'
-              : 'text-foreground hover:bg-muted',
-          )}
-        >
-          <MessageSquare className="h-4 w-4 shrink-0" />
-          <span className="truncate">{t('sidebar.chat')}</span>
-        </button>
-      </div>
-
-      <ScrollArea className="flex-1">
-        {/* 对话历史置底：flex 列 + mt-auto（注意用 gap 而非 space-y——space-y 的 margin-top 会覆盖 mt-auto） */}
-        <nav className="flex min-h-full flex-col gap-0.5 p-2">
-          {/* 工作区 */}
+      {/* 中间可滚动：导航菜单 + 对话历史 */}
+      <ScrollArea className="flex-1 overflow-hidden">
+        <nav className="flex flex-col gap-0.5 p-2">
+          {/* 成长 */}
           {!collapsed && (
-            <p className="px-2.5 pb-1 pt-2 text-[10px] font-medium uppercase text-muted-foreground/70">
-              {t('sidebar.workspace')}
+            <p className="px-2.5 pb-1 pt-1 text-[10px] font-medium uppercase text-muted-foreground/70">
+              {t('sidebar.growthSection')}
             </p>
           )}
-          {NAV_ITEMS.map(renderItem)}
+          {LIFE_ITEMS.map(renderItem)}
 
-          {/* 管理（可展开/收起） */}
-          {isAdmin && !collapsed && (
-            <>
-              <button
-                onClick={() => setAdminOpen((v) => !v)}
-                className="flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                <span className="flex items-center gap-2">
-                  <Cpu className="h-4 w-4" />
-                  <span className="truncate">{t('sidebar.management')}</span>
-                </span>
-                {adminOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-              </button>
-              {adminOpen && <div className="space-y-0.5 pb-1 pl-2">{ADMIN_ITEMS.map(renderItem)}</div>}
-            </>
-          )}
-          {/* 折叠态：管理图标按钮（点击展开侧边栏） */}
-          {isAdmin && collapsed && (
-            <button
-              onClick={() => setCollapsed(false)}
-              className="flex w-full items-center justify-center rounded-md px-2.5 py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              title={t('sidebar.management')}
-            >
-              <Cpu className="h-4 w-4" />
-            </button>
+          {/* 工作区（可折叠） */}
+          <div className="pt-1">
+            {renderCollapsibleSection('sidebar.workspace', Workflow, WORKFLOW_ITEMS, workflowOpen, () => setWorkflowOpen((v) => !v))}
+          </div>
+
+          {/* 管理（可折叠） */}
+          {isAdmin && (
+            <div className="pt-1">
+              {renderCollapsibleSection('sidebar.management', Cpu, ADMIN_ITEMS, adminOpen, () => setAdminOpen((v) => !v))}
+            </div>
           )}
 
-          {/* 对话历史（置底：靠 mt-auto 贴到侧边栏底部） */}
+          {/* 对话历史 */}
           {!collapsed && (
-            <div className="mt-auto border-t border-border/60 pt-3">
+            <div className="border-t border-border/60 pt-3">
               <div className="flex items-center justify-between px-2.5 pb-1">
                 <span className="flex items-center gap-1.5 text-[10px] font-medium uppercase text-muted-foreground/70">
                   <MessagesSquare className="h-3 w-3" />
@@ -311,8 +338,8 @@ export function SidebarNav() {
         </nav>
       </ScrollArea>
 
-      {/* 底部：用户信息 + 语言 + 退出 */}
-      <div className={cn('space-y-1.5 border-t border-border p-2', collapsed && 'flex flex-col items-center')}>
+      {/* 底部固定：用户信息 + 语言 + 退出 */}
+      <div className={cn('shrink-0 space-y-1.5 border-t border-border p-2', collapsed && 'flex flex-col items-center')}>
         <div className={cn('flex items-center gap-2 py-1.5', collapsed ? 'px-0' : 'px-1')} title={collapsed ? username || '' : undefined}>
           <Avatar className="h-7 w-7 shrink-0 border border-border">
             <AvatarFallback className="bg-primary/10 text-xs text-primary">
