@@ -347,5 +347,34 @@ BEGIN
   END IF;
 END $$;
 
--- 43. 迁移完成后刷新 PostgREST schema 缓存
+-- 44. Practice System：练习（关联 Capability，完成后产生 Evidence）
+CREATE TABLE IF NOT EXISTS practices (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id          UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  capability_id    UUID NOT NULL REFERENCES journey_capabilities(id) ON DELETE CASCADE,
+  type             TEXT NOT NULL DEFAULT 'code',   -- code / workflow / project / reflection
+  title            TEXT NOT NULL,
+  description      TEXT,
+  difficulty       TEXT NOT NULL DEFAULT 'beginner', -- beginner / intermediate / advanced
+  instructions     TEXT NOT NULL DEFAULT '',
+  expected_evidence JSONB NOT NULL DEFAULT '{}',    -- 完成后期望产生的证据描述
+  status           TEXT NOT NULL DEFAULT 'pending',  -- pending / in_progress / completed
+  completed_at     TIMESTAMPTZ,
+  metadata         JSONB NOT NULL DEFAULT '{}',
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_practices_user ON practices(user_id);
+CREATE INDEX IF NOT EXISTS idx_practices_capability ON practices(capability_id);
+CREATE INDEX IF NOT EXISTS idx_practices_status ON practices(user_id, status);
+
+ALTER TABLE practices ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_policies WHERE policyname = 'Allow all on practices' AND tablename = 'practices') THEN
+    CREATE POLICY "Allow all on practices" ON practices FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+
+-- 45. 迁移完成后刷新 PostgREST schema 缓存
 NOTIFY pgrst, 'reload schema';

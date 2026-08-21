@@ -24,7 +24,7 @@ export type { EvidenceRule, EvidenceSummary, EvidenceSource } from './evidence-s
 export async function collectEvidence(userId: string): Promise<EvidenceSummary> {
   const summary = emptyEvidence();
   try {
-    const [wfRes, runsRes, versionsRes, schedRes, notesRes] = await Promise.all([
+    const [wfRes, runsRes, versionsRes, schedRes, notesRes, practicesRes] = await Promise.all([
       supabase
         .from('workflow_history')
         .select('saved, conversation_id, published')
@@ -36,6 +36,11 @@ export async function collectEvidence(userId: string): Promise<EvidenceSummary> 
         .eq('user_id', userId),
       supabase.from('scheduled_runs').select('id', { count: 'exact', head: true }).eq('user_id', userId),
       supabase.from('workflow_notes').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+      supabase
+        .from('practices')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('status', 'completed'),
     ]);
 
     const workflows = (wfRes.data ?? []) as Array<{
@@ -50,8 +55,9 @@ export async function collectEvidence(userId: string): Promise<EvidenceSummary> 
     const runs = (runsRes.data ?? []) as Array<{ status: string }>;
     summary.workflow_executed = runs.length;
     summary.workflow_executed_success = runs.filter((r) => r.status === 'completed').length;
-    // 练习完成 = 成功执行（画布试运行 + 外部调用）；失败也算实践但不算完成
-    summary.practice_completed = summary.workflow_executed_success;
+
+    // 练习完成 = practices 表中 status='completed' 的记录数
+    summary.practice_completed = practicesRes.count ?? 0;
 
     const versions = (versionsRes.data ?? []) as Array<{ workflow_id: string }>;
     // 编辑 = 产生过至少一个版本的工作流数（v2+ 需要 >1 条版本，这里按版本条数近似）
