@@ -21,10 +21,6 @@ export const zh = {
   sidebar: {
     workspace: '工作区',
     management: '管理',
-    growthSection: '成长',
-    home: '首页',
-    ability: '能力面板',
-    questions: '答题练习',
     chat: '新聊天',
     workflows: '工作流列表',
     editor: '画布',

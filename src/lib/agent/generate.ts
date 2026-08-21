@@ -8,6 +8,8 @@ import { agentTools, agentToolsPrompt, systemNavPrompt } from '@/lib/agent/tools
 import { detectIntentFromMessages } from '@/lib/agent/intent';
 import { supabase } from '@/lib/supabase/server';
 import { getAbilityScores } from '@/lib/growth/ability-service';
+import { analyzeConversationTrends } from '@/lib/growth/conversation-trends';
+import { analyzeBehaviorInsights, behaviorInsightToText } from '@/lib/growth/behavior-insights';
 import type { AbilityScores } from '@/lib/growth/ability-types';
 
 // ===== 后台生成执行器 =====
@@ -17,13 +19,24 @@ import type { AbilityScores } from '@/lib/growth/ability-types';
 
 const MAX_MESSAGES = 20;
 
-// 系统提示词 - 对话规则部分（与 chat-ai 保持一致）
-const CHAT_RULES = `你是一个AI助手，可以进行正常对话，也可以帮助用户创建工作流。
+// 系统提示词 - 对话规则部分（人生设计教练：平台即人生，对话即成长）
+const CHAT_RULES = `你是 LoomFlow，一个懂用户的 AI 伙伴和人生设计教练。你既可以帮助用户完成具体任务（对话、创建 AI 工作流），也在每一次对话中观察和理解用户，帮助他/她更好地设计自己的人生。
+
+## 核心理念（斯坦福人生设计课方法论）
+- 人生不是一道"待解决的题"，而是一个"待设计的产品"
+- 你关注用户真正投入、有能量的事情（好时光日志），而不是只看他"擅长"什么
+- 你帮用户看到多种可能（奥德赛计划），而不是只给一个答案
+- 你鼓励小步尝试（原型实验），而不是等待完美方案
+- 你帮用户区分"可以改变的问题"和"需要接受的现实"（重力问题）
 
 ## 对话规则
-1. 如果用户只是打招呼、闲聊、问问题 → 正常对话回复
-2. 如果用户明确要求创建工作流、设计流程、实现功能 → 返回工作流 JSON
-3. 如果不确定用户意图 → 先询问确认
+1. 用户打招呼、闲聊、问问题 → 正常对话回复
+2. 用户明确要求创建工作流、设计流程、实现功能 → 返回工作流 JSON
+3. 你不确定用户意图 → 先询问确认
+4. 在自然对话中，如果合适，可以：
+   - 留意用户反复提到的话题/困扰 → 帮他看到模式和方向
+   - 发现用户对某事有热情时 → 鼓励他探索、给他小实验建议
+   - 用户说"不知道该怎么办" → 帮他列出几种可能，而不是替他决定
 
 ## 工作流创建时机
 只有当用户提到以下关键词时才创建工作流：
@@ -34,9 +47,10 @@ const CHAT_RULES = `你是一个AI助手，可以进行正常对话，也可以�
 ## 重要
 - 正常对话时返回普通文本，不要返回 JSON
 - 只有明确要求创建工作流时才返回 JSON
-- JSON 要放在 \`\`\`json 代码块中`;
+- JSON 要放在 \`\`\`json 代码块中
+- 不要过度说教：用户没谈人生方向时，不要硬塞人生建议`;
 
-// 完整系统提示词（对话规则 + 工作流生成规则）
+// 完整系统提示词（对话规则 + 工作流生成规则 + 用户画像 + 对话趋势）
 // 动态构建：注入当前模型配置列表与搜索服务列表，防止 AI 幻觉出未配置的 id
 function buildFullSystemPrompt(
   availableModels: Array<{ id: string; label?: string | null }>,
@@ -47,6 +61,12 @@ function buildFullSystemPrompt(
     scores: AbilityScores;
     recommendedCareers: string[];
   },
+  trend?: {
+    topics: Array<{ topic: string; count: number }>;
+    messageCount: number;
+    conversationCount: number;
+  },
+  behaviorText?: string,
 ): string {
   let prompt = `${CHAT_RULES}
 
@@ -76,14 +96,41 @@ ${buildSystemPrompt(availableModels, availableSearchProviders)}`;
 
 ---
 
-## 用户人格画像（请基于此为用户提供个性化建议）
+## 用户画像（供你理解用户的参考，不必刻意提起）
 
 用户定位：${userProfile.roleLabel}
 能力维度：
 ${scoreLines}
-推荐职业方向：${careersStr}
+推荐职业方向：${careersStr}`;
+  }
 
-请根据用户的能力特征和定位，给出针对性的学习建议和发展方向。在对话中自然地融入对用户人格的理解，帮助用户找到适合自己的成长路径。`;
+  if (trend && trend.topics.length > 0) {
+    const topicLines = trend.topics
+      .map((tp) => `  - ${tp.topic}（被提及 ${tp.count} 次）`)
+      .join('\n');
+
+    prompt += `
+
+---
+
+## 用户近 30 天对话趋势（最近 ${trend.conversationCount} 段对话、${trend.messageCount} 条消息）
+
+用户反复关注的话题：
+${topicLines}
+
+这些是用户真正投入的方向。当对话涉及这些话题时，可以自然地结合用户的历史关注给出更有针对性的回应；如果合适，也可以温和地帮用户看到自己在这些方向上的积累和可能。`;
+  }
+
+  if (behaviorText) {
+    prompt += `
+
+---
+
+## 用户真实行为（平台记录，供你在适当时机自然引用）
+
+${behaviorText}
+
+这是用户在这个平台上真正做过的事。当用户提到相关工作/困扰时，可以自然引用这些真实行为给出建议（例如"我注意到你上周做了…"），让建议有据可依，而不是泛泛而谈。但不要刻意炫耀数据，保持自然。`;
   }
 
   return prompt;
@@ -261,8 +308,14 @@ export async function runAiGeneration(opts: {
       label: s.label,
     }));
 
-    // 获取用户人格画像
-    const abilityProfile = userId ? await getAbilityScores(userId) : null;
+    // 获取用户画像 + 对话趋势 + 行为洞察
+    const [abilityProfile, trend, behaviorInsight] = userId
+      ? await Promise.all([
+          getAbilityScores(userId),
+          analyzeConversationTrends(userId),
+          analyzeBehaviorInsights(userId),
+        ])
+      : [null, null, null];
     const userProfile = abilityProfile ? {
       role: abilityProfile.role,
       roleLabel: abilityProfile.roleLabel,
@@ -270,10 +323,14 @@ export async function runAiGeneration(opts: {
       recommendedCareers: abilityProfile.recommendedCareers,
     } : undefined;
 
+    const behaviorText = behaviorInsight ? behaviorInsightToText(behaviorInsight) : undefined;
+
     const systemPrompt = buildFullSystemPrompt(
       allModels.map((m) => ({ id: m.id, label: m.label })),
       searchProviders,
       userProfile,
+      trend ?? undefined,
+      behaviorText,
     );
 
     // ===== 5. 流式生成（后台执行，边生成边写库）=====

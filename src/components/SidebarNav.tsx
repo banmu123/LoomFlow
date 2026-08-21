@@ -16,7 +16,6 @@ import {
   KeyRound,
   Library,
   CloudCog,
-  Sprout,
   FlaskConical,
   MessageSquare,
   ChevronDown,
@@ -27,9 +26,6 @@ import {
   Trash2,
   Boxes,
   Search,
-  Home,
-  Target,
-  PenLine,
 } from 'lucide-react';
 import { cn, truncateTitle } from '@/lib/utils';
 import { useT } from '@/lib/i18n';
@@ -41,18 +37,13 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 interface NavItem {
   href: string;
   labelKey: string;
-  icon: typeof Home;
+  icon: typeof Workflow;
 }
 
 interface ConversationItem {
   id: string;
   title: string;
 }
-
-const LIFE_ITEMS: NavItem[] = [
-  { href: '/', labelKey: 'sidebar.home', icon: Home },
-  { href: '/ability', labelKey: 'sidebar.ability', icon: Target },
-];
 
 const WORKFLOW_ITEMS: NavItem[] = [
   { href: '/workflows', labelKey: 'sidebar.workflows', icon: Workflow },
@@ -63,7 +54,6 @@ const WORKFLOW_ITEMS: NavItem[] = [
   { href: '/workflows/custom-nodes', labelKey: 'sidebar.customNodes', icon: Boxes },
   { href: '/knowledge', labelKey: 'sidebar.knowledge', icon: Library },
   { href: '/lab', labelKey: 'sidebar.lab', icon: FlaskConical },
-  { href: '/growth', labelKey: 'sidebar.growth', icon: Sprout },
 ];
 
 const ADMIN_ITEMS: NavItem[] = [
@@ -181,7 +171,7 @@ export function SidebarNav() {
 
   const renderCollapsibleSection = (
     labelKey: string,
-    icon: typeof Home,
+    icon: typeof Workflow,
     items: NavItem[],
     open: boolean,
     onToggle: () => void,
@@ -270,14 +260,6 @@ export function SidebarNav() {
       {/* 中间可滚动：导航菜单 + 对话历史 */}
       <ScrollArea className="flex-1 overflow-hidden">
         <nav className="flex flex-col gap-0.5 p-2">
-          {/* 成长 */}
-          {!collapsed && (
-            <p className="px-2.5 pb-1 pt-1 text-[10px] font-medium uppercase text-muted-foreground/70">
-              {t('sidebar.growthSection')}
-            </p>
-          )}
-          {LIFE_ITEMS.map(renderItem)}
-
           {/* 工作区（可折叠） */}
           <div className="pt-1">
             {renderCollapsibleSection('sidebar.workspace', Workflow, WORKFLOW_ITEMS, workflowOpen, () => setWorkflowOpen((v) => !v))}

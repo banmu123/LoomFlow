@@ -23,10 +23,6 @@ export const en: ZhMessages = {
   sidebar: {
     workspace: 'Workspace',
     management: 'Admin',
-    growthSection: 'Growth',
-    home: 'Home',
-    ability: 'Ability',
-    questions: 'Practice',
     chat: 'New Chat',
     workflows: 'Workflows',
     editor: 'Canvas',
