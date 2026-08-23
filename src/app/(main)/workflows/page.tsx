@@ -27,6 +27,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { formatVersion } from '@/lib/version';
 import {
   WORKFLOW_TEMPLATES,
+  TEMPLATE_CATEGORIES,
   normalizeWorkflowModels,
   type WorkflowTemplate,
 } from '@/lib/workflow-templates';
@@ -447,6 +448,7 @@ export default function WorkflowsPage() {
 
   // 页面 Tab：我的工作流 / 工作流模板
   const [activeTab, setActiveTab] = useState<'list' | 'templates'>('list');
+  const [templateCategory, setTemplateCategory] = useState('all');
 
   // 使用模板：加载到画布（模板模型 id 自动替换为用户配置的模型）
   const handleUseTemplate = useCallback(
@@ -544,8 +546,33 @@ export default function WorkflowsPage() {
         /* 工作流模板：新用户引导 */
         <div className="flex-1 overflow-y-auto p-6">
           <p className="mb-4 text-sm text-muted-foreground">{t('workflows.templatesHint')}</p>
+          <div className="mb-4 flex flex-wrap gap-1.5">
+            <button
+              onClick={() => setTemplateCategory('all')}
+              className={
+                templateCategory === 'all'
+                  ? 'rounded-full border border-primary bg-primary/10 px-3 py-1 text-xs text-primary'
+                  : 'rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground hover:border-primary/40'
+              }
+            >
+              {t('templates.all')}
+            </button>
+            {TEMPLATE_CATEGORIES.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => setTemplateCategory(cat.id)}
+                className={
+                  templateCategory === cat.id
+                    ? 'rounded-full border border-primary bg-primary/10 px-3 py-1 text-xs text-primary'
+                    : 'rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground hover:border-primary/40'
+                }
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {WORKFLOW_TEMPLATES.map((tpl) => (
+            {WORKFLOW_TEMPLATES.filter((tpl) => templateCategory === 'all' || tpl.category === templateCategory).map((tpl) => (
               <div
                 key={tpl.id}
                 className="flex flex-col gap-3 rounded-lg border border-border p-4 transition-colors hover:border-primary/50"

@@ -762,6 +762,22 @@ export const zh = {
     conversationNotFound: '对话不存在',
     networkError: '网络错误',
   },
+  templates: {
+    title: '场景中心',
+    subtitle: '选一个场景，填一下就能干活',
+    all: '全部',
+    useNow: '立即使用',
+    notFound: '模板不存在',
+    fillInputs: '填写输入',
+    pasteContent: '粘贴内容…',
+    inputPlaceholder: '请输入…',
+    run: '运行',
+    running: '运行中…',
+    result: '运行结果',
+    runFailed: '运行失败',
+    openInCanvas: '打开完整编辑器',
+    saveFailed: '保存失败',
+  },
 };
 
 export type ZhMessages = typeof zh;

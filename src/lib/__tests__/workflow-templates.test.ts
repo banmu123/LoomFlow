@@ -2,8 +2,18 @@ import { describe, it, expect } from 'vitest';
 import { WORKFLOW_TEMPLATES } from '../workflow-templates';
 
 describe('工作流模板结构合法性', () => {
-  it('至少 4 个模板', () => {
-    expect(WORKFLOW_TEMPLATES.length).toBeGreaterThanOrEqual(4);
+  it('至少 20 个模板', () => {
+    expect(WORKFLOW_TEMPLATES.length).toBeGreaterThanOrEqual(20);
+  });
+
+  it('每个模板有分类且 id 唯一', () => {
+    const ids = new Set<string>();
+    for (const tpl of WORKFLOW_TEMPLATES) {
+      expect(tpl.category, `${tpl.id} 缺分类`).toBeTruthy();
+      expect(tpl.emoji, `${tpl.id} 缺 emoji`).toBeTruthy();
+      expect(ids.has(tpl.id), `${tpl.id} 重复`).toBe(false);
+      ids.add(tpl.id);
+    }
   });
 
   it('每个模板：节点结构合法', () => {
