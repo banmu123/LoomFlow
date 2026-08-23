@@ -792,6 +792,81 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
     [conversationId, conversations, isGenerating, model, updateConversation],
   );
 
+  // 配置模型成功后：刷新模型列表 + 自动重试当前对话中失败/未回复的最后一条消息
+  const handleModelConfigured = useCallback(() => {
+    // 1. 刷新模型列表（模型选择器出现新模型）
+    loadModels();
+    // 2. 若当前对话的最后一条 user 消息没有成功回复（error/空/无回复），自动重试
+    if (!convId || isGenerating) return;
+    const cur = conversations.find((c) => c.id === convId);
+    if (!cur || cur.messages.length === 0) return;
+    // 找到最后一条 user 消息（失败时其后可能跟了一条 assistant error 消息）
+    const lastUser = [...cur.messages].reverse().find((m) => m.role === 'user');
+    if (!lastUser || lastUser.status !== 'done') return;
+    // 该 user 消息之后是否已有成功的 assistant 回复
+    const lastUserIdx = cur.messages.findIndex((m) => m.id === lastUser.id);
+    const repliesAfter = cur.messages.slice(lastUserIdx + 1);
+    const hasOkReply = repliesAfter.some(
+      (m) => m.role === 'assistant' && m.status !== 'error' && m.content,
+    );
+    if (hasOkReply) return;
+
+    // 删除该 user 消息之后的所有失败回复（error assistant），避免重试后新旧回复并存
+    const staleReplies = repliesAfter.filter((m) => m.role === 'assistant');
+    for (const sr of staleReplies) {
+      fetch(`/api/conversations/${convId}/messages/${sr.id}`, {
+        method: 'DELETE',
+      }).catch(() => {});
+      updateConversation(convId, (c) => ({
+        ...c,
+        messages: c.messages.filter((m) => m.id !== sr.id),
+      }));
+    }
+
+    // 触发重新生成（复用 handleRegenerate 的调用形态：无 assistant id → 走 autoGenerate 路径）
+    autoGenerateRef.current = null;
+    setIsGenerating(true);
+    generateInFlightRef.current = true;
+    fetch(`/api/conversations/${convId}/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content: lastUser.content,
+        images: lastUser.images ?? [],
+        model,
+        regenerate: true,
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data?.assistantMessage?.id) {
+          setError(data?.error || '自动重试失败，请重试');
+          setIsGenerating(false);
+          return;
+        }
+        updateConversation(convId, (c) => ({
+          ...c,
+          messages: [
+            ...c.messages,
+            {
+              id: data.assistantMessage.id,
+              role: 'assistant' as const,
+              content: '',
+              status: 'pending' as const,
+              createdAt: Date.now(),
+            },
+          ],
+        }));
+      })
+      .catch(() => {
+        setError('自动重试失败，请重试');
+        setIsGenerating(false);
+      })
+      .finally(() => {
+        generateInFlightRef.current = false;
+      });
+  }, [convId, conversations, isGenerating, model, loadModels, updateConversation]);
+
   // 上传图片到 OSS
   const handleAttachImage = useCallback(async (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -1019,7 +1094,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
         <ModelConfigDialog
           open={modelConfigOpen}
           onOpenChange={setModelConfigOpen}
-          onConfigured={loadModels}
+          onConfigured={handleModelConfigured}
         />
 
         {/* 工作流预览抽屉（AI 生成工作流后） */}
