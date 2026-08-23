@@ -63,9 +63,11 @@ export function CanvasAssistant({
     transport: new DefaultChatTransport({
       api: '/api/canvas-assistant',
       // 发送请求时注入最新画布数据/图片/模型/工作流 id（transport 随渲染重建，闭包始终是最新 state）
+      // 注意：自定义 body 时必须显式带上 messages，否则后端收不到（SDK 不会自动合并）
       prepareSendMessagesRequest: (options) => ({
         ...options,
         body: {
+          messages: options.messages,
           ...options.body,
           canvasData: getCanvasData(),
           images: images.map((img) => img.url),
