@@ -19,6 +19,10 @@ app.prepare().then(() => {
   const server = createServer(async (req, res) => {
     try {
       const parsedUrl = parse(req.url!, true);
+      // 注入当前路径给服务端 layout（用于登录后 redirect 回原页面）
+      if (parsedUrl.pathname) {
+        req.headers['x-pathname'] = parsedUrl.pathname;
+      }
       await handle(req, res, parsedUrl);
     } catch (err) {
       console.error('Error occurred handling', req.url, err);

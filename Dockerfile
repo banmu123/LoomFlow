@@ -12,6 +12,12 @@ WORKDIR /app
 # pnpm 通过 corepack 启用（packageManager: pnpm@9.0.0 锁定版本）
 RUN corepack enable
 
+# npm 镜像源（国内构建加速/稳定；corepack 下载 pnpm 与 pnpm install 均走此源）
+RUN npm config set registry https://registry.npmmirror.com \
+    && npm config set fetch-retries 5 \
+    && npm config set fetch-retry-mintimeout 20000 \
+    && npm config set fetch-retry-maxtimeout 120000
+
 # 先复制依赖清单，利用 Docker 层缓存
 # 依赖安装：pnpm store 持久化缓存（BuildKit cache mount）——lock 文件未变时秒过，变更时只装差异
 COPY package.json pnpm-lock.yaml ./
