@@ -40,6 +40,8 @@ Describe your idea in natural language → generate a runnable workflow → cust
 
 **In one sentence**: Dify builds LLM app platforms for teams, n8n does general automation for everyone — **LoomFlow turns "one sentence" into a runnable, publishable workflow for individuals and small teams**. It doesn't chase comprehensiveness — it pursues a 30-second learning curve and a one-minute deployment.
 
+**Scope**: LoomFlow is **not** an AI coach, a personal-growth app, or a coding-practice platform. It stays deliberately narrow — one pipeline: *natural language → workflow → canvas → API*. Anything that doesn't serve that loop is kept out of the core product.
+
 ---
 
 ## ✨ Highlights
@@ -96,12 +98,6 @@ Record **why** a workflow is designed this way — decisions, problems, solution
 
 ### 🤖 Canvas AI Assistant
 Chat with the canvas: ask about the current workflow, describe a change ("add a summarizer after search"), and the AI outputs a complete workflow JSON you **apply to the canvas in one click**.
-
-### 🌱 Growth System
-Goal-driven learning: define a **Goal** in natural language → AI generates a **Journey** of capabilities → practice with Workflows or the **Code Lab** → real behavior feeds an **Evidence Engine** that advances capability status (Locked → Exploring → Developing → Mastered) and unlocks **Milestones**. No XP, no fake data — everything derives from real actions.
-
-### 🧑‍💻 Code Lab
-Lightweight practice environment (Monaco editor + sandbox): write JavaScript/TypeScript, run with **tests & assertions**, and get **Hint / Explain / Review / Debug** from the AI Mentor — which guides rather than gives away the answer. Fully sandboxed: no host, secrets, database or network access.
 
 ### 🧠 Bring Your Own Model
 Add **any model** (DeepSeek / Ark / any OpenAI-compatible endpoint) through the admin UI — **no code changes**:
@@ -297,9 +293,9 @@ Checklist:
 ```
 src/
 ├── app/                  # Pages & API routes
-│   ├── (main)/           # Main UI (chat + workflows + admin + growth + lab)
+│   ├── (main)/           # Main UI (chat + workflows + admin)
 │   ├── share/            # Public workflow share pages
-│   └── api/              # Backend APIs (auth / conversations / workflow-history / publish / admin / nodes / search-providers / growth / code-lab)
+│   └── api/              # Backend APIs (auth / conversations / workflow-history / publish / admin / nodes / search-providers)
 ├── components/           # UI components
 ├── lib/
 │   ├── tinyflow/         # Workflow execution engine + NodeRegistry/NodeDefinition
@@ -307,8 +303,6 @@ src/
 │   ├── ai/               # Model Registry (providers / capabilities / models)
 │   ├── agent/            # AI chat tools (create_custom_node, knowledge, stats...)
 │   ├── workflow-ai/      # AI workflow generation prompts
-│   ├── growth/           # Growth System (goals / journeys / evidence engine / milestones)
-│   ├── code-lab/         # Code Lab sandbox (isolated VM execution)
 │   ├── secrets.ts        # Sensitive config encryption (AES-256-GCM)
 │   └── i18n.tsx          # i18n framework
 ├── messages/             # zh/en translations
@@ -319,7 +313,7 @@ src/
 
 ## 🧪 Testing & CI
 
-- **Vitest** — 266 unit tests (engine, schema, sandbox, executors, search providers, secrets encryption, growth engine & milestones, code-lab sandbox, flow trace, notes, model registry, node registry, agent tools, i18n)
+- **Vitest** — 266 unit tests (engine, schema, sandbox, executors, search providers, secrets encryption, flow trace, notes, model registry, node registry, agent tools, i18n)
 - **GitHub Actions** — lint + typecheck + test + production build on every push (Node 20/22 matrix)
 
 ---

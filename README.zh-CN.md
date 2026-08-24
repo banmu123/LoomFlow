@@ -40,6 +40,8 @@
 
 **一句话**：Dify 是给团队造 LLM 应用平台的，n8n 是给所有人做通用自动化的——**LoomFlow 是给个人和小团队"用一句话把想法变成可运行、可发布的工作流"**。不追求大而全，追求 30 秒上手、一分钟部署。
 
+**边界**：LoomFlow **不是** AI 教练、个人成长应用或编程练习平台。它刻意保持聚焦——只做一件事：*自然语言 → 工作流 → 画布 → API*。不服务于这条主线的功能，都排除在核心产品之外。
+
 ---
 
 ## ✨ 功能亮点
@@ -90,12 +92,6 @@ curl -X POST https://your-host/api/publish/{workflowId}/execute \
 
 ### 🤖 画布 AI 助手
 在画布上直接对话：询问当前工作流、描述修改需求（如"给搜索结果加一个总结节点"），AI 输出完整工作流 JSON，**一键应用到画布**。
-
-### 🌱 成长系统（Growth System）
-目标驱动的学习体系：用自然语言定义 **Goal** → AI 生成 **Journey** 能力路径 → 通过 Workflow 或 **Code Lab** 实践 → 真实行为驱动 **Evidence Engine** 推进能力状态（未开始 → 探索 → 学习中 → 已掌握）并解锁 **Milestone**。无 XP、无虚假数据——一切来自真实行为。
-
-### 🧑‍💻 Code Lab
-轻量代码练习环境（Monaco 编辑器 + 沙箱）：编写 JS/TS、运行**测试断言**、AI 导师提供**提示/讲解/审查/排错**（先引导思考，不直接给答案）。完全沙箱隔离：无法访问宿主、密钥、数据库与网络。
 
 ### 🔒 私有化部署
 应用 + 数据 + 存储都可部署在自己服务器；数据库可切换自建 PostgreSQL（详见部署手册）。
@@ -280,9 +276,9 @@ curl http://localhost:5000/api/health
 ```
 src/
 ├── app/                  # 页面与 API 路由
-│   ├── (main)/           # 主界面（对话 + 工作流 + 管理后台 + 成长 + 代码练习）
+│   ├── (main)/           # 主界面（对话 + 工作流 + 管理后台）
 │   ├── share/            # 工作流分享页
-│   └── api/              # 后端 API（auth / conversations / workflow-history / publish / admin / nodes / search-providers / growth / code-lab）
+│   └── api/              # 后端 API（auth / conversations / workflow-history / publish / admin / nodes / search-providers）
 ├── components/           # UI 组件
 ├── lib/
 │   ├── tinyflow/         # 工作流执行引擎（12 种节点执行器）
@@ -290,8 +286,6 @@ src/
 │   ├── ai/               # 模型注册表（providers / capabilities / models）
 │   ├── agent/            # AI 对话工具（create_custom_node、知识库、统计等）
 │   ├── workflow-ai/      # AI 生成工作流提示词
-│   ├── growth/           # 成长系统（Goal / Journey / 证据引擎 / 里程碑）
-│   ├── code-lab/         # Code Lab 沙箱（隔离 VM 执行）
 │   ├── secrets.ts        # 敏感配置加密（AES-256-GCM）
 │   └── i18n.tsx          # 国际化框架
 ├── messages/             # 中英文案
@@ -302,7 +296,7 @@ src/
 
 ## 🧪 测试与 CI
 
-- **Vitest** — 266 个单元测试（引擎、schema、沙箱、执行器、搜索适配层、密钥加密、成长引擎与里程碑、Code Lab 沙箱、执行追踪、笔记、模型注册表、节点注册表、Agent 工具、i18n）
+- **Vitest** — 266 个单元测试（引擎、schema、沙箱、执行器、搜索适配层、密钥加密、执行追踪、笔记、模型注册表、节点注册表、Agent 工具、i18n）
 - **GitHub Actions** — 每次推送自动执行 lint + 类型检查 + 测试 + 生产构建（Node 20/22 矩阵）
 
 ---

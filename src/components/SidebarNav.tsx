@@ -16,7 +16,6 @@ import {
   KeyRound,
   Library,
   CloudCog,
-  FlaskConical,
   MessageSquare,
   ChevronDown,
   ChevronRight,
@@ -53,7 +52,6 @@ const WORKFLOW_ITEMS: NavItem[] = [
   { href: '/workflows/api-keys', labelKey: 'sidebar.apiKeys', icon: KeyRound },
   { href: '/workflows/custom-nodes', labelKey: 'sidebar.customNodes', icon: Boxes },
   { href: '/knowledge', labelKey: 'sidebar.knowledge', icon: Library },
-  { href: '/lab', labelKey: 'sidebar.lab', icon: FlaskConical },
 ];
 
 const ADMIN_ITEMS: NavItem[] = [
