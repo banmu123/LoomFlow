@@ -77,7 +77,22 @@ export type SaveFlowRunData = {
   flowData?: unknown | null;
   startTime?: number;
   finishTime?: number;
+  /** 节点级 trace（Evaluation/Optimization 数据源） */
+  trace?: unknown;
+  tokenUsage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number } | null;
+  cost?: number;
+  retryCount?: number;
 };
+
+/** run trace → 落库用的 token_usage 摘要 */
+export function traceToTokenUsage(trace: unknown): { promptTokens: number; completionTokens: number; totalTokens: number } {
+  const t = (trace ?? {}) as { tokenUsage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number } };
+  return {
+    promptTokens: Number(t.tokenUsage?.promptTokens ?? 0),
+    completionTokens: Number(t.tokenUsage?.completionTokens ?? 0),
+    totalTokens: Number(t.tokenUsage?.totalTokens ?? 0),
+  };
+}
 
 // 写入/更新执行记录（落库持久化）
 export async function saveFlowRun(
@@ -96,6 +111,11 @@ export async function saveFlowRun(
       events: data.events ?? null,
       error: data.error ?? null,
       flow_data: data.flowData ?? null,
+      trace: data.trace ?? null,
+      token_usage: data.tokenUsage ?? null,
+      cost: data.cost ?? null,
+      retry_count: data.retryCount ?? null,
+      duration_ms: data.startTime && data.finishTime ? Math.max(0, data.finishTime - data.startTime) : null,
     };
 
     if (exists.data) {
@@ -118,6 +138,10 @@ export async function saveFlowRun(
         patch.finished_at = new Date(data.finishTime).toISOString();
         patch.duration_ms = Math.max(0, data.finishTime - (data.startTime ?? Date.now()));
       }
+      if (data.trace !== undefined) patch.trace = data.trace;
+      if (data.tokenUsage !== undefined) patch.token_usage = data.tokenUsage;
+      if (data.cost !== undefined) patch.cost = data.cost;
+      if (data.retryCount !== undefined) patch.retry_count = data.retryCount;
       await supabase.from('flow_runs').update(patch).eq('id', flowId);
     } else {
       await supabase.from('flow_runs').insert({ id: flowId, ...row });
@@ -243,6 +267,7 @@ export async function runFlow(
 
     const finalOutputs = extractFinalOutputs(flowData, engine);
     const persistedStatus = runStateToPersistedStatus(engine.getState());
+    const finalTrace = engine.getTrace();
 
     await saveFlowRun(flowId, {
       status: persistedStatus,
@@ -250,6 +275,10 @@ export async function runFlow(
       events,
       startTime,
       finishTime: Date.now(),
+      trace: finalTrace,
+      tokenUsage: traceToTokenUsage(finalTrace),
+      cost: finalTrace.cost,
+      retryCount: finalTrace.retryCount,
     });
 
     // 幂等 settle：记录最终结果
@@ -274,7 +303,7 @@ export async function runFlow(
         context: engine.getContext(),
       });
 
-      await saveFlowRun(flowId, { status: 'paused', events, startTime });
+      await saveFlowRun(flowId, { status: 'paused', events, startTime, trace: engine.getTrace() });
 
       return {
         flowId,
@@ -289,12 +318,17 @@ export async function runFlow(
     const persistedStatus = runStateToPersistedStatus(runState);
 
     flowRunStore.update(flowId, { status: persistedStatus });
+    const failedTrace = engine.getTrace();
     await saveFlowRun(flowId, {
       status: persistedStatus,
       error: error.message,
       events,
       startTime,
       finishTime: Date.now(),
+      trace: failedTrace,
+      tokenUsage: traceToTokenUsage(failedTrace),
+      cost: failedTrace.cost,
+      retryCount: failedTrace.retryCount,
     });
 
     if (options.idempotencyKey) {

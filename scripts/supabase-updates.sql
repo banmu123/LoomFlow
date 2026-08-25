@@ -607,3 +607,13 @@ DO $$ BEGIN
 END $$;
 
 NOTIFY pgrst, 'reload schema';
+
+-- 58. Evaluation：skill_runs 补充 trace（节点级分析与继承 Workflow Evaluation 用）
+ALTER TABLE skill_runs ADD COLUMN IF NOT EXISTS retry_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE skill_runs ADD COLUMN IF NOT EXISTS trace JSONB;
+
+-- flow_runs 按时间范围分析索引（Evaluation 24h/7d/30d 查询性能）
+CREATE INDEX IF NOT EXISTS idx_flow_runs_workflow_created ON flow_runs(workflow_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_skill_runs_skill_ran ON skill_runs(skill_id, ran_at DESC);
+
+NOTIFY pgrst, 'reload schema';

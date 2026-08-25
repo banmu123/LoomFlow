@@ -71,6 +71,10 @@ services:
     depends_on:
       postgrest:
         condition: service_healthy
+    ports:
+      # 宿主机访问 PostgREST（本地开发用）：仅绑定回环地址，不对外暴露
+      # 本地 Next.js dev 指向 http://127.0.0.1:8123 即可连上 docker 内数据库
+      - "127.0.0.1:8123:80"
     volumes:
       - ./docker/nginx/rest.conf:/etc/nginx/conf.d/default.conf:ro
     healthcheck:

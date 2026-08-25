@@ -245,6 +245,8 @@ export async function saveSkillRun(run: {
   tokenUsage: number;
   estimatedCost: number;
   rateLimited?: boolean;
+  retryCount?: number;
+  trace?: unknown;
 }): Promise<void> {
   await supabase.from('skill_runs').insert({
     id: run.runId,
@@ -259,6 +261,8 @@ export async function saveSkillRun(run: {
     token_usage: run.tokenUsage,
     estimated_cost: run.estimatedCost,
     rate_limited: run.rateLimited ?? false,
+    retry_count: run.retryCount ?? 0,
+    trace: run.trace ?? null,
   });
 }
 

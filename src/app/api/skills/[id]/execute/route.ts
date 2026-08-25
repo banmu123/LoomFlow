@@ -124,6 +124,8 @@ export async function POST(
     durationMs: result.durationMs,
     tokenUsage: result.tokenUsage,
     estimatedCost: result.estimatedCost,
+    retryCount: (result.trace as { retryCount?: number } | undefined)?.retryCount,
+    trace: result.trace,
   });
 
   const statusCode = result.status === 'failed' ? 500 : result.status === 'timeout' ? 504 : 200;
