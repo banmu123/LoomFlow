@@ -4,7 +4,7 @@ import type { FlowContext, ConfirmRequest, NodeStatus } from './types';
 export interface FlowRunRecord {
   flowId: string;
   engine: FlowEngine;
-  status: 'running' | 'paused' | 'completed' | 'failed' | 'stopped';
+  status: 'running' | 'paused' | 'completed' | 'failed' | 'stopped' | 'cancelled' | 'timeout';
   context: FlowContext;
   confirmRequest?: ConfirmRequest;
   /** 发起者用户 id（status/stop/confirm 端点校验归属；null=未登录遗留记录） */

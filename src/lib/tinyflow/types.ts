@@ -113,7 +113,9 @@ export type NodeStatus =
   | 'success'
   | 'failed'
   | 'skipped'
-  | 'waiting_confirm';
+  | 'waiting_confirm'
+  | 'cancelled'
+  | 'timeout';
 
 export interface NodeResult {
   nodeId: string;
@@ -121,6 +123,10 @@ export interface NodeResult {
   outputs: Record<string, unknown>;
   error?: string;
   duration?: number;
+  /** 实际尝试次数（含重试）；>=1 */
+  attempt?: number;
+  /** 重试次数（不含首次） */
+  retryCount?: number;
 }
 
 export interface FlowContext {
@@ -133,16 +139,41 @@ export interface FlowContext {
   userId?: string | null;
 }
 
+export interface RetryConfig {
+  /** 是否启用重试（false = 关闭，非幂等操作必须允许关闭） */
+  retryEnable: boolean;
+  /** 最大重试次数 */
+  maxRetries: number;
+  /** 初始退避间隔（ms） */
+  retryDelayMs: number;
+  /** 是否指数退避 */
+  exponentialBackoff: boolean;
+}
+
 export interface ExecuteOptions {
   flowData: TinyflowData;
   inputs: Record<string, unknown>;
   userId?: string | null;
+  /** 关联工作流 id（trace/backfill） */
+  workflowId?: string | null;
   signal?: AbortSignal;
+  /** 工作流级超时（ms）；<=0 = 不限制 */
+  timeoutMs?: number;
+  /** 节点级默认超时（ms）；节点 data.timeout 优先 */
+  defaultNodeTimeoutMs?: number;
+  /** 最大并行节点数（依赖关系允许时）；1 = 串行（默认），上限由引擎钳制 */
+  maxConcurrency?: number;
+  /** 幂等键（重复请求直接返回首次结果） */
+  idempotencyKey?: string;
+  /** 恢复 checkpoint 数据（resume） */
+  resumeCheckpoint?: unknown;
   onNodeStart?: (nodeId: string) => void;
   onNodeComplete?: (nodeId: string, result: NodeResult) => void;
   onFlowComplete?: (outputs: Record<string, unknown>) => void;
   onFlowError?: (error: Error) => void;
   resumeContext?: FlowContext;
+  /** checkpoint 持久化回调（每次节点完成后调用，供落库） */
+  onCheckpoint?: (flowId: string, checkpoint: unknown) => void;
 }
 
 export interface FlowError extends Error {

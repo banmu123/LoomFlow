@@ -18,7 +18,7 @@ export async function GET(
 
   const { data, error } = await supabase
     .from('flow_runs')
-    .select('id, workflow_id, user_id, source, status, inputs, outputs, events, flow_data, error, created_at, updated_at')
+    .select('id, workflow_id, user_id, source, status, inputs, outputs, events, flow_data, error, trace, created_at, updated_at, started_at, finished_at, duration_ms, retry_count')
     .eq('id', id)
     .single();
 

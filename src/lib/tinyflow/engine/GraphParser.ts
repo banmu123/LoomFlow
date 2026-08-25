@@ -87,4 +87,40 @@ export class GraphParser {
   getChildren(loopNodeId: string): FlowNode[] {
     return [...this.nodes.values()].filter((n) => n.parentId === loopNodeId);
   }
+
+  /** 反向邻接：节点的前驱节点集合 */
+  getIncomingIds(nodeId: string): string[] {
+    return this.reverseAdj.get(nodeId) || [];
+  }
+
+  /**
+   * 计算每个节点从其直接前驱可直接就绪的集合。
+   * 返回 Map<nodeId, 可直接就绪的前驱数>（不考虑该前驱是否真的会执行）。
+   */
+  getDependencyCounts(): Map<string, number> {
+    const counts = new Map<string, number>();
+    for (const node of this.nodes.values()) {
+      if (node.parentId) continue; // loop 子节点由 LoopExecutor 内部调度
+      counts.set(node.id, (this.reverseAdj.get(node.id) || []).length);
+    }
+    return counts;
+  }
+
+  /** 图广度可达节点集合（用于检查 start 是否可到达某节点） */
+  reachableFrom(startId: string): Set<string> {
+    const visited = new Set<string>();
+    const queue = [startId];
+    while (queue.length > 0) {
+      const id = queue.shift()!;
+      if (visited.has(id)) continue;
+      visited.add(id);
+      for (const target of this.adjacency.get(id) || []) queue.push(target);
+    }
+    return visited;
+  }
+
+  /** 节点 id 对应的 FlowNode（别名便利） */
+  getNodeId(id: string): string | undefined {
+    return this.nodes.get(id)?.id;
+  }
 }

@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
 
   let query = supabase
     .from('flow_runs')
-    .select('id, workflow_id, source, status, inputs, outputs, error, created_at')
+    .select('id, workflow_id, source, status, inputs, outputs, error, created_at, duration_ms, retry_count')
     .order('created_at', { ascending: false })
     .limit(limit);
 

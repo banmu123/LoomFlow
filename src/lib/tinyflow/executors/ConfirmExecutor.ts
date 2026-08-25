@@ -8,7 +8,13 @@ export class ConfirmExecutor extends BaseExecutor {
     super(paramResolver, exprEvaluator);
   }
 
-  async execute(node: FlowNode, _context: FlowContext): Promise<Record<string, unknown>> {
+  async execute(node: FlowNode, context: FlowContext): Promise<Record<string, unknown>> {
+    // resume 场景：用户已提交确认数据 → 直接返回为输出，不再次暂停
+    const confirmData = context.inputs._confirmData as Record<string, unknown> | undefined;
+    if (confirmData && typeof confirmData === 'object') {
+      return { output: confirmData, confirmed: true };
+    }
+
     const confirms = node.data.confirms || [];
 
     // 抛出确认请求错误, 引擎会暂停执行

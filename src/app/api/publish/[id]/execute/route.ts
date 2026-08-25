@@ -19,6 +19,10 @@ export async function POST(
   const ip = getClientIp(request);
   const body = await request.json().catch(() => null);
   const inputs = (body?.inputs ?? {}) as Record<string, unknown>;
+  const idempotencyKey =
+    request.headers.get('idempotency-key') || (body?.idempotencyKey as string | undefined);
+  const timeoutMs = typeof body?.timeoutMs === 'number' ? body.timeoutMs : undefined;
+  const maxConcurrency = typeof body?.maxConcurrency === 'number' ? body.maxConcurrency : undefined;
 
   const startTime = Date.now();
 
@@ -27,6 +31,10 @@ export async function POST(
       source: 'api',
       workflowId: id,
       userId: auth.userId,
+      idempotencyKey,
+      timeoutMs,
+      maxConcurrency,
+      signal: request.signal,
     });
 
     // 记录调用日志
@@ -46,9 +54,9 @@ export async function POST(
       ip,
     });
 
-    if (result.status === 'failed') {
+    if (result.status === 'failed' || result.status === 'timeout' || result.status === 'cancelled') {
       return Response.json(
-        { status: 'failed', error: result.error },
+        { status: result.status, error: result.error },
         { status: 500 },
       );
     }

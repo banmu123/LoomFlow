@@ -20,7 +20,12 @@ export class HttpExecutor extends BaseExecutor {
     return null;
   }
 
-  async execute(node: FlowNode, context: FlowContext): Promise<Record<string, unknown>> {
+  async execute(
+    node: FlowNode,
+    context: FlowContext,
+    _subFlowRunner?: unknown,
+    signal?: AbortSignal,
+  ): Promise<Record<string, unknown>> {
     const data = node.data;
     const method = (data.method || 'GET').toUpperCase();
     const url = data.url ? this.paramResolver.interpolateTemplate(data.url, context) : '';
@@ -86,7 +91,13 @@ export class HttpExecutor extends BaseExecutor {
         headers,
         body,
         redirect: 'manual',
-        signal: AbortSignal.timeout(requestTimeoutMs),
+        // 合并运行时取消信号 + 节点超时信号：取消/超时可立即中止在途请求
+        signal: signal
+          ? (AbortSignal as unknown as { any: (s: AbortSignal[]) => AbortSignal }).any([
+              signal,
+              AbortSignal.timeout(requestTimeoutMs),
+            ])
+          : AbortSignal.timeout(requestTimeoutMs),
       });
 
       // 手动跟随重定向（每跳重新校验，防重定向到内网）

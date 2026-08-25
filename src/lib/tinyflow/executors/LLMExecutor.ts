@@ -20,7 +20,12 @@ export class LLMExecutor extends BaseExecutor {
     return null;
   }
 
-  async execute(node: FlowNode, context: FlowContext): Promise<Record<string, unknown>> {
+  async execute(
+    node: FlowNode,
+    context: FlowContext,
+    _subFlowRunner?: unknown,
+    signal?: AbortSignal,
+  ): Promise<Record<string, unknown>> {
     const data = node.data;
     // llmId 由 validate() 保证非空；必须来自「模型配置」，不做默认值兜底
     const rawModelId = String(data.llmId);
@@ -100,6 +105,8 @@ export class LLMExecutor extends BaseExecutor {
       system: systemPrompt || undefined,
       temperature,
       maxOutputTokens: Number(data.maxTokens) || 8192,
+      abortSignal: signal,
+      timeout: data.timeoutMs ? Number(data.timeoutMs) : undefined,
     });
 
     // tokens 随输出附带（节点级 trace 展示 + 下游可引用）

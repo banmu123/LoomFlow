@@ -9,10 +9,13 @@ export const runtime = 'nodejs';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { flowData, inputs = {}, workflowId = null } = body as {
+    const { flowData, inputs = {}, workflowId = null, idempotencyKey, timeoutMs, maxConcurrency } = body as {
       flowData: TinyflowData;
       inputs?: Record<string, unknown>;
       workflowId?: string | null;
+      idempotencyKey?: string;
+      timeoutMs?: number;
+      maxConcurrency?: number;
     };
 
     if (!flowData || !flowData.nodes || !flowData.edges) {
@@ -45,9 +48,13 @@ export async function POST(request: NextRequest) {
       source: 'internal',
       userId: user.id,
       workflowId: safeWorkflowId,
+      idempotencyKey: typeof idempotencyKey === 'string' ? idempotencyKey : undefined,
+      timeoutMs: typeof timeoutMs === 'number' ? timeoutMs : undefined,
+      maxConcurrency: typeof maxConcurrency === 'number' ? maxConcurrency : undefined,
+      signal: request.signal,
     });
 
-    if (result.status === 'failed') {
+    if (result.status === 'failed' || result.status === 'timeout' || result.status === 'cancelled') {
       return NextResponse.json(result, { status: 500 });
     }
     return NextResponse.json(result);

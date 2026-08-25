@@ -35,7 +35,8 @@ export abstract class BaseExecutor {
   abstract execute(
     node: FlowNode,
     context: FlowContext,
-    subFlowRunner?: SubFlowRunner
+    subFlowRunner?: SubFlowRunner,
+    signal?: AbortSignal
   ): Promise<Record<string, unknown>>;
 
   /**

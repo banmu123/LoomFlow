@@ -2,7 +2,6 @@ import type { FlowNode, FlowContext, SubFlowRunner, Parameter } from '../types';
 import { BaseExecutor } from './BaseExecutor';
 import type { ParameterResolver } from '../engine/ParameterResolver';
 import type { ExpressionEvaluator } from '../engine/ExpressionEvaluator';
-import type { FlowEngine } from '../engine/FlowEngine';
 
 export class LoopExecutor extends BaseExecutor {
   constructor(paramResolver: ParameterResolver, exprEvaluator: ExpressionEvaluator) {
@@ -12,7 +11,8 @@ export class LoopExecutor extends BaseExecutor {
   async execute(
     node: FlowNode,
     context: FlowContext,
-    subFlowRunner?: SubFlowRunner
+    subFlowRunner?: SubFlowRunner,
+    signal?: AbortSignal,
   ): Promise<Record<string, unknown>> {
     const data = node.data;
 
@@ -31,6 +31,7 @@ export class LoopExecutor extends BaseExecutor {
     const results: unknown[] = [];
 
     for (let i = 0; i < maxLoopCount; i++) {
+      if (signal?.aborted) throw new Error('loop aborted');
       // 检查中断条件
       if (breakCondition) {
         const shouldBreak = this.exprEvaluator.evaluate(breakCondition, context);
@@ -44,25 +45,13 @@ export class LoopExecutor extends BaseExecutor {
         loopCount: i + 1,
       };
 
-      // 如果有子节点, 执行子流程
-      if (subFlowRunner) {
-        // 获取子节点
-        const engine = this.getEngine();
-        if (engine) {
-          const childNodes = (engine as unknown as {
-            parser: { getChildren: (id: string) => FlowNode[] };
-          }).parser.getChildren(node.id);
-
-          if (childNodes.length > 0) {
-            await subFlowRunner(childNodes, context, {
-              flowData: { nodes: childNodes, edges: [], viewport: { x: 0, y: 0, zoom: 1 } },
-              inputs: loopContext,
-              signal: undefined,
-              onNodeStart: undefined,
-              onNodeComplete: undefined,
-            });
-          }
-        }
+      // 子节点由引擎按其 parentId 解析（subFlowRunner 传入空数组）
+      if (subFlowRunner && maxLoopCount > 0) {
+        await subFlowRunner([], context, {
+          flowData: { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } },
+          inputs: loopContext,
+          signal,
+        });
       }
 
       // 收集循环输出
@@ -71,9 +60,9 @@ export class LoopExecutor extends BaseExecutor {
         ...loopContext,
       });
 
-      // 等待间隔
+      // 等待间隔（可中止）
       if (intervalMs > 0) {
-        await new Promise((resolve) => setTimeout(resolve, intervalMs));
+        await waitInterval(intervalMs, signal);
       }
     }
 
@@ -82,10 +71,22 @@ export class LoopExecutor extends BaseExecutor {
       loopCount: results.length,
     };
   }
+}
 
-  private engineRef: FlowEngine | null = null;
-
-  private getEngine(): FlowEngine | null {
-    return this.engineRef;
-  }
+function waitInterval(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error('loop aborted'));
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    const onAbort = (): void => {
+      clearTimeout(timer);
+      reject(new Error('loop aborted'));
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
 }

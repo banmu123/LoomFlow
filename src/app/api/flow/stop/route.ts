@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { flowRunStore } from '@/lib/tinyflow';
+import { saveFlowRun } from '@/lib/tinyflow/runFlow';
 import { getCurrentUser } from '@/lib/server-auth';
 
 export const runtime = 'nodejs';
@@ -27,14 +28,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '无权操作该流程' }, { status: 403 });
     }
 
-    // 中止引擎
-    record.engine.abort();
-    flowRunStore.update(flowId, { status: 'stopped' });
+    // 统一取消逻辑：状态置为 cancelled（不再使用语义含混的 stopped）
+    record.engine.cancel();
+    flowRunStore.update(flowId, { status: 'cancelled' });
+    await saveFlowRun(flowId, { status: 'cancelled' });
 
     return NextResponse.json({
       flowId,
-      status: 'stopped',
-      message: 'Flow execution has been stopped',
+      status: 'cancelled',
+      message: 'Flow execution has been cancelled',
     });
   } catch (err) {
     const error = err as Error;

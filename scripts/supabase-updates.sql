@@ -465,3 +465,25 @@ ALTER TABLE user_ability_scores ADD COLUMN IF NOT EXISTS recommended_careers JSO
 
 -- 54. 迁移完成后刷新 PostgREST schema 缓存
 NOTIFY pgrst, 'reload schema';
+
+-- 55. Runtime 可靠性：执行记录扩展（超时/取消/幂等/trace/checkpoint/耗时）
+-- 幂等键（外部调用重复请求去重；进程外唯一约束兜底内存幂等）
+ALTER TABLE flow_runs ADD COLUMN IF NOT EXISTS idempotency_key TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_flow_runs_idempotency_key
+  ON flow_runs (idempotency_key)
+  WHERE idempotency_key IS NOT NULL;
+
+-- 观察性字段（started_at 已有 created_at，但为兼容保存耗时单独补列）
+ALTER TABLE flow_runs ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
+ALTER TABLE flow_runs ADD COLUMN IF NOT EXISTS finished_at TIMESTAMPTZ;
+ALTER TABLE flow_runs ADD COLUMN IF NOT EXISTS duration_ms BIGINT;
+ALTER TABLE flow_runs ADD COLUMN IF NOT EXISTS retry_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE flow_runs ADD COLUMN IF NOT EXISTS token_usage JSONB;
+ALTER TABLE flow_runs ADD COLUMN IF NOT EXISTS cost NUMERIC(12, 6) NOT NULL DEFAULT 0;
+-- 节点级 trace（observability；敏感字段已在应用层脱敏）
+ALTER TABLE flow_runs ADD COLUMN IF NOT EXISTS trace JSONB;
+-- 执行 checkpoint（resume / 服务重启恢复；节点完成时增量保存）
+ALTER TABLE flow_runs ADD COLUMN IF NOT EXISTS checkpoint JSONB;
+
+-- 迁移完成后刷新 PostgREST schema 缓存
+NOTIFY pgrst, 'reload schema';
