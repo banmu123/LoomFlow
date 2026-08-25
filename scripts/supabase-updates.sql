@@ -487,3 +487,54 @@ ALTER TABLE flow_runs ADD COLUMN IF NOT EXISTS checkpoint JSONB;
 
 -- 迁移完成后刷新 PostgREST schema 缓存
 NOTIFY pgrst, 'reload schema';
+
+-- 56. Workflow Copilot：测试用例与测试运行
+-- 测试用例（归属工作流 + 可指定版本；输入/期望输出/评估规则）
+CREATE TABLE IF NOT EXISTS workflow_test_cases (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workflow_id     UUID NOT NULL REFERENCES workflow_history(id) ON DELETE CASCADE,
+  user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  workflow_version INTEGER,                       -- NULL = 始终针对当前/最新
+  name            TEXT NOT NULL,
+  description     TEXT,
+  inputs          JSONB NOT NULL DEFAULT '{}',
+  expected_outputs JSONB,                          -- exact/partial_match 用
+  evaluation_rules JSONB NOT NULL DEFAULT '[]',    -- EvaluationRule[]
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_wf_test_cases_workflow ON workflow_test_cases(workflow_id);
+CREATE INDEX IF NOT EXISTS idx_wf_test_cases_user ON workflow_test_cases(user_id);
+
+-- 测试运行结果历史
+CREATE TABLE IF NOT EXISTS workflow_test_runs (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  test_case_id    UUID NOT NULL REFERENCES workflow_test_cases(id) ON DELETE CASCADE,
+  workflow_id     UUID NOT NULL,
+  workflow_version INTEGER,
+  status          TEXT NOT NULL,                  -- passed / failed / error
+  outcome         TEXT NOT NULL,                  -- pass / fail
+  execution_error TEXT,
+  run_status      TEXT,                           -- 底层执行状态 completed/failed/...
+  outputs         JSONB,
+  evaluation      JSONB,
+  error           TEXT,
+  duration_ms     INTEGER NOT NULL DEFAULT 0,
+  ran_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_wf_test_runs_case ON workflow_test_runs(test_case_id, ran_at DESC);
+
+ALTER TABLE workflow_test_cases ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workflow_test_runs ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT FROM pg_policies WHERE policyname = 'Allow all on workflow_test_cases' AND tablename = 'workflow_test_cases') THEN
+    CREATE POLICY "Allow all on workflow_test_cases" ON workflow_test_cases FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT FROM pg_policies WHERE policyname = 'Allow all on workflow_test_runs' AND tablename = 'workflow_test_runs') THEN
+    CREATE POLICY "Allow all on workflow_test_runs" ON workflow_test_runs FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+
+-- Copilot 修改默认采用「提案 → 审批 → 新版本」，无需额外持久化（提案内存态 + workflow_versions 记录新版本）。
+
+NOTIFY pgrst, 'reload schema';
