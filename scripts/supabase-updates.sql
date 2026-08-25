@@ -538,3 +538,72 @@ END $$;
 -- Copilot 修改默认采用「提案 → 审批 → 新版本」，无需额外持久化（提案内存态 + workflow_versions 记录新版本）。
 
 NOTIFY pgrst, 'reload schema';
+
+-- 57. Skill：将 Workflow 封装为可复用的产品能力（复用 Workflow Runtime / 不建第二套引擎）
+CREATE TABLE IF NOT EXISTS skills (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id          UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  workflow_id      UUID NOT NULL REFERENCES workflow_history(id) ON DELETE CASCADE,
+  workflow_version INTEGER,                       -- 当前绑定工作流版本（NULL = 最新/发布快照）
+  title            TEXT NOT NULL,
+  definition       JSONB NOT NULL,                -- SkillDefinitionV1 (inputs/outputs/examples/...)
+  execution_policy JSONB NOT NULL DEFAULT '{"timeoutMs":60000}',
+  evaluation_rules JSONB NOT NULL DEFAULT '[]',
+  published_targets JSONB NOT NULL DEFAULT '{"webUi":true,"api":false,"share":false,"shareToken":null}',
+  status           TEXT NOT NULL DEFAULT 'draft', -- draft / published / archived
+  version          INTEGER NOT NULL DEFAULT 1,    -- Skill 自身版本（行为变更时 +1）
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_skills_user ON skills(user_id, updated_at DESC);
+
+-- Skill 版本快照（Skill v1 → Workflow v8 的关联）
+CREATE TABLE IF NOT EXISTS skill_versions (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  skill_id          UUID NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+  version           INTEGER NOT NULL,
+  workflow_id       UUID NOT NULL,
+  workflow_version  INTEGER,
+  title             TEXT NOT NULL,
+  definition        JSONB NOT NULL,
+  evaluation_rules  JSONB,
+  status            TEXT NOT NULL DEFAULT 'candidate', -- candidate / published
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (skill_id, version)
+);
+CREATE INDEX IF NOT EXISTS idx_skill_versions_skill ON skill_versions(skill_id, version DESC);
+
+-- Skill 运行历史 + 质量指标数据源
+CREATE TABLE IF NOT EXISTS skill_runs (
+  id              UUID PRIMARY KEY,
+  skill_id        UUID NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+  skill_version   INTEGER,
+  workflow_version INTEGER,
+  inputs          JSONB NOT NULL DEFAULT '{}',
+  status          TEXT NOT NULL,                  -- completed / failed / timeout / cancelled
+  outputs         JSONB,
+  error           TEXT,
+  duration_ms     INTEGER NOT NULL DEFAULT 0,
+  token_usage     INTEGER NOT NULL DEFAULT 0,
+  estimated_cost  NUMERIC(12,6) NOT NULL DEFAULT 0,
+  rate_limited    BOOLEAN NOT NULL DEFAULT false,
+  ran_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_skill_runs_skill ON skill_runs(skill_id, ran_at DESC);
+
+ALTER TABLE skills ENABLE ROW LEVEL SECURITY;
+ALTER TABLE skill_versions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE skill_runs ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT FROM pg_policies WHERE policyname = 'Allow all on skills' AND tablename = 'skills') THEN
+    CREATE POLICY "Allow all on skills" ON skills FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT FROM pg_policies WHERE policyname = 'Allow all on skill_versions' AND tablename = 'skill_versions') THEN
+    CREATE POLICY "Allow all on skill_versions" ON skill_versions FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT FROM pg_policies WHERE policyname = 'Allow all on skill_runs' AND tablename = 'skill_runs') THEN
+    CREATE POLICY "Allow all on skill_runs" ON skill_runs FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+
+NOTIFY pgrst, 'reload schema';

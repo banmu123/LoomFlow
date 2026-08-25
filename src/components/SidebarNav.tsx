@@ -25,6 +25,7 @@ import {
   Trash2,
   Boxes,
   Search,
+  Sparkles,
 } from 'lucide-react';
 import { cn, truncateTitle } from '@/lib/utils';
 import { useT } from '@/lib/i18n';
@@ -45,6 +46,7 @@ interface ConversationItem {
 }
 
 const WORKFLOW_ITEMS: NavItem[] = [
+  { href: '/skills', labelKey: 'sidebar.skills', icon: Sparkles },
   { href: '/workflows', labelKey: 'sidebar.workflows', icon: Workflow },
   { href: '/workflows/editor', labelKey: 'sidebar.editor', icon: LayoutDashboard },
   { href: '/workflows/history', labelKey: 'sidebar.history', icon: History },
