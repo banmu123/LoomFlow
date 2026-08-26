@@ -4,7 +4,8 @@
  * 标准化测试用例，评估 AI Workflow Generation 能力
  */
 
-import type { TinyflowData } from '../../src/lib/tinyflow/types';
+// Types are used for documentation only
+// import type { TinyflowData } from '../../lib/tinyflow/types';
 
 // ===== 测试用例类型定义 =====
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { extractFinalOutputs, traceToTokenUsage } from '../runFlow';
-import type { TinyflowData } from '../types';
+import type { TinyflowData, NodeData } from '../types';
 import type { FlowEngine } from '../engine/FlowEngine';
 
 // Mock supabase
@@ -21,14 +21,31 @@ vi.mock('@/lib/supabase/server', () => ({
   },
 }));
 
+function createNodeData(title: string, extra: Partial<NodeData> = {}): NodeData {
+  return {
+    title,
+    description: '',
+    condition: '',
+    loopEnable: false,
+    loopIntervalMs: '',
+    maxLoopCount: '',
+    loopBreakCondition: '',
+    retryEnable: false,
+    retryIntervalMs: '',
+    maxRetryCount: '',
+    resetRetryCountAfterNormal: false,
+    ...extra,
+  };
+}
+
 describe('runFlow utilities', () => {
   describe('extractFinalOutputs', () => {
     it('should extract outputs from endNode when available', () => {
       const flowData: TinyflowData = {
         nodes: [
-          { id: 'start', type: 'startNode', position: { x: 0, y: 0 }, data: {} },
-          { id: 'llm', type: 'llmNode', position: { x: 100, y: 0 }, data: {} },
-          { id: 'end', type: 'endNode', position: { x: 200, y: 0 }, data: {} },
+          { id: 'start', type: 'startNode', position: { x: 0, y: 0 }, data: createNodeData('Start') },
+          { id: 'llm', type: 'llmNode', position: { x: 100, y: 0 }, data: createNodeData('LLM') },
+          { id: 'end', type: 'endNode', position: { x: 200, y: 0 }, data: createNodeData('End') },
         ],
         edges: [],
         viewport: { x: 0, y: 0, zoom: 1 },
@@ -51,9 +68,9 @@ describe('runFlow utilities', () => {
     it('should fallback to summary when endNode has no outputs', () => {
       const flowData: TinyflowData = {
         nodes: [
-          { id: 'start', type: 'startNode', position: { x: 0, y: 0 }, data: {} },
-          { id: 'llm', type: 'llmNode', position: { x: 100, y: 0 }, data: {} },
-          { id: 'end', type: 'endNode', position: { x: 200, y: 0 }, data: {} },
+          { id: 'start', type: 'startNode', position: { x: 0, y: 0 }, data: createNodeData('Start') },
+          { id: 'llm', type: 'llmNode', position: { x: 100, y: 0 }, data: createNodeData('LLM') },
+          { id: 'end', type: 'endNode', position: { x: 200, y: 0 }, data: createNodeData('End') },
         ],
         edges: [],
         viewport: { x: 0, y: 0, zoom: 1 },
@@ -76,9 +93,9 @@ describe('runFlow utilities', () => {
     it('should skip start and end nodes in fallback summary', () => {
       const flowData: TinyflowData = {
         nodes: [
-          { id: 'start', type: 'startNode', position: { x: 0, y: 0 }, data: {} },
-          { id: 'http', type: 'httpNode', position: { x: 100, y: 0 }, data: {} },
-          { id: 'end', type: 'endNode', position: { x: 200, y: 0 }, data: {} },
+          { id: 'start', type: 'startNode', position: { x: 0, y: 0 }, data: createNodeData('Start') },
+          { id: 'http', type: 'httpNode', position: { x: 100, y: 0 }, data: createNodeData('HTTP') },
+          { id: 'end', type: 'endNode', position: { x: 200, y: 0 }, data: createNodeData('End') },
         ],
         edges: [],
         viewport: { x: 0, y: 0, zoom: 1 },
@@ -103,7 +120,7 @@ describe('runFlow utilities', () => {
     it('should return empty object when no outputs available', () => {
       const flowData: TinyflowData = {
         nodes: [
-          { id: 'start', type: 'startNode', position: { x: 0, y: 0 }, data: {} },
+          { id: 'start', type: 'startNode', position: { x: 0, y: 0 }, data: createNodeData('Start') },
         ],
         edges: [],
         viewport: { x: 0, y: 0, zoom: 1 },

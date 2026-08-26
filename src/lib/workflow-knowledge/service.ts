@@ -56,13 +56,13 @@ export async function indexWorkflowKnowledge(
   }
 
   // 批量获取执行统计
-  const workflowIds = workflows.map(w => w.id);
+  const workflowIds = workflows.map((w: { id: string }) => w.id);
   const runStats = await getRunStats(workflowIds);
   const versionCounts = await getVersionCounts(workflowIds);
   const notes = await getWorkflowNotes(workflowIds);
 
   // 构建知识条目
-  return workflows.map(w => {
+  return workflows.map((w: { id: string; title: string; description: string | null; user_id: string; data: unknown; created_at: string; updated_at: string; published: boolean }) => {
     const data = w.data as TinyflowData;
     const stats = runStats[w.id] || { totalRuns: 0, successRate: 0, avgDuration: 0, avgCost: 0, lastRunAt: null, lastError: null };
     const versions = versionCounts[w.id] || { current: 1, count: 1 };
@@ -511,10 +511,10 @@ export async function extractExperience(
 
   // 分析失败教训
   const whatFailed: string[] = [];
-  const errors = runs?.filter(r => r.error).map(r => r.error) || [];
+  const errors: string[] = runs?.filter((r: { error: string | null }) => r.error).map((r: { error: string | null }) => r.error as string) || [];
   if (errors.length > 0) {
-    const uniqueErrors = [...new Set(errors)].slice(0, 3);
-    whatFailed.push(...uniqueErrors.map(e => `曾出现错误: ${e?.slice(0, 100)}`));
+    const uniqueErrors: string[] = [...new Set(errors)].slice(0, 3);
+    whatFailed.push(...uniqueErrors.map((e: string) => `曾出现错误: ${e.slice(0, 100)}`));
   }
   if (knowledge.successRate < 0.5) {
     whatFailed.push('成功率较低，需要优化');

@@ -6,16 +6,33 @@ import {
   workflowErrorSummary,
   WORKFLOW_SCHEMA_VERSION,
 } from '../schema';
-import type { TinyflowData } from '../types';
+import type { TinyflowData, NodeData } from '../types';
 // Import builtin nodes to register them
 import '../nodes/builtin';
+
+function createNodeData(title: string, extra: Partial<NodeData> = {}): NodeData {
+  return {
+    title,
+    description: '',
+    condition: '',
+    loopEnable: false,
+    loopIntervalMs: '',
+    maxLoopCount: '',
+    loopBreakCondition: '',
+    retryEnable: false,
+    retryIntervalMs: '',
+    maxRetryCount: '',
+    resetRetryCountAfterNormal: false,
+    ...extra,
+  };
+}
 
 describe('Workflow Schema Validation', () => {
   const validWorkflow: TinyflowData = {
     nodes: [
-      { id: 'start', type: 'startNode', position: { x: 0, y: 0 }, data: {} },
-      { id: 'llm', type: 'llmNode', position: { x: 100, y: 0 }, data: {} },
-      { id: 'end', type: 'endNode', position: { x: 200, y: 0 }, data: {} },
+      { id: 'start', type: 'startNode', position: { x: 0, y: 0 }, data: createNodeData('开始') },
+      { id: 'llm', type: 'llmNode', position: { x: 100, y: 0 }, data: createNodeData('LLM') },
+      { id: 'end', type: 'endNode', position: { x: 200, y: 0 }, data: createNodeData('结束') },
     ],
     edges: [
       { id: 'e1', source: 'start', target: 'llm' },
@@ -69,8 +86,8 @@ describe('Workflow Schema Validation', () => {
       const invalid: TinyflowData = {
         ...validWorkflow,
         nodes: [
-          { id: 'same-id', type: 'startNode', position: { x: 0, y: 0 }, data: {} },
-          { id: 'same-id', type: 'llmNode', position: { x: 100, y: 0 }, data: {} },
+          { id: 'same-id', type: 'startNode', position: { x: 0, y: 0 }, data: createNodeData('Start') },
+          { id: 'same-id', type: 'llmNode', position: { x: 100, y: 0 }, data: createNodeData('LLM') },
         ],
       };
 
@@ -106,7 +123,7 @@ describe('Workflow Schema Validation', () => {
         ...validWorkflow,
         nodes: [
           ...validWorkflow.nodes,
-          { id: 'start2', type: 'startNode', position: { x: 0, y: 100 }, data: {} },
+          { id: 'start2', type: 'startNode', position: { x: 0, y: 100 }, data: createNodeData('Start2') },
         ],
       };
 
@@ -120,7 +137,7 @@ describe('Workflow Schema Validation', () => {
         ...validWorkflow,
         nodes: [
           ...validWorkflow.nodes,
-          { id: 'end2', type: 'endNode', position: { x: 200, y: 100 }, data: {} },
+          { id: 'end2', type: 'endNode', position: { x: 200, y: 100 }, data: createNodeData('End2') },
         ],
       };
 

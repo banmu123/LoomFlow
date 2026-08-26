@@ -4,7 +4,7 @@
  * 评估 AI 生成的 Workflow 质量
  */
 
-import type { TinyflowData } from '../../lib/tinyflow/types';
+import type { TinyflowData, NodeData } from '../../lib/tinyflow/types';
 import { validateWorkflow } from '../../lib/tinyflow/schema';
 import { FlowEngine } from '../../lib/tinyflow/engine/FlowEngine';
 import type { BenchmarkTestCase } from './test-cases';

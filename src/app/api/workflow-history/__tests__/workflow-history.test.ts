@@ -67,6 +67,8 @@ describe('Workflow History API', () => {
         id: 'user-1',
         username: 'admin',
         role: 'admin',
+        display_name: 'Admin',
+        status: 'active',
       });
 
       const mockWorkflows = [
@@ -101,6 +103,8 @@ describe('Workflow History API', () => {
         id: 'user-1',
         username: 'admin',
         role: 'admin',
+        display_name: 'Admin',
+        status: 'active',
       });
 
       vi.mocked(supabase.from).mockReturnValue({
@@ -146,6 +150,8 @@ describe('Workflow History API', () => {
         id: 'user-1',
         username: 'admin',
         role: 'admin',
+        display_name: 'Admin',
+        status: 'active',
       });
 
       const { POST } = await import('@/app/api/workflow-history/route');
@@ -169,6 +175,8 @@ describe('Workflow History API', () => {
         id: 'user-1',
         username: 'admin',
         role: 'admin',
+        display_name: 'Admin',
+        status: 'active',
       });
 
       const mockInserted = {
@@ -237,6 +245,8 @@ describe('Workflow History API', () => {
         id: 'user-1',
         username: 'admin',
         role: 'admin',
+        display_name: 'Admin',
+        status: 'active',
       });
 
       const mockExisting = {
@@ -328,6 +338,8 @@ describe('Workflow History API', () => {
         id: 'user-1',
         username: 'admin',
         role: 'admin',
+        display_name: 'Admin',
+        status: 'active',
       });
 
       vi.mocked(supabase.from).mockReturnValue({
@@ -362,6 +374,8 @@ describe('Workflow History API', () => {
         id: 'user-1',
         username: 'admin',
         role: 'admin',
+        display_name: 'Admin',
+        status: 'active',
       });
 
       vi.mocked(supabase.from).mockReturnValue({

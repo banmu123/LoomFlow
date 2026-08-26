@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { WorkflowKnowledge, WorkflowMatch, KnowledgeQuery } from '../types';
 
 // Mock supabase
 vi.mock('@/lib/supabase/server', () => ({
@@ -127,11 +128,7 @@ describe('WorkflowKnowledgeService', () => {
 
   describe('Tokenize Function', () => {
     it('should tokenize text correctly', async () => {
-      // Import internal function via service module
       const service = await import('../service');
-      
-      // The tokenize function is not exported, but we can test it indirectly
-      // through findSimilarWorkflows which uses it
       expect(service.findSimilarWorkflows).toBeDefined();
     });
   });
@@ -139,20 +136,14 @@ describe('WorkflowKnowledgeService', () => {
   describe('Structure Info Extraction', () => {
     it('should extract node types from workflow data', async () => {
       const service = await import('../service');
-      
-      // Test via indexWorkflowKnowledge with mock data
-      // The extractStructureInfo function is internal
       expect(service.indexWorkflowKnowledge).toBeDefined();
     });
   });
 });
 
 describe('Workflow Knowledge Types', () => {
-  it('should have correct WorkflowKnowledge structure', async () => {
-    const types = await import('../types');
-    
-    // Type check - this will fail at compile time if types are wrong
-    const mockKnowledge: types.WorkflowKnowledge = {
+  it('should have correct WorkflowKnowledge structure', () => {
+    const mockKnowledge: WorkflowKnowledge = {
       workflowId: 'test-id',
       title: 'Test Workflow',
       description: 'Test description',
@@ -185,10 +176,8 @@ describe('Workflow Knowledge Types', () => {
     expect(mockKnowledge.successRate).toBe(0.9);
   });
 
-  it('should have correct WorkflowMatch structure', async () => {
-    const types = await import('../types');
-    
-    const mockMatch: types.WorkflowMatch = {
+  it('should have correct WorkflowMatch structure', () => {
+    const mockMatch: WorkflowMatch = {
       workflow: {
         workflowId: 'test-id',
         title: 'Test',
@@ -227,10 +216,8 @@ describe('Workflow Knowledge Types', () => {
     expect(mockMatch.reasons).toHaveLength(1);
   });
 
-  it('should have correct KnowledgeQuery structure', async () => {
-    const types = await import('../types');
-    
-    const mockQuery: types.KnowledgeQuery = {
+  it('should have correct KnowledgeQuery structure', () => {
+    const mockQuery: KnowledgeQuery = {
       userId: 'user-1',
       query: 'test query',
       nodeTypes: ['llmNode'],
@@ -250,8 +237,6 @@ describe('Workflow Knowledge Types', () => {
 describe('Context Builder', () => {
   it('should have correct EnhancedCopilotContext structure', async () => {
     const contextBuilder = await import('../context-builder');
-    
-    // Type check
     expect(contextBuilder.buildEnhancedCopilotContext).toBeDefined();
     expect(contextBuilder.enhancedContextToPrompt).toBeDefined();
     expect(contextBuilder.buildFullKnowledgeContext).toBeDefined();
