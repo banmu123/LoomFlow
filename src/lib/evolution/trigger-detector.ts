@@ -74,7 +74,7 @@ export async function detectEvent(rule: EvolutionRule): Promise<DetectionResult>
     .order('created_at', { ascending: false })
     .limit(threshold);
 
-  const recent = data ?? [];
+  const recent = (data ?? []) as Array<{ status: string; created_at: string }>;
   if (recent.length < threshold) {
     return { triggered: false, reason: `执行次数不足（${recent.length}/${threshold}）` };
   }

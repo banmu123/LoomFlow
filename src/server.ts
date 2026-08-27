@@ -2,6 +2,7 @@ import { createServer } from 'http';
 import { parse } from 'url';
 import next from 'next';
 import { initScheduler } from './lib/scheduler';
+import { initEvolutionScheduler } from './lib/evolution/scheduler';
 
 const dev = process.env.COZE_PROJECT_ENV !== 'PROD';
 const hostname = process.env.HOSTNAME || 'localhost';
@@ -15,6 +16,9 @@ app.prepare().then(() => {
   // 定时任务调度器：启动时加载所有启用的任务，每 10 分钟同步一次 DB 变更
   // 注意：单进程架构（Docker 单副本）安全；若未来多副本部署，需加分布式锁防重复执行
   initScheduler();
+
+  // 演化调度器：每 30 分钟扫描演化规则，满足条件时自动触发优化分析
+  initEvolutionScheduler();
 
   const server = createServer(async (req, res) => {
     try {
