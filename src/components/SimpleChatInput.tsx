@@ -309,7 +309,7 @@ export function SimpleChatInput({
                 {/* 柔和胶囊选择器：图标 + 自适应宽度 + 超长截断（完整名在下拉里） */}
                 <SelectTrigger className="h-7 min-w-[110px] max-w-[190px] gap-1.5 rounded-full border-border/70 bg-card/80 px-3 text-xs text-secondary-foreground shadow-sm transition-colors hover:border-[#b77945]/40 hover:text-foreground">
                   <Sparkles className="h-3.5 w-3.5 shrink-0 text-[#b77945]" />
-                  <SelectValue placeholder="选择模型" className="truncate" />
+                  <SelectValue placeholder={t('chat.selectModel')} className="truncate" />
                 </SelectTrigger>
                 <SelectContent>
                   {modelOptions.map((opt) => (

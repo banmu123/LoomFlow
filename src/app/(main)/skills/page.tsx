@@ -45,7 +45,7 @@ import {
 import type { SkillRecord, SkillDefinition, SkillQualityResult } from '@/lib/skill-types-client';
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleString('zh-CN', { hour12: false });
+  return new Date(iso).toLocaleString(undefined, { hour12: false });
 }
 
 interface WorkflowOption {
@@ -54,9 +54,9 @@ interface WorkflowOption {
 }
 
 const STATUS_LABEL: Record<SkillRecord['status'], string> = {
-  draft: '草稿',
-  published: '已发布',
-  archived: '已归档',
+  draft: 'skills.draft',
+  published: 'skills.published',
+  archived: 'skills.archived',
 };
 
 export default function SkillsPage() {
@@ -382,7 +382,7 @@ export default function SkillsPage() {
                     </div>
                   </div>
                   <Badge variant={s.status === 'published' ? 'default' : s.status === 'archived' ? 'secondary' : 'outline'}>
-                    {STATUS_LABEL[s.status]}
+                    {t(STATUS_LABEL[s.status])}
                   </Badge>
                 </div>
 

@@ -238,7 +238,7 @@ SERVER_IP=你的服务器 ./scripts/deploy-docker.sh
 
 ```bash
 curl http://localhost:5000/api/health
-# {"status":"ok","service":"loomflow","version":"v0.1.5","db":"ok",...}
+# {"status":"ok","service":"loomflow","version":"v0.1.7","db":"ok",...}
 ```
 
 检查清单：
@@ -296,7 +296,7 @@ src/
 
 ## 🧪 测试与 CI
 
-- **Vitest** — 266 个单元测试（引擎、schema、沙箱、执行器、搜索适配层、密钥加密、执行追踪、笔记、模型注册表、节点注册表、Agent 工具、i18n）
+- **Vitest** — 493 个单元测试（引擎、schema、沙箱、执行器、搜索适配层、密钥加密、执行追踪、笔记、模型注册表、节点注册表、Agent 工具、i18n）
 - **GitHub Actions** — 每次推送自动执行 lint + 类型检查 + 测试 + 生产构建（Node 20/22 矩阵）
 
 ---

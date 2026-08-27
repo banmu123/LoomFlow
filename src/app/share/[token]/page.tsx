@@ -39,20 +39,20 @@ interface NodeEvent {
 }
 
 const NODE_LABELS: Record<string, string> = {
-  startNode: '开始',
-  endNode: '结束',
-  llmNode: '大模型',
-  httpNode: 'HTTP 请求',
-  codeNode: '代码',
-  templateNode: '模板',
-  knowledgeNode: '知识库',
-  searchNode: '搜索',
-  confirmNode: '人工确认',
-  loopNode: '循环',
+  startNode: 'share.nodeStart',
+  endNode: 'share.nodeEnd',
+  llmNode: 'share.nodeLlm',
+  httpNode: 'share.nodeHttp',
+  codeNode: 'share.nodeCode',
+  templateNode: 'share.nodeTemplate',
+  knowledgeNode: 'share.nodeKnowledge',
+  searchNode: 'share.nodeSearch',
+  confirmNode: 'share.nodeConfirm',
+  loopNode: 'share.nodeLoop',
 };
 
 function formatTime(ts: number): string {
-  return new Date(ts).toLocaleTimeString('zh-CN', { hour12: false });
+  return new Date(ts).toLocaleTimeString(undefined, { hour12: false });
 }
 
 export default function SharePage() {
@@ -80,7 +80,7 @@ export default function SharePage() {
           });
           setFormValues(defaults);
         } else {
-          setError(data?.error || '分享链接无效');
+          setError(data?.error || t('share.invalidLink'));
         }
       } catch {
         setError(t('share.loadFailed'));
@@ -103,7 +103,7 @@ export default function SharePage() {
       });
       const data = await res.json();
       if (data.events) setEvents(data.events);
-      if (data.status === 'failed') setRunError(data.error || '执行失败');
+      if (data.status === 'failed') setRunError(data.error || t('share.executionFailed'));
     } catch {
       setRunError(t('share.networkError'));
     } finally {
@@ -113,7 +113,7 @@ export default function SharePage() {
 
   const renderField = (param: ShareMeta['input_parameters'][0], idx: number) => {
     const dt = (param.dataType || 'string').toLowerCase();
-    const label = param.name || `参数 ${idx + 1}`;
+    const label = param.name || `${t('share.parameter')} ${idx + 1}`;
     const setVal = (v: unknown) => setFormValues((prev) => ({ ...prev, [param.name]: v }));
 
     return (
@@ -196,7 +196,7 @@ export default function SharePage() {
                       {idx + 1}
                     </span>
                     <Badge variant="outline" className="text-[10px]">
-                      {NODE_LABELS[node.type] || node.type}
+                      {t(NODE_LABELS[node.type]) || node.type}
                     </Badge>
                     <span className="truncate text-sm font-medium">{node.title}</span>
                   </div>

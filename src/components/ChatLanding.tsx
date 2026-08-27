@@ -75,7 +75,7 @@ export function ChatLanding() {
         });
         const db = await res.json();
         if (!db?.id) {
-          setError('创建对话失败，请重试');
+          setError(t('chat.networkError'));
           return;
         }
         window.dispatchEvent(new Event('conversations-updated'));

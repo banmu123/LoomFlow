@@ -63,27 +63,8 @@ export const RECOMMENDATIONS = [
   'home.templates.translator',
 ];
 
-// 工具名 → 可读标签（对话中的执行日志展示）
-const TOOL_LABELS: Record<string, string> = {
-  list_workflows: '查询工作流列表',
-  get_workflow: '查看工作流详情',
-  list_workflow_versions: '查询版本历史',
-  list_models: '查询模型配置',
-  get_api_key_status: '查询 API Key 状态',
-  get_execution_history: '查询执行记录',
-  get_api_call_logs: '查询调用日志',
-  list_knowledge_bases: '查询知识库列表',
-  search_knowledge: '检索知识库',
-  get_oss_config_status: '查询 OSS 配置状态',
-  create_knowledge_base: '创建知识库',
-  delete_knowledge_base: '删除知识库',
-  create_model: '配置模型',
-  list_users: '查询用户列表',
-  get_stats: '查询用量统计',
-  get_audit_logs: '查询审计日志',
-  get_admin_api_logs: '查询 API 调用日志',
-  get_publish_status: '查询发布状态',
-};
+// 工具名 → 可读标签（对话中的执行日志展示）——通过 t('tools.xxx') 国际化
+const TOOL_LABELS: Record<string, string> = {};
 
 interface Message {
   id: string;
@@ -209,7 +190,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
 
   const handleChangePassword = async () => {
     if (pwdForm.new_password !== pwdConfirm) {
-      setError('两次输入的新密码不一致');
+      setError(t('chat.passwordMismatch'));
       return;
     }
     setPwdSubmitting(true);
@@ -224,14 +205,14 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
         setPwdOpen(false);
         setPwdForm({ old_password: '', new_password: '' });
         setPwdConfirm('');
-        setError('密码修改成功，请重新登录');
+        setError(t('chat.passwordChanged'));
         // 服务端已清除 cookie，跳转登录页
         setTimeout(() => router.push('/login'), 800);
       } else {
-        setError(data?.error || '修改失败');
+        setError(data?.error || t('common.modifyFailed'));
       }
     } catch {
-      setError('网络错误，请重试');
+      setError(t('common.networkErrorRetry'));
     } finally {
       setPwdSubmitting(false);
     }
@@ -505,7 +486,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
       const res = await fetch('/api/conversations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: '新建对话', model: model || undefined }),
+        body: JSON.stringify({ title: t('chat.newConversation'), model: model || undefined }),
       });
       const db = await res.json();
       if (!db?.id) return null;
@@ -552,7 +533,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
       .then((res) => res.json())
       .then((data) => {
         if (!data?.assistantMessage?.id) {
-          setError(data?.error || '自动生成失败，请重试');
+          setError(data?.error || t('chat.networkError'));
           setIsGenerating(false);
           return;
         }
@@ -572,7 +553,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
         }));
       })
       .catch(() => {
-        setError('自动生成失败，请重试');
+        setError(t('chat.networkError'));
         setIsGenerating(false);
       })
       .finally(() => {
@@ -596,7 +577,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
       // 新聊天首条消息：创建真实对话，URL 立即带上新对话 id
       const newConv = await createDbConversation();
       if (!newConv) {
-        setError('对话同步失败，请重试');
+        setError(t('chat.networkError'));
         return;
       }
       router.replace(`/chat/${newConv.id}`);
@@ -661,7 +642,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
       });
       const data = await res.json();
       if (!res.ok || !data?.assistantMessage?.id) {
-        setError(data?.error || '发送失败，请重试');
+        setError(data?.error || t('chat.requestFailed', { status: res.status }));
         // 生成未开始：移除本地占位
         updateConversation(convId, (c) => ({
           ...c,
@@ -684,7 +665,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
         }),
       }));
     } catch {
-      setError('发送失败，请重试');
+      setError(t('chat.requestFailed', { status: 0 }));
       updateConversation(convId, (c) => ({
         ...c,
         messages: c.messages.filter((m) => m.id !== assistantMsg.id),
@@ -763,7 +744,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
         });
         const data = await res.json();
         if (!res.ok || !data?.assistantMessage?.id) {
-          setError(data?.error || '重新生成失败，请重试');
+          setError(data?.error || t('chat.networkError'));
           updateConversation(conversationId, (c) => ({
             ...c,
             messages: c.messages.filter((m) => m.id !== newAssistant.id),
@@ -781,7 +762,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
           ),
         }));
       } catch {
-        setError('重新生成失败，请重试');
+        setError(t('chat.networkError'));
         updateConversation(conversationId, (c) => ({
           ...c,
           messages: c.messages.filter((m) => m.id !== newAssistant.id),
@@ -840,7 +821,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
       .then((res) => res.json())
       .then((data) => {
         if (!data?.assistantMessage?.id) {
-          setError(data?.error || '自动重试失败，请重试');
+          setError(data?.error || t('chat.networkError'));
           setIsGenerating(false);
           return;
         }
@@ -859,7 +840,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
         }));
       })
       .catch(() => {
-        setError('自动重试失败，请重试');
+        setError(t('chat.networkError'));
         setIsGenerating(false);
       })
       .finally(() => {
@@ -870,11 +851,11 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
   // 上传图片到 OSS
   const handleAttachImage = useCallback(async (file: File) => {
     if (!file.type.startsWith('image/')) {
-      setError('仅支持上传图片文件');
+      setError(t('chat.imageOnly'));
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      setError('图片大小不能超过 10MB');
+      setError(t('chat.imageTooLarge'));
       return;
     }
     setUploading(true);
@@ -886,10 +867,10 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
           { url: result.data!.url, name: result.data!.fileName },
         ]);
       } else {
-        setError(result.message || '图片上传失败');
+        setError(result.message || t('chat.imageUploadFailed'));
       }
     } catch {
-      setError('图片上传失败');
+      setError(t('chat.imageUploadFailed'));
     } finally {
       setUploading(false);
     }
@@ -1058,7 +1039,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
                   ) : (
                     <XCircle className="h-3 w-3 shrink-0 text-destructive" />
                   )}
-                  <span className="truncate">{TOOL_LABELS[log.toolName] ?? log.toolName}</span>
+                  <span className="truncate">{t(`tools.${log.toolName}`) !== `tools.${log.toolName}` ? t(`tools.${log.toolName}`) : (TOOL_LABELS[log.toolName] ?? log.toolName)}</span>
                   {log.status === 'running' && (
                     <span className="text-muted-foreground">{t('chat.toolLogRunning')}</span>
                   )}
@@ -1111,7 +1092,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
           <AlertDialogHeader>
             <AlertDialogTitle>{t('chat.changePassword')}</AlertDialogTitle>
             <AlertDialogDescription>
-              修改后需要重新登录（密码至少 8 位，包含字母和数字）
+              {t('chat.changePasswordHint')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-3 py-2">
@@ -1132,12 +1113,12 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
             />
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleChangePassword}
               disabled={pwdSubmitting}
             >
-              {pwdSubmitting ? '提交中...' : '确认修改'}
+              {pwdSubmitting ? t('common.submitting') : t('common.confirmModify')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1152,16 +1133,16 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
           <AlertDialogHeader>
             <AlertDialogTitle>{t('chat.deleteConversation')}</AlertDialogTitle>
             <AlertDialogDescription>
-              确定要删除「{deleteTarget?.title}」吗？此操作不可撤销，对话中的所有消息将被永久删除。
+              {t('chat.deleteConversationConfirm', { title: deleteTarget?.title ?? '' })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteTarget && handleDeleteConversation(deleteTarget.id)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              删除
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

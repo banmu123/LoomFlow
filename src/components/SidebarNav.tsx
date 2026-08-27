@@ -104,7 +104,7 @@ export function SidebarNav() {
         setConversations(
           data.map((c: { id: string; title: string }) => ({
             id: c.id,
-            title: c.title || '未命名对话',
+            title: c.title || t('common.unnamed'),
           })),
         );
       }
@@ -235,7 +235,7 @@ export function SidebarNav() {
           <button
             onClick={() => setCollapsed((v) => !v)}
             className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            title={collapsed ? '展开侧边栏' : '收起侧边栏'}
+            title={collapsed ? t('sidebar.expandSidebar') : t('sidebar.collapseSidebar')}
           >
             {collapsed ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
           </button>
@@ -307,7 +307,7 @@ export function SidebarNav() {
                     <button
                       onClick={() => setDeleteTarget(conv)}
                       className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
-                      title="删除对话"
+                      title={t('sidebar.deleteConversation')}
                     >
                       <Trash2 className="h-3 w-3" />
                     </button>

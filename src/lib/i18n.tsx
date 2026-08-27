@@ -24,7 +24,7 @@ interface I18nContextValue {
   t: (key: string, params?: Record<string, string | number>) => string;
 }
 
-const I18nContext = createContext<I18nContextValue>({
+export const I18nContext = createContext<I18nContextValue>({
   locale: 'zh',
   setLocale: () => {},
   t: (key) => key,

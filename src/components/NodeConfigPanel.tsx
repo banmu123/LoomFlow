@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/select';
 import type { NodeConfigField, NodeDefinition } from '@/lib/tinyflow/node-definition';
 import { getConfigDefaults, validateConfig } from '@/lib/tinyflow/node-config';
+import { useT } from '@/lib/i18n';
 
 // 节点配置面板：根据 NodeDefinition.configSchema 动态生成表单。
 // 值来源：节点当前 data（回显）→ configSchema 默认值兜底。
@@ -41,6 +42,7 @@ export function NodeConfigPanel({
 }) {
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [errors, setErrors] = useState<string[]>([]);
+  const t = useT();
 
   // 打开时：用节点当前 data 回显，configSchema 默认值兜底
   useEffect(() => {
@@ -81,7 +83,7 @@ export function NodeConfigPanel({
 
         {schema.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">
-            该节点没有声明配置项（configSchema 为空）
+            {t('nodeConfig.noConfigItems')}
           </p>
         ) : (
           <div className="max-h-[55vh] space-y-4 overflow-y-auto py-2">
@@ -101,9 +103,9 @@ export function NodeConfigPanel({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            取消
+            {t('common.cancel')}
           </Button>
-          <Button onClick={handleSave}>保存</Button>
+          <Button onClick={handleSave}>{t('common.save')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -120,6 +122,7 @@ function ConfigField({
   value: unknown;
   onChange: (value: unknown) => void;
 }) {
+  const t = useT();
   // 动态选项（optionsProvider）兜底：/api/nodes 已 resolve 为静态 options；
   // 直接传入内存 NodeDefinition 时在此加载
   const [dynamicOptions, setDynamicOptions] = useState<Array<{ value: string; label: string }> | null>(null);
@@ -170,7 +173,7 @@ function ConfigField({
           {label}
           <Select value={String(value ?? '')} onValueChange={onChange}>
             <SelectTrigger className="h-8 text-xs">
-              <SelectValue placeholder={field.placeholder || '请选择'} />
+              <SelectValue placeholder={field.placeholder || t('nodeConfig.selectPlaceholder')} />
             </SelectTrigger>
             <SelectContent>
               {options.map((opt) => (

@@ -69,7 +69,7 @@ interface VersionItem {
 }
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleString('zh-CN', { hour12: false });
+  return new Date(iso).toLocaleString(undefined, { hour12: false });
 }
 
 export default function WorkflowsPage() {

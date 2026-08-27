@@ -18,7 +18,7 @@ export function LocaleSwitcher({ compact = false }: { compact?: boolean }) {
       title={locale === 'zh' ? 'Switch to English' : '切换到中文'}
     >
       <Languages className="h-4 w-4" />
-      {!compact && <span>{locale === 'zh' ? 'EN' : '中文'}</span>}
+      {!compact && <span>{locale === 'zh' ? 'EN' : '中'}</span>}
     </button>
   );
 }

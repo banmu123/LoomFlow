@@ -177,7 +177,7 @@ export function SimpleChatMessage({
           </span>
           <Avatar className="h-7 w-7 shrink-0 border border-border">
             <AvatarFallback className="bg-primary/15 text-xs text-primary">
-              我
+              {isUser ? t('chat.mention').charAt(0).toUpperCase() : ''}
             </AvatarFallback>
           </Avatar>
         </div>
@@ -202,7 +202,7 @@ export function SimpleChatMessage({
           ) : status === 'error' ? (
             <div className="inline-flex items-center gap-2 rounded-lg rounded-tl-sm border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
               <AlertTriangle className="h-4 w-4 shrink-0" />
-              <span>{error ?? '发生错误，请重试'}</span>
+              <span>{error ?? t('chat.networkError')}</span>
             </div>
           ) : status === 'cancelled' ? (
             <div className="rounded-lg rounded-tl-sm bg-muted px-3 py-2">

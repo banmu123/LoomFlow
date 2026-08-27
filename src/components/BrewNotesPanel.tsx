@@ -148,12 +148,12 @@ export function BrewNotesPanel({
   const runAiSummary = () => {
     if (!workflowId) return;
     summaryChat.setMessages([]);
-    summaryChat.sendMessage({ text: '请总结这些笔记' });
+    summaryChat.sendMessage({ text: t('canvas.notesSummarize') });
   };
   const runAiSuggest = () => {
     if (!workflowId) return;
     suggestChat.setMessages([]);
-    suggestChat.sendMessage({ text: '请给出笔记建议' });
+    suggestChat.sendMessage({ text: t('canvas.notesSuggestBtn') });
   };
 
   const summaryText = summaryChat.messages

@@ -71,11 +71,11 @@ export function ModelConfigDialog({ open, onOpenChange, onConfigured }: ModelCon
 
   const handleSubmit = async () => {
     if (!form.id.trim() || !form.api_key.trim()) {
-      toast.error('模型 ID 和 API Key 不能为空');
+      toast.error(t('modelConfig.modelIdAndKeyRequired'));
       return;
     }
     if (form.capabilities.length === 0) {
-      toast.error('请至少选择一项能力');
+      toast.error(t('modelConfig.capabilityRequired'));
       return;
     }
     setSaving(true);
@@ -94,14 +94,14 @@ export function ModelConfigDialog({ open, onOpenChange, onConfigured }: ModelCon
       });
       const data = await res.json();
       if (res.ok) {
-        toast.success(`模型「${data.id}」配置成功，现在可以开始对话了`);
+        toast.success(t('modelConfig.modelConfigured', { id: data.id }));
         onOpenChange(false);
         onConfigured?.();
       } else {
-        toast.error(data?.error || '配置失败');
+        toast.error(data?.error || t('modelConfig.configFailed'));
       }
     } catch {
-      toast.error('配置失败，请检查网络');
+      toast.error(t('modelConfig.configFailedNetwork'));
     } finally {
       setSaving(false);
     }
@@ -117,7 +117,7 @@ export function ModelConfigDialog({ open, onOpenChange, onConfigured }: ModelCon
         <div className="space-y-4 py-2">
           <div className="space-y-1.5">
             <Label>
-              模型 ID <span className="text-destructive">*</span>
+              {t('modelConfig.modelId')} <span className="text-destructive">*</span>
             </Label>
             <Input
               value={form.id}
@@ -159,7 +159,7 @@ export function ModelConfigDialog({ open, onOpenChange, onConfigured }: ModelCon
             <Input
               value={form.base_url}
               onChange={(e) => setForm((f) => ({ ...f, base_url: e.target.value }))}
-              placeholder="https://api.deepseek.com/v1（留空使用默认）"
+              placeholder={t('modelConfig.baseurlPlaceholder')}
               className="font-mono text-sm"
             />
           </div>

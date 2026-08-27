@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
+import { useT } from '@/lib/i18n';
 
 export function PlaceholderPage({
   title,
@@ -9,6 +10,7 @@ export function PlaceholderPage({
   description: string;
   icon: LucideIcon;
 }) {
+  const t = useT();
   return (
     <div className="flex h-full flex-col overflow-y-auto">
       <div className="border-b border-border px-6 py-4">
@@ -24,7 +26,7 @@ export function PlaceholderPage({
       </div>
       <div className="flex flex-1 items-center justify-center">
         <div className="text-center">
-          <p className="text-sm text-muted-foreground">功能开发中，敬请期待</p>
+          <p className="text-sm text-muted-foreground">{t('common.comingSoon')}</p>
         </div>
       </div>
     </div>

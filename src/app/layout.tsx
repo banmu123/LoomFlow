@@ -8,8 +8,8 @@ export const metadata: Metadata = {
     default: 'LoomFlow',
     template: '%s | LoomFlow',
   },
-  description: 'LoomFlow - AI 原生工作流平台',
-  keywords: ['LoomFlow', 'AI工作流', '工作流编排'],
+  description: 'LoomFlow - AI-native workflow platform',
+  keywords: ['LoomFlow', 'AI workflow', 'workflow orchestration'],
   authors: [{ name: 'LoomFlow' }],
 };
 
@@ -19,7 +19,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" suppressHydrationWarning>
       <body className={`antialiased`}>
         <I18nProvider>
           {children}

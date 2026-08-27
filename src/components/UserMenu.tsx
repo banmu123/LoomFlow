@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { KeyRound, LogOut, ChevronDown } from 'lucide-react';
+import { useT } from '@/lib/i18n';
 
 type MockUser = {
   name: string;
@@ -25,14 +26,15 @@ type MockUser = {
 };
 
 const MOCK_USER: MockUser = {
-  name: '测试用户',
+  name: 'User',
   email: 'user@example.com',
-  department: '研发部',
+  department: 'Engineering',
 };
 
 export function UserMenu() {
   const router = useRouter();
   const pathname = usePathname();
+  const t = useT();
   const [loading] = useState(false);
 
   if (loading) {
@@ -80,7 +82,7 @@ export function UserMenu() {
           }}
         >
           <KeyRound className="mr-2 h-4 w-4" />
-          修改密码
+          {t('chat.changePassword')}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
@@ -91,7 +93,7 @@ export function UserMenu() {
           }}
         >
           <LogOut className="mr-2 h-4 w-4" />
-          退出登录
+          {t('chat.logout')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
