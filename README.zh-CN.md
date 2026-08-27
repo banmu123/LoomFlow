@@ -96,6 +96,14 @@ curl -X POST https://your-host/api/publish/{workflowId}/execute \
 ### 🔒 私有化部署
 应用 + 数据 + 存储都可部署在自己服务器；数据库可切换自建 PostgreSQL（详见部署手册）。
 
+### 🔄 工作流演化引擎
+工作流持续自优化——**无需人工干预**。演化引擎自动检测性能退化并提出优化方案：
+
+- **触发规则**：定时（cron）、指标触发（延迟增长 30%、失败率超阈值）、事件触发（连续失败 N 次）
+- **AI 分析**：指标聚合 → 瓶颈检测 → 静态分析 → AI 生成优化 Patch
+- **人工确认**：提案需用户明确确认后才会修改生产工作流
+- **完整审计**：每次触发、分析、决策都记录在演化事件中
+
 ---
 
 ## 🏗️ 架构图
@@ -278,7 +286,7 @@ src/
 ├── app/                  # 页面与 API 路由
 │   ├── (main)/           # 主界面（对话 + 工作流 + 管理后台）
 │   ├── share/            # 工作流分享页
-│   └── api/              # 后端 API（auth / conversations / workflow-history / publish / admin / nodes / search-providers）
+│   └── api/              # 后端 API（auth / conversations / workflow-history / publish / admin / nodes / search-providers / evolution）
 ├── components/           # UI 组件
 ├── lib/
 │   ├── tinyflow/         # 工作流执行引擎（12 种节点执行器）
@@ -286,6 +294,9 @@ src/
 │   ├── ai/               # 模型注册表（providers / capabilities / models）
 │   ├── agent/            # AI 对话工具（create_custom_node、知识库、统计等）
 │   ├── workflow-ai/      # AI 生成工作流提示词
+│   ├── workflow-eval/    # 工作流评估（指标、瓶颈、静态分析、AI 优化）
+│   ├── workflow-copilot/ # Copilot 管线（patch、proposal、diff、测试用例）
+│   ├── evolution/        # 演化引擎（规则评估、触发检测、编排、调度）
 │   ├── secrets.ts        # 敏感配置加密（AES-256-GCM）
 │   └── i18n.tsx          # 国际化框架
 ├── messages/             # 中英文案
@@ -296,7 +307,7 @@ src/
 
 ## 🧪 测试与 CI
 
-- **Vitest** — 493 个单元测试（引擎、schema、沙箱、执行器、搜索适配层、密钥加密、执行追踪、笔记、模型注册表、节点注册表、Agent 工具、i18n）
+- **Vitest** — 538 个单元测试（引擎、schema、沙箱、执行器、搜索适配层、密钥加密、执行追踪、笔记、模型注册表、节点注册表、Agent 工具、i18n、演化引擎）
 - **GitHub Actions** — 每次推送自动执行 lint + 类型检查 + 测试 + 生产构建（Node 20/22 矩阵）
 
 ---

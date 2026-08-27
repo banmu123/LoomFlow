@@ -113,6 +113,21 @@ Admin → Model Settings → Add Model
   capabilities: [text, vision]  →  ✅ instantly available everywhere
 ```
 
+### 🔄 Workflow Evolution Engine
+Workflows continuously improve — **without manual intervention**. The Evolution Engine automatically detects performance regressions and proposes optimizations:
+
+- **Trigger rules**: scheduled (cron), metric-based (latency +30%, failure rate > threshold), event-based (N consecutive failures)
+- **AI analysis**: metrics → bottleneck detection → static analysis → AI generates optimization patch
+- **Human approval**: proposals require explicit user confirmation before modifying production workflows
+- **Full audit trail**: every trigger, analysis, and decision is recorded in evolution events
+
+```text
+Evolution Dashboard → Workflow Health (score, trend, bottlenecks)
+  → AI Proposals (view diff, approve, reject)
+  → Trigger Rules (create cron / metric / event triggers)
+  → Timeline (full audit history)
+```
+
 ---
 
 ## 🏗️ Architecture
@@ -295,7 +310,7 @@ src/
 ├── app/                  # Pages & API routes
 │   ├── (main)/           # Main UI (chat + workflows + admin)
 │   ├── share/            # Public workflow share pages
-│   └── api/              # Backend APIs (auth / conversations / workflow-history / publish / admin / nodes / search-providers)
+│   └── api/              # Backend APIs (auth / conversations / workflow-history / publish / admin / nodes / search-providers / evolution)
 ├── components/           # UI components
 ├── lib/
 │   ├── tinyflow/         # Workflow execution engine + NodeRegistry/NodeDefinition
@@ -303,6 +318,9 @@ src/
 │   ├── ai/               # Model Registry (providers / capabilities / models)
 │   ├── agent/            # AI chat tools (create_custom_node, knowledge, stats...)
 │   ├── workflow-ai/      # AI workflow generation prompts
+│   ├── workflow-eval/    # Workflow evaluation (metrics, bottleneck, static analysis, AI optimization)
+│   ├── workflow-copilot/ # Copilot pipeline (patch, proposal, diff, test cases)
+│   ├── evolution/        # Evolution Engine (rule evaluator, trigger detector, orchestrator, scheduler)
 │   ├── secrets.ts        # Sensitive config encryption (AES-256-GCM)
 │   └── i18n.tsx          # i18n framework
 ├── messages/             # zh/en translations
@@ -313,7 +331,7 @@ src/
 
 ## 🧪 Testing & CI
 
-- **Vitest** — 493 unit tests (engine, schema, sandbox, executors, search providers, secrets encryption, flow trace, notes, model registry, node registry, agent tools, i18n)
+- **Vitest** — 538 unit tests (engine, schema, sandbox, executors, search providers, secrets encryption, flow trace, notes, model registry, node registry, agent tools, i18n, evolution engine)
 - **GitHub Actions** — lint + typecheck + test + production build on every push (Node 20/22 matrix)
 
 ---
