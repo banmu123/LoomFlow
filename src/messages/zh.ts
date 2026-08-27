@@ -84,6 +84,7 @@ export const zh = {
     apiLogs: 'API 调用',
     apiKeys: 'API 管理',
     customNodes: '自定义节点',
+    evolution: '演化',
     knowledge: '知识库',
     growth: '成长',
     oss: '存储设置',

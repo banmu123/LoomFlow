@@ -86,6 +86,7 @@ export const en: ZhMessages = {
     apiLogs: 'API Calls',
     apiKeys: 'API Keys',
     customNodes: 'Custom Nodes',
+    evolution: 'Evolution',
     knowledge: 'Knowledge Base',
     growth: 'Growth',
     oss: 'Storage Settings',

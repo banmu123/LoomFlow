@@ -53,6 +53,7 @@ const WORKFLOW_ITEMS: NavItem[] = [
   { href: '/workflows/schedules', labelKey: 'sidebar.schedules', icon: Clock },
   { href: '/workflows/api-keys', labelKey: 'sidebar.apiKeys', icon: KeyRound },
   { href: '/workflows/custom-nodes', labelKey: 'sidebar.customNodes', icon: Boxes },
+  { href: '/workflows/evolution', labelKey: 'sidebar.evolution', icon: Activity },
   { href: '/knowledge', labelKey: 'sidebar.knowledge', icon: Library },
 ];
 
