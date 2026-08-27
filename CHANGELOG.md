@@ -1,5 +1,34 @@
 # Changelog
 
+## [v0.1.8] - 2026-08-27
+
+### 新增
+
+- **工作流演化引擎（Evolution Engine）**：工作流持续自优化，无需人工干预
+  - **触发规则**：支持三种触发类型——定时（cron）、指标触发（延迟增长/失败率超阈值等 6 种指标 × 6 种操作符）、事件触发（连续失败/连续超时）
+  - **规则评估器**：cooldown 冷却期防重复触发、最小执行数检查、重复 proposal 防重
+  - **触发检测器**：当前窗口 vs 基线窗口指标对比，输出 MetricSnapshot（current + baseline + delta）
+  - **编排层**：薄编排，复用现有 workflow-eval + workflow-copilot 管线，不含优化逻辑
+  - **调度器**：30 分钟扫描循环，按 workflow 分组串行执行，启动时延迟 30s 首次扫描
+  - **演化看板**：工作流健康评分（成功率×0.4 + 延迟×0.3 + 失败率×0.3）、趋势检测、瓶颈展示、AI 提案（查看 Diff/确认/拒绝）、演化时间线、触发规则 CRUD
+  - **三级权限**：owner 全权、member 只读、admin 全权（复用现有认证系统）
+  - **可靠性**：幂等 key（rule_id + date）防重复 proposal、DB UNIQUE 约束兜底
+- **安全修复**：`next.config.ts` 图片优化器 SSRF 风险，`remotePatterns` 从 `*` 限制为 `*.aliyuncs.com`
+- **i18n 补全**：15 个组件 60+ 处硬编码中文替换为 `t()` 国际化调用，新增 40+ i18n key（tools/nodeConfig/modelConfig/sidebar 等）
+
+### 变更
+
+- `i18n.tsx` 导出 `I18nContext` 供 class 组件（ErrorBoundary）使用
+- `formatTime` locale 硬编码 `'zh-CN'` 改为 `undefined`（浏览器默认）
+- README 测试数更新、版本号更新、新增演化引擎功能说明
+
+### 测试
+
+- 538 个单元测试全绿（新增 45 个演化引擎测试：rule-evaluator 13 + trigger-detector 10 + permissions 10 + orchestrator 9 + 其他 3）
+- validate（ts-check + lint）通过
+
+---
+
 ## [v0.1.7] - 2026-08-23
 
 ### 新增
