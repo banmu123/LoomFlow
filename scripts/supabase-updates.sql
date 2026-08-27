@@ -617,3 +617,109 @@ CREATE INDEX IF NOT EXISTS idx_flow_runs_workflow_created ON flow_runs(workflow_
 CREATE INDEX IF NOT EXISTS idx_skill_runs_skill_ran ON skill_runs(skill_id, ran_at DESC);
 
 NOTIFY pgrst, 'reload schema';
+
+-- 59. Evolution Engine：演化规则、事件、提案
+
+-- 演化规则（触发配置）
+CREATE TABLE IF NOT EXISTS evolution_rules (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workflow_id     UUID NOT NULL REFERENCES workflow_history(id) ON DELETE CASCADE,
+  user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  enabled         BOOLEAN NOT NULL DEFAULT true,
+  trigger_type    TEXT NOT NULL CHECK (trigger_type IN ('cron', 'metric', 'event')),
+
+  -- cron 配置
+  cron_expr       TEXT,
+
+  -- metric 配置
+  metric_key      TEXT,
+  metric_op       TEXT,
+  metric_threshold NUMERIC,
+  metric_range    TEXT DEFAULT '7d',
+  baseline_range  TEXT DEFAULT '30d',
+
+  -- event 配置
+  event_type      TEXT,
+  event_threshold INTEGER,
+
+  -- 通用
+  cooldown_hours  INTEGER NOT NULL DEFAULT 24,
+  last_triggered_at TIMESTAMPTZ,
+  metadata        JSONB NOT NULL DEFAULT '{}',
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_evolution_rules_workflow ON evolution_rules(workflow_id);
+CREATE INDEX IF NOT EXISTS idx_evolution_rules_user ON evolution_rules(user_id);
+CREATE INDEX IF NOT EXISTS idx_evolution_rules_enabled ON evolution_rules(enabled) WHERE enabled = true;
+
+-- 演化提案（AI 生成的优化方案快照）
+CREATE TABLE IF NOT EXISTS evolution_proposals (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workflow_id     UUID NOT NULL REFERENCES workflow_history(id) ON DELETE CASCADE,
+  user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  event_id        UUID NOT NULL,
+
+  -- AI 输出
+  explanation     TEXT NOT NULL,
+  risk            TEXT,
+  operations      JSONB NOT NULL,
+
+  -- 校验结果
+  proposal        JSONB NOT NULL,
+  schema_valid    BOOLEAN NOT NULL DEFAULT false,
+  issues          JSONB NOT NULL DEFAULT '[]',
+  test_summary    JSONB,
+
+  -- diff
+  diff_markdown   TEXT,
+
+  -- 状态
+  status          TEXT NOT NULL DEFAULT 'pending'
+                    CHECK (status IN ('pending', 'applied', 'rejected')),
+  applied_version INTEGER,
+  applied_at      TIMESTAMPTZ,
+  rejected_at     TIMESTAMPTZ,
+
+  -- 幂等
+  idempotency_key TEXT UNIQUE,
+
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_evolution_proposals_workflow ON evolution_proposals(workflow_id);
+CREATE INDEX IF NOT EXISTS idx_evolution_proposals_event ON evolution_proposals(event_id);
+CREATE INDEX IF NOT EXISTS idx_evolution_proposals_status ON evolution_proposals(status);
+
+-- 演化事件（核心审计记录）
+CREATE TABLE IF NOT EXISTS evolution_events (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workflow_id     UUID NOT NULL REFERENCES workflow_history(id) ON DELETE CASCADE,
+  user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  rule_id         UUID REFERENCES evolution_rules(id) ON DELETE SET NULL,
+
+  -- 触发信息
+  trigger_type    TEXT NOT NULL,
+  trigger_reason  TEXT NOT NULL,
+
+  -- 指标快照
+  metric_snapshot JSONB,
+
+  -- 分析生命周期
+  analysis_status TEXT NOT NULL DEFAULT 'pending'
+                    CHECK (analysis_status IN ('pending', 'analyzing', 'proposal_created', 'applied', 'rejected', 'failed', 'no_change')),
+
+  -- 关联 proposal
+  proposal_id     UUID REFERENCES evolution_proposals(id) ON DELETE SET NULL,
+
+  -- 扩展
+  metadata        JSONB NOT NULL DEFAULT '{}',
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_evolution_events_workflow ON evolution_events(workflow_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_evolution_events_rule ON evolution_events(rule_id);
+CREATE INDEX IF NOT EXISTS idx_evolution_events_status ON evolution_events(analysis_status);
+CREATE INDEX IF NOT EXISTS idx_evolution_events_created ON evolution_events(created_at DESC);
+
+-- 迁移完成后刷新 PostgREST schema 缓存
+NOTIFY pgrst, 'reload schema';
