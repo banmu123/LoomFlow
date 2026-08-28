@@ -34,25 +34,60 @@ import { diffToMarkdown } from '../workflow-copilot/diff';
 
 // ===== Event Lifecycle =====
 
-/** 创建 evolution_event 记录，返回 event_id */
+/** 底层 Event Creation Input */
+export interface CreateEventInput {
+  workflowId: string;
+  userId: string;
+  ruleId?: string;
+  triggerType: string;
+  triggerReason: string;
+  metricSnapshot?: unknown;
+  metadata?: Record<string, unknown>;
+  idempotencyKey?: string;
+}
+
+/** 底层 Event Creation：所有 event 创建的统一入口 */
+export async function createEvolutionEvent(input: CreateEventInput): Promise<string> {
+  const row: Record<string, unknown> = {
+    workflow_id: input.workflowId,
+    user_id: input.userId,
+    trigger_type: input.triggerType,
+    trigger_reason: input.triggerReason,
+    analysis_status: 'pending',
+  };
+  if (input.ruleId) row.rule_id = input.ruleId;
+  if (input.metricSnapshot !== undefined) row.metric_snapshot = input.metricSnapshot;
+  if (input.metadata !== undefined) row.metadata = input.metadata;
+  if (input.idempotencyKey) row.idempotency_key = input.idempotencyKey;
+
+  const { data, error } = await supabase
+    .from('evolution_events')
+    .insert(row)
+    .select('id')
+    .single();
+
+  // 23505 = unique_violation；只有 idempotency_key 约束冲突时视为幂等命中
+  if (error?.code === '23505' && input.idempotencyKey) {
+    return ''; // 幂等：已存在相同事件
+  }
+  if (error) throw new Error(`创建事件失败: ${error.message}`);
+
+  return data?.id ?? '';
+}
+
+/** Rule Trigger 适配器：EvolutionRule + DetectionResult → event */
 export async function createEvent(
   rule: EvolutionRule,
   detection: DetectionResult,
 ): Promise<string> {
-  const { data } = await supabase
-    .from('evolution_events')
-    .insert({
-      workflow_id: rule.workflow_id,
-      user_id: rule.user_id,
-      rule_id: rule.id,
-      trigger_type: rule.trigger_type,
-      trigger_reason: detection.reason,
-      metric_snapshot: detection.snapshot ?? null,
-      analysis_status: 'pending',
-    })
-    .select('id')
-    .single();
-  return data?.id ?? '';
+  return createEvolutionEvent({
+    workflowId: rule.workflow_id,
+    userId: rule.user_id,
+    ruleId: rule.id,
+    triggerType: rule.trigger_type,
+    triggerReason: detection.reason,
+    metricSnapshot: detection.snapshot ?? null,
+  });
 }
 
 /** 更新事件状态 */

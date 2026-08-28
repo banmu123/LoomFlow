@@ -117,6 +117,7 @@ Admin → Model Settings → Add Model
 Workflows continuously improve — **without manual intervention**. The Evolution Engine automatically detects performance regressions and proposes optimizations:
 
 - **Trigger rules**: scheduled (cron), metric-based (latency +30%, failure rate > threshold), event-based (N consecutive failures)
+- **Regression detection**: automatic baseline comparison (version / production / rolling) across 5 metrics (success rate, failure rate, P95 latency, cost, test score) with relative + absolute thresholds
 - **AI analysis**: metrics → bottleneck detection → static analysis → AI generates optimization patch
 - **Human approval**: proposals require explicit user confirmation before modifying production workflows
 - **Full audit trail**: every trigger, analysis, and decision is recorded in evolution events
@@ -125,6 +126,7 @@ Workflows continuously improve — **without manual intervention**. The Evolutio
 Evolution Dashboard → Workflow Health (score, trend, bottlenecks)
   → AI Proposals (view diff, approve, reject)
   → Trigger Rules (create cron / metric / event triggers)
+  → Regression Detection (baseline vs candidate, 5 metrics, severity policy)
   → Timeline (full audit history)
 ```
 
@@ -318,7 +320,7 @@ src/
 │   ├── ai/               # Model Registry (providers / capabilities / models)
 │   ├── agent/            # AI chat tools (create_custom_node, knowledge, stats...)
 │   ├── workflow-ai/      # AI workflow generation prompts
-│   ├── workflow-eval/    # Workflow evaluation (metrics, bottleneck, static analysis, AI optimization)
+│   ├── workflow-eval/    # Workflow evaluation (metrics, bottleneck, static analysis, AI optimization, regression detection, baseline manager)
 │   ├── workflow-copilot/ # Copilot pipeline (patch, proposal, diff, test cases)
 │   ├── evolution/        # Evolution Engine (rule evaluator, trigger detector, orchestrator, scheduler)
 │   ├── secrets.ts        # Sensitive config encryption (AES-256-GCM)
@@ -331,7 +333,7 @@ src/
 
 ## 🧪 Testing & CI
 
-- **Vitest** — 538 unit tests (engine, schema, sandbox, executors, search providers, secrets encryption, flow trace, notes, model registry, node registry, agent tools, i18n, evolution engine)
+- **Vitest** — 686 unit tests (engine, schema, sandbox, executors, search providers, secrets encryption, flow trace, notes, model registry, node registry, agent tools, i18n, evolution engine, regression detection)
 - **GitHub Actions** — lint + typecheck + test + production build on every push (Node 20/22 matrix)
 
 ---

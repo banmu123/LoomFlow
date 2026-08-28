@@ -723,3 +723,12 @@ CREATE INDEX IF NOT EXISTS idx_evolution_events_created ON evolution_events(crea
 
 -- 迁移完成后刷新 PostgREST schema 缓存
 NOTIFY pgrst, 'reload schema';
+
+-- 60. Evolution Events: idempotency key for regression dedup
+ALTER TABLE evolution_events ADD COLUMN IF NOT EXISTS idempotency_key TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_evolution_events_idempotency_key
+  ON evolution_events (idempotency_key)
+  WHERE idempotency_key IS NOT NULL;
+
+-- 迁移完成后刷新 PostgREST schema 缓存
+NOTIFY pgrst, 'reload schema';
