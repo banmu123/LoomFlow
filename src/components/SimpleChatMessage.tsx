@@ -13,6 +13,7 @@ import {
   Copy,
   RefreshCw,
   ArrowRight,
+  Loader2,
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
@@ -41,10 +42,9 @@ function copyText(text: string) {
 
 function ThinkingDots() {
   return (
-    <div className="flex items-center gap-1 py-1">
-      <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.3s]" />
-      <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.15s]" />
-      <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60" />
+    <div className="flex items-center gap-2 py-1">
+      <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground/60" />
+      <span className="text-xs text-muted-foreground/60 animate-pulse">思考中...</span>
     </div>
   );
 }
@@ -56,6 +56,13 @@ function StreamingDots() {
       <span className="h-1 w-1 animate-bounce rounded-full bg-muted-foreground/40 [animation-delay:-0.15s]" />
       <span className="h-1 w-1 animate-bounce rounded-full bg-muted-foreground/40" />
     </span>
+  );
+}
+
+/** 流式输入光标：模拟打字机效果 */
+function TypingCursor() {
+  return (
+    <span className="ml-0.5 inline-block h-3.5 w-0.5 animate-pulse bg-foreground/60" />
   );
 }
 
@@ -242,6 +249,7 @@ export function SimpleChatMessage({
                 )}
               >
                 <MarkdownContent text={content} />
+                {status === 'streaming' && <TypingCursor />}
                 {status === 'streaming' && !reasoning && <StreamingDots />}
                 {children}
               </div>

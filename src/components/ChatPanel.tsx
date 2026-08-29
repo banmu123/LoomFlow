@@ -356,7 +356,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
       setIsGenerating(true);
       const timer = setInterval(() => {
         loadConversationMessages(convId);
-      }, 1500);
+      }, 500);
       return () => clearInterval(timer);
     }
     setIsGenerating(false);

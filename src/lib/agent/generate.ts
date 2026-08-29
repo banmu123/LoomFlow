@@ -210,8 +210,8 @@ export async function runAiGeneration(opts: {
   const { conversationId, assistantMessageId, images = [] } = opts;
   const modelParam = opts.model;
 
-  // 节流写入：累积到阈值或超时后写一次（轮询 1.5s，写太频繁无意义）
-  const WRITE_INTERVAL_MS = 500;
+  // 节流写入：累积到阈值或超时后写一次（轮询 500ms，写太频繁无意义）
+  const WRITE_INTERVAL_MS = 300;
   let lastWriteAt = 0;
   let contentBuf = '';
   let content = '';
