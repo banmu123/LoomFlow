@@ -8,6 +8,8 @@
 
 **A lightweight AI workflow builder for individuals and small teams.**
 
+An AI-native workflow runtime with built-in evaluation, evolution, and quality gates.
+
 Describe your idea in natural language → generate a runnable workflow → customize it on a visual canvas → publish it as an API.
 
 *Everyone should be able to create their own AI automation flows.*
