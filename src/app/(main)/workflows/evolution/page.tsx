@@ -18,6 +18,7 @@ import {
   Zap,
   GitBranch,
   RefreshCw,
+  Shield,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useT } from '@/lib/i18n';
@@ -403,6 +404,54 @@ export default function EvolutionPage() {
                   ) : (
                     <p className="text-sm text-muted-foreground">No data</p>
                   )}
+                </CardContent>
+              </Card>
+
+              {/* Quality Gate Status Card */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                    <Shield className="h-4 w-4" />
+                    {t('qualityGate.title')}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    const gateEvent = events.find((e) => e.trigger_type === 'quality_gate');
+                    if (!gateEvent) {
+                      return <p className="text-sm text-muted-foreground">No quality gate checks yet</p>;
+                    }
+                    const meta = gateEvent.metric_snapshot as Record<string, unknown> | null;
+                    const decision = (meta?.decision as string) ?? gateEvent.analysis_status;
+                    const version = meta?.candidateVersion as number | undefined;
+                    const checks = meta?.checks as Array<{ name: string; status: string }> | undefined;
+                    const passed = checks?.filter((c) => c.status === 'pass').length ?? 0;
+                    const total = checks?.length ?? 0;
+
+                    const decisionConfig: Record<string, { icon: typeof CheckCircle2; color: string; label: string }> = {
+                      allow: { icon: CheckCircle2, color: 'text-green-600', label: t('qualityGate.allow') },
+                      warning: { icon: AlertTriangle, color: 'text-amber-500', label: t('qualityGate.warning') },
+                      block: { icon: XCircle, color: 'text-destructive', label: t('qualityGate.block') },
+                    };
+                    const cfg = decisionConfig[decision] ?? decisionConfig.allow;
+                    const Icon = cfg.icon;
+
+                    return (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Icon className={`h-5 w-5 ${cfg.color}`} />
+                          <span className={`text-sm font-semibold ${cfg.color}`}>{cfg.label}</span>
+                          {version != null && <Badge variant="outline" className="text-xs">v{version}</Badge>}
+                        </div>
+                        {total > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            {t('qualityGate.passed', { passed, total })}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground">{timeAgo(gateEvent.created_at)}</p>
+                      </div>
+                    );
+                  })()}
                 </CardContent>
               </Card>
 

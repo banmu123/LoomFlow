@@ -44,6 +44,7 @@ import { useTinyflowLocale } from '@/lib/tinyflow-locale';
 import { toast } from 'sonner';
 import { getPendingWorkflow, clearPendingWorkflow } from '@/lib/pending-workflow';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { QualityGateResult, type QualityGateReportData } from '@/components/QualityGateResult';
 import { formatVersion } from '@/lib/version';
 import { uploadFileToOSS } from '@/lib/oss-upload-client';
 import { NodeConfigPanel } from '@/components/NodeConfigPanel';
@@ -610,6 +611,9 @@ export default function TinyflowWrapper() {
   const [versionToRestore, setVersionToRestore] = useState<{ version: number; title: string } | null>(null);
   // 待发布的版本（ConfirmDialog 确认后发布该版本）
   const [publishTarget, setPublishTarget] = useState<{ version: number; title: string } | null>(null);
+  const [gateReport, setGateReport] = useState<QualityGateReportData | null>(null);
+  const [gateLoading, setGateLoading] = useState(false);
+  const [publishAfterGate, setPublishAfterGate] = useState(false);
 
   const handleSaveWorkflow = useCallback(async (title?: string, description?: string) => {
     if (!instanceRef.current || savingWorkflow) return;
@@ -716,25 +720,69 @@ export default function TinyflowWrapper() {
   // 发布指定版本（外部 API 立即切换到该版本内容）
   const confirmPublishVersion = useCallback(async () => {
     if (!publishTarget || !currentWorkflowId) return;
+    setGateLoading(true);
     try {
+      // Step 1: Call Quality Gate check
+      const gateRes = await fetch('/api/evolution/quality-gate/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workflowId: currentWorkflowId, candidateVersion: publishTarget.version }),
+      });
+      const gateData = await gateRes.json();
+
+      if (!gateRes.ok) {
+        toast.error(gateData?.error || t('qualityGate.checkFailed'));
+        setGateLoading(false);
+        return;
+      }
+
+      setGateReport(gateData);
+      setGateLoading(false);
+
+      // Step 2: Decision
+      if (gateData.decision === 'allow') {
+        await doPublish(gateData.gateEvaluationId);
+      }
+      // WARNING / BLOCK: show dialog
+    } catch {
+      toast.error(t('qualityGate.checkFailed'));
+      setGateLoading(false);
+    }
+  }, [publishTarget, currentWorkflowId, t]);
+
+  const doPublish = useCallback(async (gateEvaluationId?: string) => {
+    if (!publishTarget || !currentWorkflowId) return;
+    try {
+      const body: Record<string, unknown> = { version: publishTarget.version };
+      if (gateEvaluationId) body.gateEvaluationId = gateEvaluationId;
+
       const res = await fetch(`/api/workflow-history/${currentWorkflowId}/publish`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ version: publishTarget.version }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (res.ok) {
         toast.success(t('workflows.versionPublished', { version: publishTarget.version }));
         loadVersions();
+        setPublishTarget(null);
+        setGateReport(null);
       } else {
         toast.error(data?.error || t('canvas.publishFailed'));
       }
     } catch {
       toast.error(t('canvas.publishFailed'));
     } finally {
-      setPublishTarget(null);
+      setPublishAfterGate(false);
     }
   }, [publishTarget, currentWorkflowId, loadVersions, t]);
+
+  const handleGateContinuePublish = useCallback(async () => {
+    setPublishAfterGate(true);
+    if (gateReport) {
+      await doPublish(gateReport.gateEvaluationId);
+    }
+  }, [gateReport, doPublish]);
 
   // ===== Build inputs object =====
   const buildInputs = useCallback((): Record<string, unknown> => {
@@ -1876,9 +1924,34 @@ export default function TinyflowWrapper() {
         onCancel={() => setVersionToRestore(null)}
       />
 
-      {/* 发布版本确认（外部 API 立即切换到该版本） */}
+      {/* 发布版本 Quality Gate */}
+      <Dialog
+        open={!!gateReport}
+        onOpenChange={(open) => {
+          if (!open) {
+            setGateReport(null);
+            setPublishTarget(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          {gateReport && (
+            <QualityGateResult
+              report={gateReport}
+              onContinuePublish={handleGateContinuePublish}
+              onCancel={() => {
+                setGateReport(null);
+                setPublishTarget(null);
+              }}
+              loading={publishAfterGate}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* 发布版本确认（Quality Gate 通过后或无 gate 时的 fallback） */}
       <ConfirmDialog
-        open={!!publishTarget}
+        open={!!publishTarget && !gateReport && !gateLoading}
         title={
           publishTarget
             ? t('workflows.publishVersionConfirm', {
@@ -1887,7 +1960,8 @@ export default function TinyflowWrapper() {
               })
             : ''
         }
-        confirmText={t('workflows.publish')}
+        confirmText={gateLoading ? t('qualityGate.checking') : t('workflows.publish')}
+        loading={gateLoading}
         onConfirm={confirmPublishVersion}
         onCancel={() => setPublishTarget(null)}
       />

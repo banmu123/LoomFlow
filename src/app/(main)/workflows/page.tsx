@@ -24,6 +24,7 @@ import { setPendingWorkflow } from '@/lib/pending-workflow';
 import { toast } from 'sonner';
 import { useT } from '@/lib/i18n';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { QualityGateResult, type QualityGateReportData } from '@/components/QualityGateResult';
 import { formatVersion } from '@/lib/version';
 import {
   WORKFLOW_TEMPLATES,
@@ -139,6 +140,11 @@ export default function WorkflowsPage() {
     selected: number | null;
   } | null>(null);
 
+  // Quality Gate
+  const [gateReport, setGateReport] = useState<QualityGateReportData | null>(null);
+  const [gateLoading, setGateLoading] = useState(false);
+  const [publishAfterGate, setPublishAfterGate] = useState(false);
+
   const openPublishDialog = useCallback(async (wf: WorkflowRecord) => {
     try {
       const res = await fetch(`/api/workflow-history/${wf.id}/versions`);
@@ -159,32 +165,77 @@ export default function WorkflowsPage() {
     if (!publishDialog || publishDialog.selected == null) return;
     const { wf, selected } = publishDialog;
     setPublishingId(wf.id);
+    setGateLoading(true);
     try {
-      const res = await fetch(`/api/workflow-history/${wf.id}/publish`, {
+      // Step 1: Call Quality Gate check
+      const gateRes = await fetch('/api/evolution/quality-gate/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ version: selected }),
+        body: JSON.stringify({ workflowId: wf.id, candidateVersion: selected }),
+      });
+      const gateData = await gateRes.json();
+
+      if (!gateRes.ok) {
+        toast.error(gateData?.error || t('qualityGate.checkFailed'));
+        setPublishingId(null);
+        setGateLoading(false);
+        return;
+      }
+
+      setGateReport(gateData);
+      setGateLoading(false);
+
+      // Step 2: Decision
+      if (gateData.decision === 'allow') {
+        // ALLOW: directly publish
+        await doPublish(wf.id, selected, gateData.gateEvaluationId);
+      }
+      // WARNING / BLOCK: show dialog, user decides
+    } catch {
+      toast.error(t('qualityGate.checkFailed'));
+      setPublishingId(null);
+      setGateLoading(false);
+    }
+  }, [publishDialog, t]);
+
+  const doPublish = useCallback(async (workflowId: string, version: number, gateEvaluationId?: string) => {
+    setPublishingId(workflowId);
+    try {
+      const body: Record<string, unknown> = { version };
+      if (gateEvaluationId) body.gateEvaluationId = gateEvaluationId;
+
+      const res = await fetch(`/api/workflow-history/${workflowId}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (res.ok) {
-        // 首次发布自动生成全局 API Key，仅在本次响应显示一次
         toast.success(
           data?.api_key
-            ? `已发布版本 v${formatVersion(selected)}，全局 API Key 已生成（仅显示一次）`
-            : `已发布版本 v${formatVersion(selected)}`,
+            ? `已发布版本 v${formatVersion(version)}，全局 API Key 已生成（仅显示一次）`
+            : `已发布版本 v${formatVersion(version)}`,
         );
         setPublishInfo(data);
         setPublishDialog(null);
+        setGateReport(null);
         loadWorkflows();
       } else {
-        toast.error(data?.error || '发布失败');
+        toast.error(data?.error || t('qualityGate.checkFailed'));
       }
     } catch {
-      toast.error('发布失败');
+      toast.error(t('publish.publishFailed'));
     } finally {
       setPublishingId(null);
+      setPublishAfterGate(false);
     }
-  }, [publishDialog, loadWorkflows]);
+  }, [loadWorkflows, t]);
+
+  const handleGateContinuePublish = useCallback(async () => {
+    if (!publishDialog || !gateReport) return;
+    setPublishAfterGate(true);
+    await doPublish(publishDialog.wf.id, publishDialog.selected!, gateReport.gateEvaluationId);
+  }, [publishDialog, gateReport, doPublish]);
 
   const handleUnpublish = useCallback(
     async (wf: WorkflowRecord) => {
@@ -854,13 +905,40 @@ export default function WorkflowsPage() {
             <Button variant="outline" onClick={() => setPublishDialog(null)}>
               {t('common.cancel')}
             </Button>
-            <Button onClick={handlePublish} disabled={publishingId !== null}>
-              {publishingId !== null && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
-              {publishDialog?.selected != null
-                ? `${t('workflows.publish')} v${formatVersion(publishDialog.selected)}`
-                : t('workflows.publish')}
+            <Button onClick={handlePublish} disabled={publishingId !== null || gateLoading}>
+              {(publishingId !== null || gateLoading) && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
+              {gateLoading
+                ? t('qualityGate.checking')
+                : publishDialog?.selected != null
+                  ? `${t('workflows.publish')} v${formatVersion(publishDialog.selected)}`
+                  : t('workflows.publish')}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quality Gate 结果对话框 */}
+      <Dialog
+        open={!!gateReport}
+        onOpenChange={(open) => {
+          if (!open) {
+            setGateReport(null);
+            setPublishingId(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          {gateReport && (
+            <QualityGateResult
+              report={gateReport}
+              onContinuePublish={handleGateContinuePublish}
+              onCancel={() => {
+                setGateReport(null);
+                setPublishingId(null);
+              }}
+              loading={publishAfterGate}
+            />
+          )}
         </DialogContent>
       </Dialog>
 

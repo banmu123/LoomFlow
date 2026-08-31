@@ -732,3 +732,23 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_evolution_events_idempotency_key
 
 -- 迁移完成后刷新 PostgREST schema 缓存
 NOTIFY pgrst, 'reload schema';
+
+-- 61. Quality Gate: evaluation persistence
+CREATE TABLE IF NOT EXISTS quality_gate_evaluations (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workflow_id       UUID NOT NULL REFERENCES workflow_history(id) ON DELETE CASCADE,
+  candidate_version INTEGER NOT NULL,
+  data_hash         TEXT NOT NULL,
+  decision          TEXT NOT NULL CHECK (decision IN ('allow', 'warning', 'block')),
+  report            JSONB NOT NULL,
+  policy_snapshot   JSONB NOT NULL,
+  created_by        UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at        TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_qge_workflow ON quality_gate_evaluations(workflow_id);
+CREATE INDEX IF NOT EXISTS idx_qge_created_by ON quality_gate_evaluations(created_by);
+CREATE INDEX IF NOT EXISTS idx_qge_expires ON quality_gate_evaluations(expires_at);
+
+-- 迁移完成后刷新 PostgREST schema 缓存
+NOTIFY pgrst, 'reload schema';

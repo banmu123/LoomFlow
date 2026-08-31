@@ -4,10 +4,17 @@ import { getCurrentUser } from '@/lib/server-auth';
 import { logAudit, getClientIp } from '@/lib/audit';
 import { ensureUserApiKey } from '@/lib/api-key';
 import { formatVersion } from '@/lib/version';
+import { computeHash } from '@/lib/workflow-hash';
+import { loadAndValidateGateEvaluation, verifyVersionDataHash } from '@/lib/quality-gate/evaluator';
 
 // 发布工作流：标记 published=true。
 // 全局 API Key 在首次发布时自动生成，仅在生成当次响应中返回（只显示一次）；
 // 已生成过 Key 的用户再次发布不返回 Key。
+//
+// Quality Gate 集成：
+//   - 发布指定版本时必须提供 gateEvaluationId
+//   - 服务端校验 gateEvaluation 的完整性（user/workflow/version/dataHash/未过期/decision!=block）
+//   - TOCTOU：发布前再次校验版本 dataHash 未变化
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -48,7 +55,18 @@ export async function POST(
     published: true,
     published_version: null,
   };
+
   if (typeof body?.version === 'number') {
+    // 发布指定版本：必须提供 gateEvaluationId
+    const gateEvaluationId = body?.gateEvaluationId as string | undefined;
+    if (!gateEvaluationId) {
+      return Response.json(
+        { error: '发布指定版本需要先执行 Quality Gate 检查（提供 gateEvaluationId）' },
+        { status: 400 },
+      );
+    }
+
+    // 读取版本数据
     const { data: ver } = await supabase
       .from('workflow_versions')
       .select('data')
@@ -62,6 +80,26 @@ export async function POST(
         { status: 400 },
       );
     }
+
+    // TOCTOU：计算当前 dataHash
+    const currentHash = computeHash(ver.data);
+
+    // 校验 Gate Evaluation
+    const validation = await loadAndValidateGateEvaluation(
+      gateEvaluationId,
+      user.id,
+      id,
+      body.version,
+      currentHash,
+    );
+
+    if (!validation.valid) {
+      return Response.json(
+        { error: validation.error, report: validation.report },
+        { status: 400 },
+      );
+    }
+
     publishedData = ver.data;
     updates.published_version = body.version;
   }
@@ -97,6 +135,7 @@ export async function POST(
       title: wf.title,
       apiKeyCreated: created,
       publishedVersion: updates.published_version ?? null,
+      gateEvaluationId: body?.gateEvaluationId ?? null,
     },
     ip: getClientIp(request),
   });
