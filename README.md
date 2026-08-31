@@ -285,6 +285,27 @@ Checklist:
 - ✅ Create a simple workflow → save
 - ✅ Publish as API → call it with the API key
 
+### ☁️ Vercel Serverless (Online Demo)
+
+LoomFlow supports Vercel deployment for online demos and quick体验。
+
+```bash
+# 1. Fork/Import the repo on Vercel
+# 2. Set environment variables:
+RUNTIME_MODE=serverless
+CRON_SECRET=$(openssl rand -hex 32)
+COZE_SUPABASE_URL=https://your-project.supabase.co
+COZE_SUPABASE_SERVICE_ROLE_KEY=your_key
+AUTH_SECRET=$(openssl rand -hex 32)
+# 3. Deploy
+```
+
+> Vercel Cron automatically calls `/api/cron/scheduler` (every 10min) and `/api/cron/evolution` (every 30min) to replace the built-in scheduler.
+
+**Limitations**: No long-running tasks, no built-in worker. Best for demos and evaluation. For production, use Docker self-host.
+
+Full comparison: **[docs/deployment-modes.md](docs/deployment-modes.md)**
+
 ## 📚 Documentation
 
 - **[Roadmap](ROADMAP.md)** — where the project is heading (v0.1 → v0.5)
@@ -292,6 +313,7 @@ Checklist:
 - **[Security](docs/config/security.md)** — sandbox, auth, quotas, audit, isolation
 - **[Node System Architecture](docs/nodes.md)** — NodeDefinition/Registry/Factory, configSchema, plugin SDK
 - **[Deployment Manual](docs/config/Deployment-Manual.md)** — self-host, migrate, HTTPS
+- **[Deployment Modes](docs/deployment-modes.md)** — Docker vs Vercel comparison
 
 ---
 

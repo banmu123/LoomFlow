@@ -260,6 +260,27 @@ curl http://localhost:5000/api/health
 - ✅ 创建一个简单工作流 → 保存
 - ✅ 发布为 API → 用 API Key 调用
 
+### ☁️ Vercel Serverless（在线体验）
+
+LoomFlow 支持 Vercel 部署，用于在线 Demo 和快速体验。
+
+```bash
+# 1. 在 Vercel Fork/Import 仓库
+# 2. 设置环境变量：
+RUNTIME_MODE=serverless
+CRON_SECRET=$(openssl rand -hex 32)
+COZE_SUPABASE_URL=https://your-project.supabase.co
+COZE_SUPABASE_SERVICE_ROLE_KEY=your_key
+AUTH_SECRET=$(openssl rand -hex 32)
+# 3. 部署
+```
+
+> Vercel Cron 自动调用 `/api/cron/scheduler`（每 10 分钟）和 `/api/cron/evolution`（每 30 分钟）替代内置 scheduler。
+
+**限制**：不支持长任务执行、无内置 Worker。适合 Demo 和评估。生产部署请使用 Docker 自托管。
+
+完整对比：**[docs/deployment-modes.md](docs/deployment-modes.md)**
+
 ## 📚 文档
 
 - **[Roadmap 路线图](ROADMAP.md)** — 项目规划（v0.1 → v0.5）

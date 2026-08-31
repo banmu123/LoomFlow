@@ -1,0 +1,13 @@
+{
+  "buildCommand": "pnpm next build",
+  "crons": [
+    {
+      "path": "/api/cron/scheduler",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/evolution",
+      "schedule": "*/30 * * * *"
+    }
+  ]
+}
