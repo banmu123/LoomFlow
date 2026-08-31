@@ -273,7 +273,7 @@ Switch from Supabase cloud to your own PostgreSQL via **Docker self-hosted Supab
 
 ```bash
 curl http://localhost:5000/api/health
-# {"status":"ok","service":"loomflow","version":"v0.1.7","db":"ok",...}
+# {"status":"ok","service":"loomflow","version":"v0.1.9","db":"ok",...}
 ```
 
 Checklist:
@@ -335,7 +335,7 @@ src/
 
 ## 🧪 Testing & CI
 
-- **Vitest** — 698 unit tests (engine, schema, sandbox, executors, search providers, secrets encryption, flow trace, notes, model registry, node registry, agent tools, i18n, evolution engine, regression detection, evolution history)
+- **Vitest** — 725 unit tests (engine, schema, sandbox, executors, search providers, secrets encryption, flow trace, notes, model registry, node registry, agent tools, i18n, evolution engine, regression detection, evolution history, quality gate)
 - **GitHub Actions** — lint + typecheck + test + production build on every push (Node 20/22 matrix)
 
 ---

@@ -1,5 +1,50 @@
 # Changelog
 
+## [v0.1.9] - 2026-08-31
+
+### 新增
+
+- **回归检测（Regression Detection）**：自动检测工作流性能退化
+  - **Baseline Manager**：支持三种基线——版本基线（Version）、生产基线（Production）、滚动基线（Rolling 24h/7d/30d）
+  - **Regression Detector**：纯函数层，5 指标逐项检测（成功率、失败率、P95 延迟、成本、测试得分），支持相对 + 绝对阈值
+  - **Regression Policy**：可配置的 severity 阈值（info/low/medium/high/critical），OR 逻辑判定 regression，AND 逻辑判定 improvement
+  - **Trade-off 检测**：区分 regressed / improved / stable / tradeoff / inconclusive，不强行压成单一分数
+  - **Regression Event 集成**：检测到退化时自动创建 Evolution Event，接入现有 AI 优化管线，幂等 key 防重复
+
+- **演化历史（Evolution History）**：完整可追溯的工作流演化记录
+  - **Session 聚合**：按 proposal_id 分组，多个事件聚合为一次演化
+  - **Timeline**：按 createdAt + eventId 稳定排序的事件时间线
+  - **Outcome**：before/after 指标对比（observed_after_version，非 version-scoped）
+  - **查询 API**：GET /api/evolution/history（分页 + 时间/状态/严重度过滤）
+
+- **Quality Gate**：发布闸门，ALLOW / WARNING / BLOCK 三级决策
+  - **6 项检查**：Schema（required）、Static Analysis（required）、Tests（required）、Regression（advisory）、Cost（advisory）、Security（required）
+  - **Policy 模型**：服务端加载，客户端不能覆盖 required checks
+  - **Gate Evaluation 持久化**：quality_gate_evaluations 表，30 分钟有效期，绑定用户/版本/dataHash
+  - **TOCTOU 防护**：发布前重新校验版本 dataHash 未变化
+  - **Quality Gate UI**：发布流程集成——ALLOW 自动发布、WARNING 弹窗确认、BLOCK 阻止发布
+  - **Quality Gate 组件**：可复用 QualityGateResult，每项检查独立行，可展开查看详情
+
+- **聊天体验优化**
+  - 轮询间隔从 1.5s 降至 500ms（3x 更快反馈）
+  - DB 写入节流从 500ms 降至 300ms（更流畅的分块）
+  - pending 状态增强：spinner +「思考中...」标签
+  - streaming 状态增加打字机光标动画
+
+### 变更
+
+- ROADMAP 重构：v0.1 Foundation → v0.2 Intelligence → v0.3 Evolution → v0.4 Quality & Reliability → v0.5 Developer Ecosystem → v0.6 Experience RAG
+- README 测试数更新：698 → 725
+- 项目结构新增 `quality-gate/`、`evolution-history/` 目录
+
+### 测试
+
+- 725 个单元测试全绿
+  - regression-policy 27 + baseline 24 + regression 44 + orchestrator 12 + regression-event 31 + quality-gate 27 + evolution-history 12 + 其他
+- validate（ts-check + lint）通过
+
+---
+
 ## [v0.1.8] - 2026-08-27
 
 ### 新增
