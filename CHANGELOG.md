@@ -1,5 +1,24 @@
 # Changelog
 
+## [v0.1.10] - 2026-09-01
+
+### 新增
+
+- **Vercel Hobby 免费计划兼容**：单 Cron 统一调度，适配 Hobby 计划每天一次限制
+  - **Cron Runner**（`src/lib/scheduler/cron-runner.ts`）：统一调度入口，根据 `last_run_at` 和 `cron_expr` 频率判断到期任务
+  - 支持频率：every 10 minutes / every 30 minutes / hourly / daily
+  - 单次触发同时执行 scheduled tasks + evolution checks
+
+### 变更
+
+- `vercel.json` cron 配置：`*/10 * * * *` + `*/30 * * * *` → `0 0 * * *`（每天 UTC 0 点触发）
+- `/api/cron/scheduler` 改为调用 `runScheduledTasks()`，返回 `{ success, executed, skipped }`
+- 删除 `/api/cron/evolution` 独立端点，合并到 scheduler cron runner
+- Docker 模式保持不变：`initScheduler()` + `initEvolutionScheduler()` 正常运行
+- Favicon 替换为 LoomFlow logo（`src/app/icon.png`）
+
+---
+
 ## [v0.1.9] - 2026-08-31
 
 ### 新增
