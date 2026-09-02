@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
@@ -152,9 +153,10 @@ export function SidebarNav() {
     const Icon = item.icon;
     const active = isActive(item.href);
     return (
-      <button
+      // next/link：进入视口自动预取目标路由（RSC payload + JS chunks），切页零等待
+      <Link
         key={item.href}
-        onClick={() => router.push(item.href)}
+        href={item.href}
         title={collapsed ? t(item.labelKey) : undefined}
         className={cn(
           'flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition-all',
@@ -166,7 +168,7 @@ export function SidebarNav() {
       >
         <Icon className="h-4 w-4 shrink-0" />
         {!collapsed && <span className="truncate">{t(item.labelKey)}</span>}
-      </button>
+      </Link>
     );
   };
 
@@ -211,14 +213,6 @@ export function SidebarNav() {
     );
   };
 
-  const openConversation = (id: string) => {
-    if (pathname !== `/chat/${id}`) router.push(`/chat/${id}`);
-  };
-
-  const newConversation = () => {
-    if (pathname !== '/chat') router.push('/chat');
-  };
-
   return (
     <aside
       className={cn(
@@ -229,10 +223,10 @@ export function SidebarNav() {
       {/* 顶部固定：Logo + 新聊天 */}
       <div className="shrink-0">
         <div className={cn('flex items-center border-b border-border py-3', collapsed ? 'justify-center' : 'justify-between px-3')}>
-          <button onClick={() => router.push('/chat')} className="flex items-center gap-2" title={t('app.name')}>
+          <Link href="/chat" className="flex items-center gap-2" title={t('app.name')}>
             <img src="/screenshots/logo.png" alt="LoomFlow" className="h-7 w-7 rounded-md object-contain shadow-md shadow-[#b77945]/25" />
             {!collapsed && <span className="text-brand-gradient truncate text-sm font-bold">{t('app.name')}</span>}
-          </button>
+          </Link>
           <button
             onClick={() => setCollapsed((v) => !v)}
             className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -243,8 +237,8 @@ export function SidebarNav() {
         </div>
 
         <div className="border-b border-border p-2">
-          <button
-            onClick={newConversation}
+          <Link
+            href="/chat"
             className={cn(
               'flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm font-medium transition-all',
               pathname === '/chat'
@@ -254,7 +248,7 @@ export function SidebarNav() {
           >
             <MessageSquare className="h-4 w-4 shrink-0" />
             <span className="truncate">{t('sidebar.chat')}</span>
-          </button>
+          </Link>
         </div>
       </div>
 
@@ -298,13 +292,14 @@ export function SidebarNav() {
                         : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                     )}
                   >
-                    <button
-                      onClick={() => openConversation(conv.id)}
+                    <Link
+                      href={`/chat/${conv.id}`}
+                      prefetch={false}
                       className="flex min-w-0 flex-1 items-center gap-2 text-left"
                     >
                       <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-60" />
                       <span className="truncate">{truncateTitle(conv.title)}</span>
-                    </button>
+                    </Link>
                     <button
                       onClick={() => setDeleteTarget(conv)}
                       className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"

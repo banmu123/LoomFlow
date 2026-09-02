@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SimpleChatMessage, type ChatMessageStatus } from './SimpleChatMessage';
+import { RECOMMENDATIONS } from './chat-recommendations';
 import { SimpleChatInput } from './SimpleChatInput';
 import { ModelConfigDialog } from './ModelConfigDialog';
 import { WorkflowPreviewDrawer } from './WorkflowPreviewDrawer';
@@ -53,15 +54,6 @@ import { LocaleSwitcher } from './LocaleSwitcher';
 const CHAT_PANEL_WIDTH = 440;
 
 type MessageRole = 'user' | 'assistant';
-
-// 新建对话的模板推荐（欢迎页 ChatLanding 复用）——i18n key，页面用 t() 渲染
-export const RECOMMENDATIONS = [
-  'home.templates.dailyNews',
-  'home.templates.content',
-  'home.templates.customer',
-  'home.templates.weeklyReport',
-  'home.templates.translator',
-];
 
 // 工具名 → 可读标签（对话中的执行日志展示）——通过 t('tools.xxx') 国际化
 const TOOL_LABELS: Record<string, string> = {};
@@ -773,6 +765,17 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
     [conversationId, conversations, isGenerating, model, updateConversation],
   );
 
+  // ref 转发：SimpleChatMessage 的 memo 比较器忽略 onRegenerate（内联闭包），
+  // 闭包可能滞留旧渲染，这里保证点击时始终调用最新版 handleRegenerate
+  const handleRegenerateRef = useRef(handleRegenerate);
+  useEffect(() => {
+    handleRegenerateRef.current = handleRegenerate;
+  });
+  const handleRegenerateStable = useCallback(
+    (id: string) => handleRegenerateRef.current(id),
+    [],
+  );
+
   // 配置模型成功后：刷新模型列表 + 自动重试当前对话中失败/未回复的最后一条消息
   const handleModelConfigured = useCallback(() => {
     // 1. 刷新模型列表（模型选择器出现新模型）
@@ -1015,7 +1018,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
                   images={msg.images}
                   onRegenerate={
                     msg.role === 'assistant' && msg.status === 'done'
-                      ? () => handleRegenerate(msg.id)
+                      ? () => handleRegenerateStable(msg.id)
                       : undefined
                   }
                 />

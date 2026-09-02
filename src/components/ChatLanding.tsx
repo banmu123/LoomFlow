@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sparkles, ArrowRight, Zap } from 'lucide-react';
 import { SimpleChatInput } from './SimpleChatInput';
-import { RECOMMENDATIONS } from './ChatPanel';
+import { RECOMMENDATIONS } from './chat-recommendations';
 import { useT } from '@/lib/i18n';
 import { WORKFLOW_TEMPLATES, TEMPLATE_CATEGORIES } from '@/lib/workflow-templates';
 import { cn } from '@/lib/utils';

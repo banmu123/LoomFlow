@@ -48,11 +48,21 @@ import { QualityGateResult, type QualityGateReportData } from '@/components/Qual
 import { formatVersion } from '@/lib/version';
 import { uploadFileToOSS } from '@/lib/oss-upload-client';
 import { NodeConfigPanel } from '@/components/NodeConfigPanel';
-import { CanvasAssistant } from '@/components/CanvasAssistant';
+import dynamic from 'next/dynamic';
 import { FlowTraceView } from '@/components/FlowTraceView';
-import { BrewNotesPanel } from '@/components/BrewNotesPanel';
 import { getConfigDefaults, mergeConfig } from '@/lib/tinyflow/node-config';
 import type { NodeDefinition } from '@/lib/tinyflow/node-definition';
+
+// AI 助手 / 笔记面板依赖 @ai-sdk + react-markdown 重型链：按需异步加载，
+// 与聊天路由共享同一 async chunk，避免编辑器首屏静态重复打包（曾达 1MB+）
+const CanvasAssistant = dynamic(
+  () => import('@/components/CanvasAssistant').then((m) => m.CanvasAssistant),
+  { ssr: false },
+);
+const BrewNotesPanel = dynamic(
+  () => import('@/components/BrewNotesPanel').then((m) => m.BrewNotesPanel),
+  { ssr: false },
+);
 
 // ===== Types =====
 
