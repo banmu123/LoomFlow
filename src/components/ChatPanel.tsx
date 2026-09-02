@@ -39,6 +39,19 @@ import {
 import { cn } from '@/lib/utils';
 import { SimpleChatMessage, type ChatMessageStatus } from './SimpleChatMessage';
 import { RECOMMENDATIONS } from './chat-recommendations';
+import {
+  getCachedConversationHistory,
+  setCachedConversationHistory,
+  HISTORY_CACHE_TTL_MS,
+  type CachedMessageRow,
+} from './chat-history-cache';
+import { fetchConversationsList, invalidateConversationsCache } from './conversations-cache';
+import { fetchModelOptions } from '@/lib/ai/models-cache';
+
+interface CachedMessageRowWithLogs extends CachedMessageRow {
+  tool_logs?: Array<{ toolName: string; status: 'running' | 'done' | 'error' }> | null;
+}
+
 import { SimpleChatInput } from './SimpleChatInput';
 import { ModelConfigDialog } from './ModelConfigDialog';
 import { WorkflowPreviewDrawer } from './WorkflowPreviewDrawer';
@@ -76,10 +89,27 @@ interface Conversation {
   title: string;
   model?: string | null;
   messages: Message[];
+  /** 消息是否已加载（列表懒加载：挂载只拉列表，消息进入对话时按需加载） */
+  messagesLoaded?: boolean;
 }
 
 let seq = 0;
 const nextId = () => `${Date.now()}-${seq++}`;
+
+/** messages 接口原始行 → 前端消息（缓存命中与全新拉取共用同一映射） */
+function toMessages(rows: CachedMessageRowWithLogs[]): Message[] {
+  return rows.map((m) => ({
+    id: m.id,
+    role: m.role as MessageRole,
+    content: m.content,
+    reasoning: m.reasoning ?? undefined,
+    status: m.status as ChatMessageStatus | undefined,
+    error: m.error ?? undefined,
+    images: m.images ?? undefined,
+    toolLogs: m.tool_logs ?? undefined,
+    createdAt: m.created_at ? new Date(m.created_at).getTime() : 0,
+  }));
+}
 
 export function ChatPanel({ conversationId = '' }: { conversationId?: string }) {
   const router = useRouter();
@@ -108,32 +138,31 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
 
   // 加载已配置模型（从模型配置页返回或切回标签页时自动刷新）
   // 优先使用当前对话绑定的模型（创建对话时选择的模型），否则保持当前选择，再回退第一个
-  const loadModels = useCallback(async () => {
-    try {
-      const res = await fetch('/api/ai/models');
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        const options = data.map((m: { id: string; label: string | null }) => ({
-          value: m.id,
-          label: m.label || m.id,
-        }));
-        setModelOptions(options);
-        // 当前对话绑定的模型优先
-        const boundModel = conversations.find((c) => c.id === convId)?.model;
-        if (boundModel && options.some((o) => o.value === boundModel)) {
-          setModel(boundModel);
-        } else {
-          // 保持当前选择，不存在时回退第一个
-          setModel((prev) => (options.some((o) => o.value === prev) ? prev : options[0]?.value || ''));
+  // 模型列表走客户端缓存（TTL 去重，多组件共享一次请求）；force 用于配置变更后的强刷
+  const loadModels = useCallback(
+    async (force = false) => {
+      try {
+        const options = await fetchModelOptions(force);
+        if (options.length > 0 || force) {
+          setModelOptions(options);
+          // 当前对话绑定的模型优先
+          const boundModel = conversations.find((c) => c.id === convId)?.model;
+          if (boundModel && options.some((o) => o.value === boundModel)) {
+            setModel(boundModel);
+          } else {
+            // 保持当前选择，不存在时回退第一个
+            setModel((prev) => (options.some((o) => o.value === prev) ? prev : options[0]?.value || ''));
+          }
         }
+      } catch {
+        // ignore
+      } finally {
+        // 模型加载完成标记（避免加载中误判为"未配置模型"）
+        setModelsLoaded(true);
       }
-    } catch {
-      // ignore
-    } finally {
-      // 模型加载完成标记（避免加载中误判为"未配置模型"）
-      setModelsLoaded(true);
-    }
-  }, [conversations, convId]);
+    },
+    [conversations, convId],
+  );
 
   useEffect(() => {
     loadModels();
@@ -141,7 +170,8 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
 
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === 'visible') loadModels();
+      // 切回标签页强刷（模型可能在模型配置页被修改）
+      if (document.visibilityState === 'visible') loadModels(true);
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
@@ -225,71 +255,32 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
     })();
   }, []);
 
-  // ===== Load conversations from Supabase on mount =====
-  // 加载全部对话（挂载与侧边栏切换时复用）
-  const loadAllConversations = useCallback(async () => {
+  // ===== 加载对话列表（仅列表元数据，1 次请求）=====
+  // 消息按需加载：进入对话时由 per-convId effect 拉取（或悬停预取命中缓存），
+  // 避免旧版挂载时 N+1 请求（每个对话各拉一次 messages）
+  const loadConversationList = useCallback(async () => {
     try {
-      const res = await fetch('/api/conversations');
-      const data = await res.json();
-
-      // 数据库没有对话时不自动创建——只有真正发送消息才创建历史（保留本地占位会话）
-      if (!Array.isArray(data) || data.length === 0) {
-        setLoadingHistory(false);
-        return;
-      }
-
-      // Load messages for each conversation
-      const convs: Conversation[] = await Promise.all(
-        data.map(async (dbConv: { id: string; title: string; model?: string | null }) => {
-          try {
-            const msgsRes = await fetch(`/api/conversations/${dbConv.id}/messages`);
-            const msgs = await msgsRes.json();
-            return {
-              id: dbConv.id,
-              title: dbConv.title,
-              model: dbConv.model ?? null,
-              messages: Array.isArray(msgs)
-                ? msgs.map(
-                    (m: {
-                      id: string;
-                      role: MessageRole;
-                      content: string;
-                      reasoning?: string;
-                      status?: ChatMessageStatus;
-                      error?: string;
-                      images?: string[] | null;
-                      tool_logs?: Message['toolLogs'] | null;
-                      created_at: string;
-                    }) => ({
-                      id: m.id,
-                      role: m.role,
-                      content: m.content,
-                      reasoning: m.reasoning,
-                      status: m.status,
-                      error: m.error,
-                      images: m.images ?? undefined,
-                      toolLogs: m.tool_logs ?? undefined,
-                      createdAt: new Date(m.created_at).getTime(),
-                    }),
-                  )
-                : [],
-            };
-          } catch {
-            return { id: dbConv.id, title: dbConv.title, model: dbConv.model ?? null, messages: [] };
-          }
-        }),
+      const list = await fetchConversationsList(true);
+      setConversations(
+        list.map((c) => ({
+          id: c.id,
+          title: c.title || t('common.unnamed'),
+          model: c.model ?? null,
+          messages: [],
+          messagesLoaded: false,
+        })),
       );
-
-      setConversations(convs);
-      setLoadingHistory(false);
     } catch {
-      setLoadingHistory(false);
+      // 加载失败放行（消息区显示空态）
+    } finally {
+      // 列表加载完成即解除整页 loading（消息由 per-convId effect 接管）
+      if (!conversationId) setLoadingHistory(false);
     }
-  }, []);
+  }, [t, conversationId]);
 
   useEffect(() => {
-    loadAllConversations();
-  }, [loadAllConversations]);
+    loadConversationList();
+  }, [loadConversationList]);
 
   // 重新加载单个对话的消息（轮询观察生成进度）；生成状态以数据库消息状态为准
   const loadConversationMessages = useCallback(async (id: string) => {
@@ -321,7 +312,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
         }),
       );
       setConversations((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, messages: parsed } : c)),
+        prev.map((c) => (c.id === id ? { ...c, messages: parsed, messagesLoaded: true } : c)),
       );
       // 生成状态以数据库为准：有未完成消息 → 生成中；否则结束（进入页面/刷新后据此恢复）
       const stillPending = parsed.some(
@@ -385,16 +376,40 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
   }, [convId, conversations]);
 
 
-  // 路由带对话 id：本地还没有该对话（直达/刷新/他人创建）时单独加载标题+消息
+  // 路由带对话 id：消息未加载（直达/刷新/懒加载列表）时按需加载该对话
   useEffect(() => {
-    if (!convId || conversations.some((c) => c.id === convId)) return;
+    if (!convId) return;
+    const existing = conversations.find((c) => c.id === convId);
+    if (existing?.messagesLoaded) return;
+
+    // ① 悬停预取缓存命中：零请求即时渲染（消除双请求瀑布）
+    // 末条为 user-done 的对话可能正在别处生成，跳过缓存走全新拉取，防止重复触发生成
+    const cached = getCachedConversationHistory(convId);
+    const cacheFresh =
+      cached && Date.now() - cached.fetchedAt < HISTORY_CACHE_TTL_MS && cached.title;
+    const lastCached = cached?.messages[cached.messages.length - 1];
+    const danglingUser =
+      lastCached?.role === 'user' && (lastCached?.status ?? 'done') === 'done';
+    if (cached && cacheFresh && !danglingUser) {
+      const seed: Conversation = {
+        id: convId,
+        title: cached.title,
+        model: cached.model,
+        messages: toMessages(cached.messages),
+        messagesLoaded: true,
+      };
+      setConversations((prev) =>
+        prev.some((c) => c.id === convId)
+          ? prev.map((c) => (c.id === convId ? { ...c, ...seed } : c))
+          : [...prev, seed],
+      );
+      return;
+    }
+
     setLoadingHistory(true);
-    fetch('/api/conversations')
-      .then((res) => res.json())
+    fetchConversationsList()
       .then((list) => {
-        const meta = Array.isArray(list)
-          ? list.find((c: { id: string }) => c.id === convId)
-          : null;
+        const meta = list.find((c) => c.id === convId) ?? null;
         if (!meta) {
           // 对话不存在（如已被删除）：回到新聊天
           router.replace('/chat');
@@ -411,24 +426,24 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
           router.replace('/chat');
           return;
         }
-        setConversations((prev) => [
-          ...prev,
-          {
-            id: convId,
-            title,
-            model,
-            messages: msgs.map((m) => ({
-              id: m.id,
-              role: m.role,
-              content: m.content,
-              reasoning: m.reasoning,
-              status: m.status,
-              error: m.error,
-              images: m.images ?? undefined,
-              createdAt: new Date(m.created_at).getTime(),
-            })),
-          },
-        ]);
+        // 回写缓存：下次切换同一对话零请求
+        setCachedConversationHistory(convId, {
+          title,
+          model,
+          messages: msgs as CachedMessageRow[],
+        });
+        const seed: Conversation = {
+          id: convId,
+          title,
+          model,
+          messages: toMessages(msgs as CachedMessageRow[]),
+          messagesLoaded: true,
+        };
+        setConversations((prev) =>
+          prev.some((c) => c.id === convId)
+            ? prev.map((c) => (c.id === convId ? { ...c, ...seed } : c))
+            : [...prev, seed],
+        );
       })
       .catch(() => {
         // 加载失败也放行（消息区显示空态），避免卡在 loading
@@ -493,7 +508,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
       };
       setConversations((prev) => [newConv, ...prev]);
       // 通知侧边栏刷新对话历史（新对话立即可见并高亮）
-      window.dispatchEvent(new Event('conversations-updated'));
+      invalidateConversationsCache(); window.dispatchEvent(new Event('conversations-updated'));
       return newConv;
     } catch {
       return null;
@@ -617,7 +632,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
       })
         .then(() => {
           // 标题已更新，通知侧边栏刷新显示第一句话
-          window.dispatchEvent(new Event('conversations-updated'));
+          invalidateConversationsCache(); window.dispatchEvent(new Event('conversations-updated'));
         })
         .catch(() => {});
     }
@@ -789,8 +804,8 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
 
   // 配置模型成功后：刷新模型列表 + 自动重试当前对话中失败/未回复的最后一条消息
   const handleModelConfigured = useCallback(() => {
-    // 1. 刷新模型列表（模型选择器出现新模型）
-    loadModels();
+    // 1. 刷新模型列表（模型选择器出现新模型）——强刷绕过缓存
+    loadModels(true);
     // 2. 若当前对话的最后一条 user 消息没有成功回复（error/空/无回复），自动重试
     if (!convId || isGenerating) return;
     const cur = conversations.find((c) => c.id === convId);
@@ -908,8 +923,14 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
 
     // 异步从 Supabase 删除；删除完成后再通知侧边栏刷新（否则列表仍显示）
     fetch(`/api/conversations/${id}`, { method: 'DELETE' })
-      .then(() => window.dispatchEvent(new Event('conversations-updated')))
-      .catch(() => window.dispatchEvent(new Event('conversations-updated')));
+      .then(() => {
+        invalidateConversationsCache();
+        window.dispatchEvent(new Event('conversations-updated'));
+      })
+      .catch(() => {
+        invalidateConversationsCache();
+        window.dispatchEvent(new Event('conversations-updated'));
+      });
   };
 
   return (

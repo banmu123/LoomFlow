@@ -12,6 +12,7 @@ import { SimpleChatInput } from '@/components/SimpleChatInput';
 import { SimpleChatMessage } from '@/components/SimpleChatMessage';
 import { uploadFileToOSS } from '@/lib/oss-upload-client';
 import { extractWorkflowJson } from '@/lib/agent/workflow-extract';
+import { fetchModelOptions } from '@/lib/ai/models-cache';
 import { toast } from 'sonner';
 
 // ===== 画布 AI 助手 =====
@@ -98,17 +99,12 @@ export function CanvasAssistant({
   const [modelOptions, setModelOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [appliedKey, setAppliedKey] = useState('');
 
-  // 加载模型列表（与聊天页一致的模型选择器）
+  // 加载模型列表（与聊天页一致的模型选择器）——走客户端缓存
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('/api/ai/models');
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          const options = data.map((m: { id: string; label: string | null }) => ({
-            value: m.id,
-            label: m.label || m.id,
-          }));
+        const options = await fetchModelOptions();
+        if (options.length > 0) {
           setModelOptions(options);
           setModel((prev) => (options.some((o) => o.value === prev) ? prev : options[0]?.value || ''));
         }

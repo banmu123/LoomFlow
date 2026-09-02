@@ -1,5 +1,6 @@
 import type { NodeDefinition } from '../node-definition';
 import { nodeRegistry } from '../node-registry';
+import { fetchModelOptions } from '@/lib/ai/models-cache';
 
 // ===== 内置节点注册（最小定义，与 NodeData 保持分离） =====
 
@@ -85,18 +86,12 @@ export const LLM_NODE: NodeDefinition = {
       // 动态选项：/api/nodes 返回前 resolve 为静态 options（前端可直接渲染）
       optionsProvider: async () => {
         try {
-          const res = await fetch('/api/ai/models');
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            return data.map((m: { id: string; label: string | null }) => ({
-              value: m.id,
-              label: m.label || m.id,
-            }));
-          }
+          // 模型列表走客户端缓存（多组件共享一次请求）
+          return await fetchModelOptions();
         } catch {
           // 拉取失败返回空选项
+          return [];
         }
-        return [];
       },
     },
     {

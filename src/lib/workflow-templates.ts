@@ -3,6 +3,8 @@
 // 模板中的 llmId 使用常见默认值，加载时由 normalizeWorkflowModels 替换为用户配置的模型
 // 模板数据使用宽松结构：只填画布需要的字段（缺省字段由画布/执行器按默认值处理）
 
+import { fetchModelOptions } from '@/lib/ai/models-cache';
+
 export interface WorkflowTemplateData {
   nodes: Array<{
     id: string;
@@ -736,11 +738,11 @@ export async function normalizeWorkflowModels(workflow: unknown): Promise<void> 
   };
   if (!wf?.nodes?.length) return;
   try {
-    const res = await fetch('/api/ai/models');
-    const models = await res.json();
-    if (!Array.isArray(models) || models.length === 0) return; // 未配置模型，保留原样（画布会提示）
-    const ids = new Set(models.map((m) => m.id));
-    const fallbackId = models[0].id;
+    // 模型列表走客户端缓存（多组件共享一次请求）
+    const options = await fetchModelOptions();
+    if (options.length === 0) return; // 未配置模型，保留原样（画布会提示）
+    const ids = new Set(options.map((o) => o.value));
+    const fallbackId = options[0].value;
     for (const node of wf.nodes) {
       const data = node.data;
       if (node.type === 'llmNode' && data?.llmId && !ids.has(String(data.llmId))) {

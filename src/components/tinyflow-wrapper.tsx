@@ -47,6 +47,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { QualityGateResult, type QualityGateReportData } from '@/components/QualityGateResult';
 import { formatVersion } from '@/lib/version';
 import { uploadFileToOSS } from '@/lib/oss-upload-client';
+import { fetchModelOptions } from '@/lib/ai/models-cache';
 import { NodeConfigPanel } from '@/components/NodeConfigPanel';
 import dynamic from 'next/dynamic';
 import { FlowTraceView } from '@/components/FlowTraceView';
@@ -366,7 +367,7 @@ export default function TinyflowWrapper() {
       // 并行拉取画布所需数据 + 预加载 loomflow-ui 包（此前串行：4 接口 ~1.6s + import ~0.3s，
       // 现在全部并行，总耗时 ≈ 最慢一项 ~0.5s）
       const [llmRes, kbRes, searchRes, nodesRes, uiModule] = await Promise.all([
-        fetch('/api/ai/models'),
+        fetchModelOptions(),
         fetch('/api/knowledge-bases'),
         fetch('/api/search-providers'),
         fetch('/api/nodes'),
@@ -375,17 +376,11 @@ export default function TinyflowWrapper() {
       const { Tinyflow } = uiModule;
       if (destroyed || !containerRef.current) return;
 
-      // 模型列表严格来自模型配置（/api/ai/models），实例化前先拉取：
+      // 模型列表严格来自模型配置（客户端缓存），实例化前先拉取：
       // provider.llm 闭包持有局部变量（每次渲染/打开面板都能拿到最新配置，未配置时为空）
       let llmOptions: { value: string; label: string }[] = [];
       try {
-        const data = await llmRes.json();
-        if (Array.isArray(data)) {
-          llmOptions = data.map((m: { id: string; label: string | null }) => ({
-            value: m.id,
-            label: m.label || m.id,
-          }));
-        }
+        llmOptions = await llmRes;
       } catch {
         // 拉取失败保持空列表（画布会提示先配置模型）
       }

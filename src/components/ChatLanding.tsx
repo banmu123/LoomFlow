@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Sparkles, ArrowRight, Zap } from 'lucide-react';
 import { SimpleChatInput } from './SimpleChatInput';
 import { RECOMMENDATIONS } from './chat-recommendations';
+import { fetchModelOptions } from '@/lib/ai/models-cache';
 import { useT } from '@/lib/i18n';
 import { WORKFLOW_TEMPLATES, TEMPLATE_CATEGORIES } from '@/lib/workflow-templates';
 import { cn } from '@/lib/utils';
@@ -23,17 +24,12 @@ export function ChatLanding() {
   const [modelOptions, setModelOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [activeCategory, setActiveCategory] = useState<string>('all');
 
-  // 加载模型列表（输入框内模型选择器）
+  // 加载模型列表（输入框内模型选择器）——走客户端缓存（多组件共享一次请求）
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('/api/ai/models');
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          const options = data.map((m: { id: string; label: string | null }) => ({
-            value: m.id,
-            label: m.label || m.id,
-          }));
+        const options = await fetchModelOptions();
+        if (options.length > 0) {
           setModelOptions(options);
           setModel((prev) =>
             options.some((o) => o.value === prev) ? prev : options[0]?.value || '',

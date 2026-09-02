@@ -34,6 +34,11 @@ import { LocaleSwitcher } from './LocaleSwitcher';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import {
+  clearAllConversationHistoryCache,
+  deleteCachedConversationHistory,
+  prefetchConversationHistory,
+} from './chat-history-cache';
 
 interface NavItem {
   href: string;
@@ -44,6 +49,7 @@ interface NavItem {
 interface ConversationItem {
   id: string;
   title: string;
+  model?: string | null;
 }
 
 const WORKFLOW_ITEMS: NavItem[] = [
@@ -103,10 +109,13 @@ export function SidebarNav() {
       const res = await fetch('/api/conversations');
       const data = await res.json();
       if (Array.isArray(data)) {
+        // 发送/删除等操作会触发重拉：整体清空历史缓存，保证下次切换拿到新鲜数据
+        clearAllConversationHistoryCache();
         setConversations(
-          data.map((c: { id: string; title: string }) => ({
+          data.map((c: { id: string; title: string; model?: string | null }) => ({
             id: c.id,
             title: c.title || t('common.unnamed'),
+            model: c.model ?? null,
           })),
         );
       }
@@ -136,6 +145,7 @@ export function SidebarNav() {
 
   const handleDeleteConversation = async (conv: ConversationItem) => {
     setDeleteTarget(null);
+    deleteCachedConversationHistory(conv.id);
     try {
       await fetch(`/api/conversations/${conv.id}`, { method: 'DELETE' });
       if (pathname === `/chat/${conv.id}`) router.push('/chat');
@@ -295,6 +305,9 @@ export function SidebarNav() {
                     <Link
                       href={`/chat/${conv.id}`}
                       prefetch={false}
+                      onMouseEnter={() =>
+                        prefetchConversationHistory(conv.id, { title: conv.title, model: conv.model })
+                      }
                       className="flex min-w-0 flex-1 items-center gap-2 text-left"
                     >
                       <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-60" />
