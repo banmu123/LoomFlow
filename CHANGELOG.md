@@ -1,5 +1,35 @@
 # Changelog
 
+## [v0.1.11] - 2026-09-02
+
+### 新增
+
+- **路由切换与首屏性能优化**
+  - 侧边栏导航改用 `next/link` 启用路由预取（原 `router.push` 零预取，切页冷启动）
+  - 新增 `(main)/loading.tsx` 切页骨架屏，消除"点击 → 白屏"体感
+  - `react-markdown` / `@ai-sdk` 改为 `next/dynamic` 按需加载并全站共享 chunk（原重复打包 3 份）
+  - `/chat`、`/chat/[id]`、`/workflows/editor` 首屏 JS 从 1MB+ 降至 340–470KB（约 -60%）
+  - `SimpleChatMessage` 加 `memo`（ref 转发避免过期闭包），修复流式输出时全列表重渲染
+  - I18n context value 加 `useMemo`
+
+### 修复
+
+- **画布 AI 助手对话无任何反馈**：后端消息提取只读 `content` 字段，未兼容 `useChat` 的 UIMessage `parts` 结构，导致 `promptMessages` 为空、`streamText` 抛 "messages must not be empty"；`extractMessageText` 兼容 parts/content 两种结构，空消息返回 400 明确报错；前端渲染 `error` 状态（原完全静默）
+- **流式错误被脱敏为 "An error occurred."**：AI SDK 默认不透传流式中途错误的真实原因；`canvas-assistant` / `chat-ai` / `workflow-notes` 三个路由接入 `onError`（共享 `uiStreamErrorText`），前端可看到如 "Insufficient Balance" 等可诊断文案
+
+### 变更
+
+- GitHub 仓库 metadata 补充 description 与 topics（OSS discovery）
+- README 测试数更新：725 → 735
+
+### 测试
+
+- 735 个单元测试全绿
+  - 新增 chat-recommendations i18n key 校验、extractMessageText（parts/content 兼容）、uiStreamErrorText 用例
+- validate（ts-check + lint）通过
+
+---
+
 ## [v0.1.10] - 2026-09-01
 
 ### 新增
