@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import type { UIMessage } from 'ai';
-import { Bot, CheckCircle2, Wand2, Loader2, Bug } from 'lucide-react';
+import { Bot, CheckCircle2, Wand2, Loader2, Bug, AlertTriangle } from 'lucide-react';
 import { useT } from '@/lib/i18n';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,19 @@ function getMessageReasoning(msg: UIMessage): string {
   return '';
 }
 
+/** 请求失败原因：transport 抛出的 Error 文本通常是后端 JSON（{"error":"..."}），优先解析出可读文案 */
+function errorText(err: unknown): string {
+  const raw = err instanceof Error ? err.message : err ? String(err) : '';
+  if (!raw) return '';
+  try {
+    const parsed = JSON.parse(raw) as { error?: string };
+    if (parsed?.error) return parsed.error;
+  } catch {
+    // 非 JSON：返回原文
+  }
+  return raw;
+}
+
 export function CanvasAssistant({
   open,
   onClose,
@@ -59,7 +72,7 @@ export function CanvasAssistant({
 }) {
   const t = useT();
 
-  const { messages, sendMessage, status, stop } = useChat({
+  const { messages, sendMessage, status, stop, error, clearError } = useChat({
     transport: new DefaultChatTransport({
       api: '/api/canvas-assistant',
       // 发送请求时注入最新画布数据/图片/模型/工作流 id（transport 随渲染重建，闭包始终是最新 state）
@@ -127,12 +140,13 @@ export function CanvasAssistant({
     (text?: string) => {
       const content = (text ?? input).trim();
       if (!content || status === 'streaming' || status === 'submitted') return;
+      clearError();
       setAppliedKey('');
       setInput('');
       setImages([]);
       sendMessage({ text: content });
     },
-    [input, status, sendMessage],
+    [input, status, sendMessage, clearError],
   );
 
   // 检测最后一条 assistant 消息中的工作流 JSON
@@ -144,6 +158,7 @@ export function CanvasAssistant({
   // Debug 快捷按钮：分析最近运行失败（配合后端注入的运行历史摘要）
   const debugAnalyze = () => {
     if (busy) return;
+    clearError();
     setAppliedKey('');
     setInput('');
     sendMessage({ text: t('canvas.debugRunPrompt') });
@@ -216,6 +231,18 @@ export function CanvasAssistant({
           )}
         </div>
       </ScrollArea>
+
+      {/* 错误反馈（请求失败时不再静默） */}
+      {error && (
+        <div className="px-4 pb-1">
+          <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span className="min-w-0 break-all">
+              {errorText(error) || t('canvas.networkError')}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* 应用修改（AI 返回工作流 JSON 时） */}
       {extracted && !busy && (

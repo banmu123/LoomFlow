@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { summarizeCanvas, buildSystemPrompt } from '@/app/api/canvas-assistant/route';
+import { summarizeCanvas, buildSystemPrompt, extractMessageText } from '@/app/api/canvas-assistant/route';
 import { extractWorkflowJson } from '@/lib/agent/workflow-extract';
 import { zh } from '@/messages/zh';
 import { en } from '@/messages/en';
@@ -44,6 +44,53 @@ describe('buildSystemPrompt 系统提示词', () => {
     expect(prompt).not.toContain('{cCanvas}'); // 占位符已被替换
     expect(prompt).not.toContain('{cRuns}');
     expect(prompt).not.toContain('{cNotes}');
+  });
+});
+
+describe('extractMessageText UIMessage 文本提取', () => {
+  it('UIMessage parts 结构（useChat 实际发送格式）', () => {
+    const msg = {
+      id: 'm1',
+      role: 'user',
+      parts: [{ type: 'text', text: '给流程加一个总结节点' }],
+    };
+    expect(extractMessageText(msg)).toBe('给流程加一个总结节点');
+  });
+
+  it('parts 含非 text 分片（reasoning/file）时只取 text', () => {
+    const msg = {
+      role: 'assistant',
+      parts: [
+        { type: 'reasoning', text: '思考过程' },
+        { type: 'file', url: 'x.png' },
+        { type: 'text', text: '答案' },
+      ],
+    };
+    expect(extractMessageText(msg)).toBe('答案');
+  });
+
+  it('多段 text 分片拼接', () => {
+    const msg = {
+      role: 'user',
+      parts: [{ type: 'text', text: 'a' }, { type: 'text', text: 'b' }],
+    };
+    expect(extractMessageText(msg)).toBe('ab');
+  });
+
+  it('兼容旧版 content 字符串与 content 数组', () => {
+    expect(extractMessageText({ role: 'user', content: '旧格式' })).toBe('旧格式');
+    expect(
+      extractMessageText({
+        role: 'user',
+        content: [{ type: 'text', text: '数组' }, { type: 'image', image: 'x' }],
+      }),
+    ).toBe('数组');
+  });
+
+  it('空消息兜底为空串（由调用方过滤）', () => {
+    expect(extractMessageText({ role: 'user', parts: [] })).toBe('');
+    expect(extractMessageText({ role: 'user' })).toBe('');
+    expect(extractMessageText({ role: 'user', content: null })).toBe('');
   });
 });
 

@@ -78,6 +78,30 @@ export async function buildSystemPrompt(
     .replace('{cNotes}', notesText);
 }
 
+/**
+ * UIMessage → 纯文本。
+ * 前端 useChat 发送的是 UIMessage 结构（内容在 parts 数组的 text 分片中），
+ * 不能只读 content 字段，否则提取结果为空、streamText 抛 "messages must not be empty"。
+ */
+export function extractMessageText(m: { role?: unknown; parts?: unknown; content?: unknown }): string {
+  if (Array.isArray(m.parts)) {
+    return m.parts
+      .map((p) =>
+        p && typeof p === 'object' && (p as { type?: string }).type === 'text'
+          ? String((p as { text?: unknown }).text ?? '')
+          : '',
+      )
+      .join('');
+  }
+  if (Array.isArray(m.content)) {
+    return (m.content as Array<{ type?: string; text?: string }>)
+      .filter((p) => p.type === 'text')
+      .map((p) => p.text ?? '')
+      .join('');
+  }
+  return String(m.content ?? '');
+}
+
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) {
@@ -85,7 +109,9 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => null);
-  const rawMessages = body?.messages as Array<{ role: string; content: unknown }> | undefined;
+  const rawMessages = body?.messages as
+    | Array<{ role: string; content?: unknown; parts?: unknown }>
+    | undefined;
   const canvasData = body?.canvasData;
   const images = Array.isArray(body?.images) ? (body.images as string[]) : [];
   const requestedModel = body?.model as string | undefined;
@@ -115,19 +141,18 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: `未知 provider: ${activeModel.provider}` }, { status: 500 });
   }
 
-  // 前端 useChat 发送 UIMessage 结构（含 parts）；提取纯文本消息给模型
+  // 前端 useChat 发送 UIMessage 结构（含 parts）：extractMessageText 兼容 parts / content 两种结构
   const promptMessages: ModelMessage[] = rawMessages
     .slice(-12)
-    .map((m) => {
-      const content = Array.isArray(m.content)
-        ? (m.content as Array<{ type?: string; text?: string }>)
-            .filter((p) => p.type === 'text')
-            .map((p) => p.text ?? '')
-            .join('')
-        : String(m.content ?? '');
-      return { role: (m.role === 'assistant' ? 'assistant' : 'user') as 'user' | 'assistant', content };
-    })
+    .map((m) => ({
+      role: (m.role === 'assistant' ? 'assistant' : 'user') as 'user' | 'assistant',
+      content: extractMessageText(m),
+    }))
     .filter((m) => m.content.trim().length > 0);
+
+  if (promptMessages.length === 0) {
+    return Response.json({ error: '消息内容为空' }, { status: 400 });
+  }
 
   // 多模态：最后一条用户消息附带图片（仅视觉模型；deepseek 等非视觉模型忽略）
   const supportsVision =
