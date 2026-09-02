@@ -1,6 +1,7 @@
 import vm from 'node:vm';
 import type { FlowNode, FlowContext } from '../types';
 import { BaseExecutor } from './BaseExecutor';
+import { runPythonCode } from './PythonSandbox';
 import type { ParameterResolver } from '../engine/ParameterResolver';
 import type { ExpressionEvaluator } from '../engine/ExpressionEvaluator';
 
@@ -41,7 +42,28 @@ export class CodeExecutor extends BaseExecutor {
     const outputDefs = node.data.outputDefs || [];
     const outputNames = outputDefs.map((o) => o.name || o.id || 'output');
 
-    // ===== 沙箱执行（node:vm 隔离上下文 + 超时限制）=====
+    // ===== 执行引擎分支 =====
+    // 画布 UI 可选 js / python / groovy / qlexpress（后两者为模板遗留选项），
+    // 非 python 一律走 JS 沙箱（历史行为：engine 字段此前从未被后端消费）
+    const engine = typeof node.data.engine === 'string' ? node.data.engine.toLowerCase() : 'js';
+    let finalResult: unknown;
+
+    if (engine === 'python') {
+      // Python 沙箱（Pyodide）：inputs 以 JSON 注入为 dict，返回值需 JSON 可序列化
+      finalResult = await runPythonCode(
+        code,
+        JSON.stringify(inputs ?? {}),
+        CODE_TIMEOUT_MS,
+      );
+    } else {
+      finalResult = await this.runJavaScript(code, inputs);
+    }
+
+    return mapCodeOutputs(finalResult, outputNames);
+  }
+
+  /** JS 沙箱执行（node:vm 隔离上下文 + 超时限制） */
+  private async runJavaScript(code: string, inputs: Record<string, unknown>): Promise<unknown> {
     // 安全：node:vm 不是安全边界——绝不注入任何宿主 realm 对象
     // （宿主函数的 constructor 链可逃逸回全局作用域，已实测 RCE）。
     // 1. inputs 为深克隆纯数据（无原型/函数）
@@ -81,20 +103,27 @@ export class CodeExecutor extends BaseExecutor {
       ]);
     }
 
-    // 构造输出
-    if (outputNames.length === 0) {
-      return { output: finalResult };
-    }
+    return finalResult;
+  }
+}
 
-    if (outputNames.length === 1) {
-      return { [outputNames[0]]: finalResult };
-    }
-
-    // 多个输出: 期望返回对象
-    if (typeof finalResult === 'object' && finalResult !== null) {
-      return finalResult as Record<string, unknown>;
-    }
-
+/** 输出映射：与 JS/Python 引擎共用（0 个 → {output}；1 个 → {name: value}；多个 → 期望返回对象） */
+function mapCodeOutputs(
+  finalResult: unknown,
+  outputNames: string[],
+): Record<string, unknown> {
+  if (outputNames.length === 0) {
     return { output: finalResult };
   }
+
+  if (outputNames.length === 1) {
+    return { [outputNames[0]]: finalResult };
+  }
+
+  // 多个输出: 期望返回对象
+  if (typeof finalResult === 'object' && finalResult !== null) {
+    return finalResult as Record<string, unknown>;
+  }
+
+  return { output: finalResult };
 }
