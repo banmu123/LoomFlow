@@ -3,6 +3,7 @@ import { streamText } from 'ai';
 import { getCurrentUser } from '@/lib/server-auth';
 import { getProviderClientForModel } from '@/lib/ai';
 import { getAllModels } from '@/lib/ai/db-models';
+import { uiStreamErrorText } from '@/lib/ai/ui-stream-error';
 import { listWorkflowNotes, ensureWorkflowOwnership, notesToPromptText } from '@/lib/workflow-notes';
 import { buildRunsSummaryText } from '@/lib/flow-runs-summary';
 
@@ -72,5 +73,6 @@ export async function POST(request: NextRequest) {
     maxOutputTokens: 2048,
   });
 
-  return result.toUIMessageStreamResponse({ sendReasoning: false });
+  // onError：SDK 默认把真实错误脱敏为 "An error occurred."，透传可诊断文案
+  return result.toUIMessageStreamResponse({ sendReasoning: false, onError: uiStreamErrorText });
 }

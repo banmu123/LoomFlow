@@ -13,6 +13,7 @@ export const runtime = 'nodejs';
 // 从 Model Registry（内置 + 用户配置合并）获取模型对应的 provider 客户端
 import { getProviderClientForModel, hasCapability } from '@/lib/ai';
 import { getAllModels } from '@/lib/ai/db-models';
+import { uiStreamErrorText } from '@/lib/ai/ui-stream-error';
 // Agent 只读工具集（查询系统状态/排错）+ 系统导航知识
 import { agentTools, agentToolsPrompt, systemNavPrompt } from '@/lib/agent/tools';
 // 确定性意图预分流（query=查询带工具 / generate=生成不带工具 / chat=闲聊）
@@ -290,7 +291,9 @@ ${useTools ? `\n\n${agentToolsPrompt}` : ''}`,
   });
 
   // 返回 UI 消息流响应（useChat 需要的格式）
+  // onError：SDK 默认把真实错误脱敏为 "An error occurred."，透传可诊断文案
   return result.toUIMessageStreamResponse({
     sendReasoning: true, // 发送推理过程
+    onError: uiStreamErrorText,
   });
 }

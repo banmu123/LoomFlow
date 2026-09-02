@@ -4,6 +4,7 @@ import type { ModelMessage } from 'ai';
 import { getCurrentUser } from '@/lib/server-auth';
 import { getProviderClientForModel } from '@/lib/ai';
 import { getAllModels } from '@/lib/ai/db-models';
+import { uiStreamErrorText } from '@/lib/ai/ui-stream-error';
 import { buildRunsSummaryText } from '@/lib/flow-runs-summary';
 import { listWorkflowNotes, notesToPromptText } from '@/lib/workflow-notes';
 
@@ -186,7 +187,9 @@ export async function POST(request: NextRequest) {
   });
 
   // 与 /api/chat-ai 一致：发送 reasoning（思考过程在 UI 折叠展示）
+  // onError：SDK 默认把真实错误脱敏为 "An error occurred."，透传可诊断文案（如 Insufficient Balance）
   return result.toUIMessageStreamResponse({
     sendReasoning: true,
+    onError: uiStreamErrorText,
   });
 }
