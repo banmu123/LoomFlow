@@ -438,11 +438,21 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
 
   const activeConversation = conversations.find((c) => c.id === convId);
 
+  const updateConversation = useCallback(
+    (id: string, updater: (c: Conversation) => Conversation) => {
+      setConversations((prev) => prev.map((c) => (c.id === id ? updater(c) : c)));
+    },
+    [],
+  );
+
   // 用户手动切换模型 → 持久化到当前对话（下次进入恢复同一模型）
   const handleModelChange = useCallback(
     (nextModel: string) => {
       setModel(nextModel);
+      // 同步本地 conversations[].model：loadModels 在 conversations 任一更新时都会重跑
+      // 并按绑定模型覆盖选择器——不同步会导致刚切换的选择被旧值冲掉（发请求用错模型）
       if (convId) {
+        updateConversation(convId, (c) => ({ ...c, model: nextModel }));
         fetch(`/api/conversations/${convId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -450,7 +460,7 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
         }).catch(() => {});
       }
     },
-    [convId],
+    [convId, updateConversation],
   );
   const messages = activeConversation?.messages ?? [];
 
@@ -464,13 +474,6 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
 
   // 注意：不在卸载时 abort——切换菜单/跳转后，生成在后台继续完成并落库；
   // 重新挂载时通过 pending 消息恢复 loading 状态
-
-  const updateConversation = useCallback(
-    (id: string, updater: (c: Conversation) => Conversation) => {
-      setConversations((prev) => prev.map((c) => (c.id === id ? updater(c) : c)));
-    },
-    [],
-  );
 
   // 创建真实对话（发送首条消息时才落库），返回创建结果；失败返回 null
   const createDbConversation = useCallback(async (): Promise<Conversation | null> => {
@@ -518,7 +521,9 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
       body: JSON.stringify({
         content: last.content,
         images: last.images ?? [],
-        model,
+        // 对话绑定模型优先：欢迎页自动发送时选择器可能尚未完成绑定解析
+        // （loadModels 兜底会先选列表第一个），避免自动生成悄悄用错模型
+        model: cur.model ?? model,
         regenerate: true,
       }),
     })
@@ -630,7 +635,12 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
       const res = await fetch(`/api/conversations/${convId}/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: text, images: sentImages, model }),
+        body: JSON.stringify({
+          content: text,
+          images: sentImages,
+          // 对话绑定模型优先（与选择器显示保持一致；新建对话时绑定尚未进本地列表则用选择器）
+          model: conversations.find((c) => c.id === convId)?.model ?? model,
+        }),
       });
       const data = await res.json();
       if (!res.ok || !data?.assistantMessage?.id) {
@@ -730,7 +740,8 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
           body: JSON.stringify({
             content: userMsg.content,
             images: userMsg.images,
-            model,
+            // 对话绑定模型优先（与选择器显示保持一致）
+            model: conversations.find((c) => c.id === conversationId)?.model ?? model,
             regenerate: true,
           }),
         });
@@ -817,7 +828,8 @@ export function ChatPanel({ conversationId = '' }: { conversationId?: string }) 
       body: JSON.stringify({
         content: lastUser.content,
         images: lastUser.images ?? [],
-        model,
+        // 对话绑定模型优先（与选择器显示保持一致）
+        model: conversations.find((c) => c.id === convId)?.model ?? model,
         regenerate: true,
       }),
     })
