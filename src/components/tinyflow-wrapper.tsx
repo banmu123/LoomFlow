@@ -802,6 +802,11 @@ export default function TinyflowWrapper() {
   }, [inputMode, jsonText, formValues]);
 
   // ===== Execute =====
+  // 试运行走 /api/flow/stream（SSE）：节点开始/完成事件实时到达，
+  // 执行追踪面板逐条点亮（running 转圈 → 完成），用户全程有执行体感。
+  // 旧实现为阻塞式 /api/flow/execute：跑完才一次性返回全部事件，执行期间追踪面板空白。
+  const streamAbortRef = useRef<AbortController | null>(null);
+
   const handleExecute = useCallback(async () => {
     if (!instanceRef.current || running) return;
 
@@ -824,40 +829,109 @@ export default function TinyflowWrapper() {
     const flowData = instanceRef.current.getData() as TinyflowData;
     setFlowDataSnapshot(flowData);
 
+    const abort = new AbortController();
+    streamAbortRef.current = abort;
+
     try {
-      const response = await fetch('/api/flow/execute', {
+      const response = await fetch('/api/flow/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           flowData,
           inputs,
-          // 关联当前工作流（执行记录 flow_runs.workflow_id 落库，供 AI 排查稳定性）
+          // 关联当前工作流（flow_runs.workflow_id 落库，供执行历史/AI 排查）
           workflowId: currentWorkflowId ?? null,
         }),
+        signal: abort.signal,
       });
-      const data = await response.json();
+      if (!response.ok || !response.body) {
+        const errText = await response.text().catch(() => '');
+        throw new Error(errText || t('canvas.executeFailed'));
+      }
 
-      if (data.events) setEvents(data.events);
-      flowIdRef.current = data.flowId;
+      // 解析 SSE 流（POST fetch + ReadableStream；逐事件映射并 append）
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      const appendEvent = (type: string, data: Record<string, unknown>) => {
+        setEvents((prev) => [...prev, { type, data, timestamp: Date.now() }]);
+      };
 
-      if (data.status === 'paused' && data.confirmRequest) {
-        setConfirmReq(data.confirmRequest);
-        setConfirmData({});
-      } else if (data.status === 'completed') {
-        setResult(data.outputs || {});
-      } else if (data.status === 'failed') {
-        setError(data.error || t('canvas.executeFailed'));
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        let idx: number;
+        while ((idx = buffer.indexOf('\n\n')) !== -1) {
+          const block = buffer.slice(0, idx);
+          buffer = buffer.slice(idx + 2);
+
+          let event = 'message';
+          const dataLines: string[] = [];
+          for (const line of block.split('\n')) {
+            if (line.startsWith('event:')) event = line.slice(6).trim();
+            else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim());
+          }
+          if (dataLines.length === 0) continue;
+
+          let p: Record<string, unknown>;
+          try {
+            p = JSON.parse(dataLines.join('\n')) as Record<string, unknown>;
+          } catch {
+            continue;
+          }
+
+          switch (event) {
+            case 'flow_start':
+              flowIdRef.current = p.flowId as string;
+              break;
+            case 'node_start':
+              appendEvent('node_start', { nodeId: p.nodeId, status: 'running' });
+              break;
+            case 'node_complete':
+              appendEvent('node_complete', {
+                nodeId: p.nodeId,
+                status: p.status,
+                outputs: p.outputs,
+                error: p.error,
+                duration: p.duration,
+              });
+              break;
+            case 'flow_complete':
+              setResult((p.outputs as Record<string, unknown>) || {});
+              break;
+            case 'flow_paused':
+              setConfirmReq(p.confirmRequest as typeof confirmReq);
+              setConfirmData({});
+              break;
+            case 'flow_error':
+              setError((p.error as string) || t('canvas.executeFailed'));
+              break;
+            case 'error':
+              setError((p.error as string) || t('canvas.executeFailed'));
+              break;
+            case 'flow_end':
+              break;
+          }
+        }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('canvas.networkError'));
+      // 用户点停止触发的 abort：handleStop 已设置提示，这里不再覆盖
+      if ((err as Error).name !== 'AbortError') {
+        setError(err instanceof Error ? err.message : t('canvas.networkError'));
+      }
     } finally {
+      streamAbortRef.current = null;
       setRunning(false);
     }
-  }, [running, buildInputs]);
+  }, [running, buildInputs, t]);
 
   // ===== Stop =====
   const handleStop = useCallback(async () => {
     if (!flowIdRef.current) return;
+    // 先断开 SSE 流（立即停止前端等待），服务端由 /api/flow/stop 取消执行
+    streamAbortRef.current?.abort();
     try {
       await fetch('/api/flow/stop', {
         method: 'POST',

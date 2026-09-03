@@ -1,9 +1,19 @@
 import { NextRequest } from 'next/server';
 import { FlowEngine, flowRunStore } from '@/lib/tinyflow';
+import { saveFlowRun, extractFinalOutputs, traceToTokenUsage } from '@/lib/tinyflow/runFlow';
+import { redactForTrace } from '@/lib/tinyflow/runtime/redact';
+import { runStateToPersistedStatus } from '@/lib/tinyflow/runtime/state';
 import type { TinyflowData, FlowError } from '@/lib/tinyflow/types';
 import { getCurrentUser } from '@/lib/server-auth';
+import { supabase } from '@/lib/supabase/server';
 
 export const runtime = 'nodejs';
+
+// ===== 工作流试运行（SSE 流式）=====
+// 与 /api/flow/execute（runFlow，阻塞式）能力对等：
+// - workflowId 归属校验 + 执行记录落库（flow_runs，供执行历史/AI 排查）
+// - inputs/outputs 脱敏、trace/token/cost 持久化
+// 差异：事件经 SSE 逐条推送（node_start/node_complete/...），前端实时点亮执行追踪。
 
 export async function POST(request: NextRequest) {
   // 强制登录（安全：未认证可执行任意 flowData = RCE/SSRF/成本滥用入口）
@@ -26,9 +36,18 @@ export async function POST(request: NextRequest) {
 
       try {
         const body = await request.json();
-        const { flowData, inputs = {} } = body as {
+        const {
+          flowData,
+          inputs = {},
+          workflowId = null,
+          timeoutMs,
+          maxConcurrency,
+        } = body as {
           flowData: TinyflowData;
           inputs?: Record<string, unknown>;
+          workflowId?: string | null;
+          timeoutMs?: number;
+          maxConcurrency?: number;
         };
 
         if (!flowData || !flowData.nodes) {
@@ -37,29 +56,65 @@ export async function POST(request: NextRequest) {
           return;
         }
 
+        // workflowId 关联执行记录：校验归属（防伪造他人工作流 id）
+        let safeWorkflowId: string | null = null;
+        if (workflowId) {
+          const { data: wf } = await supabase
+            .from('workflow_history')
+            .select('id')
+            .eq('id', workflowId)
+            .eq('user_id', user.id)
+            .maybeSingle();
+          if (wf) safeWorkflowId = workflowId;
+        }
+
         const flowId = crypto.randomUUID();
+        const startTime = Date.now();
+        const events: Array<{ type: string; data: unknown; timestamp: number }> = [];
 
         const engine = new FlowEngine(flowData, {
           flowData,
           inputs,
+          userId: user.id,
+          workflowId: safeWorkflowId,
+          signal: request.signal,
+          timeoutMs: typeof timeoutMs === 'number' ? timeoutMs : undefined,
+          maxConcurrency: typeof maxConcurrency === 'number' ? maxConcurrency : undefined,
           onNodeStart: (nodeId: string) => {
-            send('node_start', { flowId, nodeId });
+            const ev = { type: 'node_start', data: { nodeId }, timestamp: Date.now() };
+            events.push(ev);
+            send('node_start', ev.data);
           },
           onNodeComplete: (nodeId: string, result) => {
-            send('node_complete', {
-              flowId,
-              nodeId,
-              status: result.status,
-              outputs: result.outputs,
-              error: result.error,
-              duration: result.duration,
-            });
+            const ev = {
+              type: 'node_complete',
+              data: {
+                nodeId,
+                status: result.status,
+                outputs: redactForTrace(result.outputs),
+                error: result.error,
+                duration: result.duration,
+                attempt: result.attempt,
+                retryCount: result.retryCount,
+              },
+              timestamp: Date.now(),
+            };
+            events.push(ev);
+            send('node_complete', ev.data);
           },
           onFlowComplete: (outputs) => {
-            send('flow_complete', { flowId, outputs });
+            const ev = {
+              type: 'flow_complete',
+              data: { outputs: redactForTrace(outputs) },
+              timestamp: Date.now(),
+            };
+            events.push(ev);
+            send('flow_complete', ev.data);
           },
           onFlowError: (error) => {
-            send('flow_error', { flowId, error: error.message });
+            const ev = { type: 'flow_error', data: { error: error.message }, timestamp: Date.now() };
+            events.push(ev);
+            send('flow_error', ev.data);
           },
         });
 
@@ -69,8 +124,19 @@ export async function POST(request: NextRequest) {
           status: 'running',
           context: engine.getContext(),
           userId: user.id,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
+          createdAt: startTime,
+          updatedAt: startTime,
+        });
+
+        // 初始落库（running）；inputs 脱敏后保存——与 runFlow 对等
+        await saveFlowRun(flowId, {
+          workflowId: safeWorkflowId,
+          userId: user.id,
+          source: 'internal',
+          status: 'running',
+          inputs: redactForTrace(inputs) as Record<string, unknown> | null,
+          flowData: flowData,
+          startTime,
         });
 
         send('flow_start', { flowId });
@@ -78,6 +144,24 @@ export async function POST(request: NextRequest) {
         try {
           await engine.run();
           flowRunStore.update(flowId, { status: 'completed' });
+
+          const finalOutputs = extractFinalOutputs(flowData, engine);
+          const persistedStatus = runStateToPersistedStatus(engine.getState());
+          const finalTrace = engine.getTrace();
+
+          await saveFlowRun(flowId, {
+            status: persistedStatus,
+            outputs: redactForTrace(finalOutputs) as Record<string, unknown> | null,
+            events,
+            startTime,
+            finishTime: Date.now(),
+            trace: finalTrace,
+            tokenUsage: traceToTokenUsage(finalTrace),
+            cost: finalTrace.cost,
+            retryCount: finalTrace.retryCount,
+          });
+
+          send('flow_complete', { flowId, outputs: finalOutputs });
         } catch (err) {
           const error = err as FlowError;
           if (error.code === 'confirm_required' && error.confirmRequest) {
@@ -86,12 +170,31 @@ export async function POST(request: NextRequest) {
               confirmRequest: error.confirmRequest,
               context: engine.getContext(),
             });
+            await saveFlowRun(flowId, {
+              status: 'paused',
+              events,
+              startTime,
+              trace: engine.getTrace(),
+            });
             send('flow_paused', {
               flowId,
               confirmRequest: error.confirmRequest,
             });
           } else {
-            flowRunStore.update(flowId, { status: 'failed' });
+            const persistedStatus = runStateToPersistedStatus(engine.getState());
+            flowRunStore.update(flowId, { status: persistedStatus });
+            const failedTrace = engine.getTrace();
+            await saveFlowRun(flowId, {
+              status: persistedStatus,
+              error: error.message,
+              events,
+              startTime,
+              finishTime: Date.now(),
+              trace: failedTrace,
+              tokenUsage: traceToTokenUsage(failedTrace),
+              cost: failedTrace.cost,
+              retryCount: failedTrace.retryCount,
+            });
             send('flow_error', { flowId, error: error.message });
           }
         }
