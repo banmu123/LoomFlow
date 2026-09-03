@@ -57,14 +57,16 @@ export function BrewNotesPanel({
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // AI 总结流式
+  // AI 总结流式（节流：chunk → 渲染 ~20/s，降低 markdown 重解析频率）
   const summaryChat = useChat({
+    experimental_throttle: 50,
     transport: new DefaultChatTransport({
       api: '/api/workflow-notes/ai-summary',
     }),
   });
   // AI 建议流式
   const suggestChat = useChat({
+    experimental_throttle: 50,
     transport: new DefaultChatTransport({
       api: '/api/workflow-notes/ai-suggest',
     }),

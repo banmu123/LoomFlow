@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import type { UIMessage } from 'ai';
@@ -74,6 +74,9 @@ export function CanvasAssistant({
   const t = useT();
 
   const { messages, sendMessage, status, stop, error, clearError } = useChat({
+    // 流式节流：chunk → 渲染频率从"每 chunk"降到 ~20/s，
+    // 消息渲染/markdown 解析/工作流提取等每渲染重算的成本同步下降
+    experimental_throttle: 50,
     transport: new DefaultChatTransport({
       api: '/api/canvas-assistant',
       // 发送请求时注入最新画布数据/图片/模型/工作流 id（transport 随渲染重建，闭包始终是最新 state）
@@ -146,9 +149,21 @@ export function CanvasAssistant({
   );
 
   // 检测最后一条 assistant 消息中的工作流 JSON
-  const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant');
-  const lastAssistantText = lastAssistant ? getMessageText(lastAssistant) : '';
-  const extracted = lastAssistantText ? extractWorkflowJson(lastAssistantText) : null;
+  // useMemo：仅在 messages 变化（配合节流 ~20/s）时重算，
+  // 避免 appliedKey/model 等无关状态更新触发 extractWorkflowJson 全文重跑
+  const { lastAssistantId, lastAssistantText, extracted } = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m.role !== 'assistant') continue;
+      const text = getMessageText(m);
+      return {
+        lastAssistantId: m.id,
+        lastAssistantText: text,
+        extracted: text ? extractWorkflowJson(text) : null,
+      };
+    }
+    return { lastAssistantId: '', lastAssistantText: '', extracted: null };
+  }, [messages]);
   const busy = status === 'streaming' || status === 'submitted';
 
   // Debug 快捷按钮：分析最近运行失败（配合后端注入的运行历史摘要）
@@ -164,7 +179,7 @@ export function CanvasAssistant({
     if (!extracted) return;
     try {
       onApplyWorkflow(extracted);
-      setAppliedKey(lastAssistant?.id ?? 'applied');
+      setAppliedKey(lastAssistantId || 'applied');
       toast.success(t('canvas.assistantApplied'));
     } catch {
       toast.error(t('canvas.workflowInvalid'));
@@ -246,10 +261,10 @@ export function CanvasAssistant({
           <Button
             size="sm"
             className="h-7 w-full text-xs"
-            variant={appliedKey === lastAssistant?.id ? 'outline' : 'default'}
+            variant={appliedKey === lastAssistantId ? 'outline' : 'default'}
             onClick={handleApply}
           >
-            {appliedKey === lastAssistant?.id ? (
+            {appliedKey === lastAssistantId ? (
               <>
                 <CheckCircle2 className="mr-1 h-3.5 w-3.5 text-green-600" />
                 {t('canvas.assistantApplied')}
