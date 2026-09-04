@@ -14,6 +14,25 @@ AI 原生工作流运行时，内置评估、演化与质量门禁。
 
 让每个人都能创建自己的 AI 自动化流程。
 
+<div align="center">
+
+[![CI](https://github.com/banmu123/LoomFlow/actions/workflows/ci.yml/badge.svg)](https://github.com/banmu123/LoomFlow/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![GitHub Stars](https://img.shields.io/github/stars/banmu123/LoomFlow?style=social)](https://github.com/banmu123/LoomFlow/stargazers)
+![Node](https://img.shields.io/badge/node-%E2%89%A520-339933)
+![Tests](https://img.shields.io/badge/tests-750%2B%20passing-brightgreen)
+
+**⚡ 快速开始（Docker 自托管）：**
+
+```bash
+git clone https://github.com/banmu123/LoomFlow.git && cd LoomFlow && bash scripts/init-env.sh && docker compose up -d
+```
+
+→ 打开 **http://localhost:5000** · 默认管理员 `admin` / `123456`（首次登录后立即修改）
+· 完整指南：[🚀 快速开始](#-quick-start)
+
+</div>
+
 ---
 
 ## 📸 界面截图

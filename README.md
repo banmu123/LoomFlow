@@ -14,6 +14,25 @@ Describe your idea in natural language → generate a runnable workflow → cust
 
 *Everyone should be able to create their own AI automation flows.*
 
+<div align="center">
+
+[![CI](https://github.com/banmu123/LoomFlow/actions/workflows/ci.yml/badge.svg)](https://github.com/banmu123/LoomFlow/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![GitHub Stars](https://img.shields.io/github/stars/banmu123/LoomFlow?style=social)](https://github.com/banmu123/LoomFlow/stargazers)
+![Node](https://img.shields.io/badge/node-%E2%89%A520-339933)
+![Tests](https://img.shields.io/badge/tests-750%2B%20passing-brightgreen)
+
+**⚡ Quick Start (Docker, self-hosted):**
+
+```bash
+git clone https://github.com/banmu123/LoomFlow.git && cd LoomFlow && bash scripts/init-env.sh && docker compose up -d
+```
+
+→ open **http://localhost:5000** · default admin `admin` / `123456` (change immediately)
+· full guide: [🚀 Quick Start](#-quick-start)
+
+</div>
+
 ---
 
 ## 📸 Screenshots

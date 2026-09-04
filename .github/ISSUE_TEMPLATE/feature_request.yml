@@ -1,0 +1,31 @@
+name: 💡 Feature Request
+description: Suggest an idea or improvement for LoomFlow
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion! Note that LoomFlow stays deliberately narrow —
+        one pipeline: *natural language → workflow → canvas → API*. Ideas that don't
+        serve that loop may be declined, but they're still welcome in discussions.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What are you trying to achieve? What's missing or painful today?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What would you like to happen? Any alternatives you considered?
+    validations:
+      required: true
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues and discussions
+          required: true

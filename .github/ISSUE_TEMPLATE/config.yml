@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 Documentation
+    url: https://github.com/banmu123/LoomFlow/tree/main/docs
+    about: Deployment guides, API docs and design notes
+  - name: 💬 Question / Usage help
+    url: https://github.com/banmu123/LoomFlow/issues?q=is%3Aissue
+    about: Check closed issues first — many setup questions are already answered

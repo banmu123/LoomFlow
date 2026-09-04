@@ -1,0 +1,57 @@
+name: 🐛 Bug Report
+description: Report a problem with LoomFlow
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report an issue!
+        Please search [existing issues](https://github.com/banmu123/LoomFlow/issues?q=is%3Aissue) first to avoid duplicates.
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the problem, and what you expected to happen instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps so we can reproduce. e.g. 1. Create workflow with nodes X → Y  2. Click "Test run"  3. See error
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment
+      options:
+        - Docker self-hosted (docker compose)
+        - Local dev (pnpm dev)
+        - Cloud / other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      description: e.g. v0.1.11, or the commit hash (`git rev-parse --short HEAD`)
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: e.g. `docker compose logs -f loomflow` output around the error (redact secrets)
+      render: shell
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues
+          required: true
+        - label: I redacted any secrets (API keys, tokens) from logs and screenshots
+          required: true
