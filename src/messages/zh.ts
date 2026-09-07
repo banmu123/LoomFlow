@@ -955,6 +955,11 @@ export const zh = {
     failed: '{failed}/{total} 项检查失败',
     warnings: '{count} 个警告',
   },
+  theme: {
+    light: '日间模式',
+    dark: '夜间模式',
+    system: '跟随系统',
+  },
 };
 
 export type ZhMessages = typeof zh;

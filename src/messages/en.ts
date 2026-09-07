@@ -952,4 +952,9 @@ export const en: ZhMessages = {
     failed: '{failed}/{total} checks failed',
     warnings: '{count} warning(s)',
   },
+  theme: {
+    light: 'Light Mode',
+    dark: 'Dark Mode',
+    system: 'System',
+  },
 };

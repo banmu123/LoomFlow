@@ -31,6 +31,7 @@ import {
 import { cn, truncateTitle } from '@/lib/utils';
 import { useT } from '@/lib/i18n';
 import { LocaleSwitcher } from './LocaleSwitcher';
+import { ThemeToggle } from './ThemeToggle';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -347,6 +348,7 @@ export function SidebarNav() {
         </div>
         <div className={cn('flex items-center px-1', collapsed ? 'justify-center' : 'justify-between')}>
           {!collapsed && <LocaleSwitcher compact />}
+          <ThemeToggle compact />
           <button
             onClick={handleLogout}
             className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-destructive"

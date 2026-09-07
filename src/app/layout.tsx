@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Toaster } from 'sonner';
+import { ThemeProvider } from 'next-themes';
 import { I18nProvider } from '@/lib/i18n';
 import './globals.css';
 
@@ -21,11 +22,13 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" suppressHydrationWarning>
       <body className={`antialiased`}>
-        <I18nProvider>
-          {children}
-          {/* 全局 toast（此前未挂载导致所有 toast 静默失效——接口错误不显示） */}
-          <Toaster position="top-center" richColors />
-        </I18nProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <I18nProvider>
+            {children}
+            {/* 全局 toast（此前未挂载导致所有 toast 静默失效——接口错误不显示） */}
+            <Toaster position="top-center" richColors />
+          </I18nProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
