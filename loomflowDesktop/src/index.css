@@ -1,0 +1,175 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --font-sans:
+    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', ui-sans-serif,
+    system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+  --font-serif:
+    'Noto Serif SC', 'Songti SC', 'SimSun', ui-serif, Georgia, Cambria,
+    'Times New Roman', Times, serif;
+}
+
+:root {
+  --radius: 0.75rem;
+  /* ===== LoomFlow Latte 主题（拿铁色系）=====
+     奶泡白背景 / 焦糖主色 / 深咖啡文字 / 奶咖强调 */
+  --background: #faf7f2; /* 奶泡白 */
+  --foreground: #3b2a20; /* 深咖啡 */
+  --card: #ffffff; /* Surface */
+  --card-foreground: #3b2a20;
+  --popover: #ffffff;
+  --popover-foreground: #3b2a20;
+  --primary: #b77945; /* 拿铁焦糖 */
+  --primary-foreground: #ffffff;
+  --secondary: #f3ece2; /* 浅米白 */
+  --secondary-foreground: #6b4a2f; /* 浅咖啡 */
+  --muted: #f1eae0; /* 米白 */
+  --muted-foreground: #8a7262; /* 浅咖啡灰 */
+  --accent: #d9b38c; /* 奶咖 */
+  --accent-foreground: #4a2e17; /* 深焦糖 */
+  --destructive: #c25e4a; /* 柔化砖红（低饱和警示） */
+  --border: #e9e0d4; /* 奶咖浅边框 */
+  --input: #e9e0d4;
+  --ring: rgb(183 121 69 / 40%); /* 焦糖聚焦环 */
+  --chart-1: #b77945; /* 焦糖 */
+  --chart-2: #d9b38c; /* 奶咖 */
+  --chart-3: #8a7262; /* 浅咖啡 */
+  --chart-4: #e8d9c5; /* 奶泡 */
+  --chart-5: #c25e4a; /* 砖红 */
+  --sidebar: #f7f2ea; /* 侧边栏米白（比背景略深） */
+  --sidebar-foreground: #3b2a20;
+  --sidebar-primary: #b77945;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f1e7da; /* 奶咖底 */
+  --sidebar-accent-foreground: #4a2e17;
+  --sidebar-border: #e9e0d4;
+  --sidebar-ring: rgb(183 121 69 / 40%);
+}
+
+.dark {
+  /* ===== LoomFlow 深拿铁（热巧克力底）===== */
+  --background: #1c1512; /* 深咖啡 */
+  --foreground: #f5ede3; /* 奶泡白文字 */
+  --card: #26201a; /* 深一层 */
+  --card-foreground: #f5ede3;
+  --popover: #26201a;
+  --popover-foreground: #f5ede3;
+  --primary: #c98a56; /* 亮焦糖（暗底提升可读性） */
+  --primary-foreground: #1c1512;
+  --secondary: #2e2620;
+  --secondary-foreground: #e8d9c5;
+  --muted: #2e2620;
+  --muted-foreground: #b39c8a; /* 浅咖啡灰 */
+  --accent: #3a2b1e; /* 焦糖暗底 */
+  --accent-foreground: #e8d9c5;
+  --destructive: #d0745c;
+  --border: rgb(245 237 227 / 12%);
+  --input: rgb(245 237 227 / 15%);
+  --ring: rgb(201 138 86 / 50%);
+  --chart-1: #c98a56;
+  --chart-2: #d9b38c;
+  --chart-3: #8a7262;
+  --chart-4: #6b4a2f;
+  --chart-5: #d0745c;
+  --sidebar: #201a15;
+  --sidebar-foreground: #f5ede3;
+  --sidebar-primary: #c98a56;
+  --sidebar-primary-foreground: #1c1512;
+  --sidebar-accent: #2e2620;
+  --sidebar-accent-foreground: #e8d9c5;
+  --sidebar-border: rgb(245 237 227 / 10%);
+  --sidebar-ring: rgb(201 138 86 / 50%);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+body {
+  @apply font-sans;
+}
+
+/* ===== 品牌渐变工具（低饱和焦糖 → 奶咖，克制不花哨）===== */
+@layer utilities {
+  .bg-brand-gradient {
+    background-image: linear-gradient(135deg, #b77945, #d9b38c);
+  }
+  .text-brand-gradient {
+    background-image: linear-gradient(135deg, #b77945, #d9b38c);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .border-brand-gradient {
+    border: 1px solid transparent;
+    background:
+      linear-gradient(var(--card), var(--card)) padding-box,
+      linear-gradient(135deg, #b77945, #d9b38c) border-box;
+  }
+}
+
+/* Desktop 特有样式 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: rgba(128, 128, 128, 0.3);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(128, 128, 128, 0.5);
+}

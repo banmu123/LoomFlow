@@ -1,0 +1,35 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Dependencies
+node_modules/
+
+# Build
+dist/
+dist-ssr/
+
+# Tauri
+src-tauri/target/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# SQLite database (user data, not committed)
+*.db
+*.db-journal
+*.db-wal
