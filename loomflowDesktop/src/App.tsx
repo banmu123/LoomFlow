@@ -18,6 +18,7 @@ import EditorPage from './pages/EditorPage';
 import RunsPage from './pages/RunsPage';
 import KnowledgePage from './pages/KnowledgePage';
 import SkillsPage from './pages/SkillsPage';
+import ModelsPage from './pages/ModelsPage';
 import SettingsPage from './pages/SettingsPage';
 import './index.css';
 
@@ -38,6 +39,7 @@ export default function App() {
                 <Route path="/workflows/history" element={<RunsPage />} />
                 <Route path="/knowledge" element={<KnowledgePage />} />
                 <Route path="/skills" element={<SkillsPage />} />
+                <Route path="/admin/models" element={<ModelsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
               </Route>
             </Routes>

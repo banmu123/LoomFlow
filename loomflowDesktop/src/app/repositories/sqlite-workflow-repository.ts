@@ -15,6 +15,13 @@ import type {
   ExecutionLogRecord,
   CreateWorkflowInput,
   UpdateWorkflowInput,
+  AIModelRecord,
+  CreateAIModelInput,
+  UpdateAIModelInput,
+  ConversationSummary,
+  ConversationRecord,
+  MessageRecord,
+  FlowEventRecord,
 } from './workflow-repository';
 import type { TinyflowData } from '@/lib/tinyflow/types';
 
@@ -424,5 +431,324 @@ export class SQLiteWorkflowRepository implements WorkflowRepository {
        ON CONFLICT(key) DO UPDATE SET value = $2, updated_at = $3`,
       [key, value, nowISO()],
     );
+  }
+
+  // ===== Flow Events (SSE 追踪) =====
+
+  async addFlowEvent(
+    executionId: string,
+    event: Omit<FlowEventRecord, 'id' | 'executionId' | 'createdAt'>,
+  ): Promise<void> {
+    const db = await getDb();
+    await db.execute(
+      `INSERT INTO flow_events (id, execution_id, event_type, node_id, node_type, data, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        uuid(),
+        executionId,
+        event.eventType,
+        event.nodeId ?? null,
+        event.nodeType ?? null,
+        event.data ? JSON.stringify(event.data) : null,
+        nowISO(),
+      ],
+    );
+  }
+
+  async getFlowEvents(executionId: string): Promise<FlowEventRecord[]> {
+    const db = await getDb();
+    const rows = await db.select<{
+      id: string;
+      execution_id: string;
+      event_type: string;
+      node_id: string | null;
+      node_type: string | null;
+      data: string | null;
+      created_at: string;
+    }[]>(
+      'SELECT id, execution_id, event_type, node_id, node_type, data, created_at FROM flow_events WHERE execution_id = $1 ORDER BY created_at ASC',
+      [executionId],
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      executionId: r.execution_id,
+      eventType: r.event_type as FlowEventRecord['eventType'],
+      nodeId: r.node_id,
+      nodeType: r.node_type,
+      data: r.data ? JSON.parse(r.data) : null,
+      createdAt: r.created_at,
+    }));
+  }
+
+  // ===== AI Models =====
+
+  async listModels(): Promise<AIModelRecord[]> {
+    const db = await getDb();
+    const rows = await db.select<{
+      id: string;
+      provider: string;
+      model_name: string;
+      display_name: string | null;
+      capabilities: string;
+      base_url: string | null;
+      api_key: string | null;
+      is_enabled: number;
+      created_at: string;
+      updated_at: string;
+    }[]>(
+      'SELECT id, provider, model_name, display_name, capabilities, base_url, api_key, is_enabled, created_at, updated_at FROM ai_models ORDER BY created_at DESC',
+    );
+    return rows.map(this.mapAIModel);
+  }
+
+  async getEnabledModels(): Promise<AIModelRecord[]> {
+    const db = await getDb();
+    const rows = await db.select<{
+      id: string;
+      provider: string;
+      model_name: string;
+      display_name: string | null;
+      capabilities: string;
+      base_url: string | null;
+      api_key: string | null;
+      is_enabled: number;
+      created_at: string;
+      updated_at: string;
+    }[]>(
+      'SELECT id, provider, model_name, display_name, capabilities, base_url, api_key, is_enabled, created_at, updated_at FROM ai_models WHERE is_enabled = 1 ORDER BY created_at DESC',
+    );
+    return rows.map(this.mapAIModel);
+  }
+
+  async getModel(id: string): Promise<AIModelRecord | null> {
+    const db = await getDb();
+    const rows = await db.select<{
+      id: string;
+      provider: string;
+      model_name: string;
+      display_name: string | null;
+      capabilities: string;
+      base_url: string | null;
+      api_key: string | null;
+      is_enabled: number;
+      created_at: string;
+      updated_at: string;
+    }[]>(
+      'SELECT id, provider, model_name, display_name, capabilities, base_url, api_key, is_enabled, created_at, updated_at FROM ai_models WHERE id = $1',
+      [id],
+    );
+    return rows.length > 0 ? this.mapAIModel(rows[0]) : null;
+  }
+
+  async createModel(input: CreateAIModelInput): Promise<AIModelRecord> {
+    const db = await getDb();
+    const id = uuid();
+    const ts = nowISO();
+    await db.execute(
+      `INSERT INTO ai_models (id, provider, model_name, display_name, capabilities, base_url, api_key, is_enabled, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)`,
+      [
+        id,
+        input.provider,
+        input.modelName,
+        input.displayName ?? null,
+        JSON.stringify(input.capabilities ?? ['text']),
+        input.baseUrl ?? null,
+        input.apiKey ?? null,
+        input.isEnabled !== false ? 1 : 0,
+        ts,
+      ],
+    );
+    return {
+      id,
+      provider: input.provider,
+      modelName: input.modelName,
+      displayName: input.displayName ?? null,
+      capabilities: input.capabilities ?? ['text'],
+      baseUrl: input.baseUrl ?? null,
+      apiKey: input.apiKey ?? null,
+      isEnabled: input.isEnabled !== false,
+      createdAt: ts,
+      updatedAt: ts,
+    };
+  }
+
+  async updateModel(id: string, input: UpdateAIModelInput): Promise<void> {
+    const db = await getDb();
+    const sets: string[] = [];
+    const params: unknown[] = [];
+    let idx = 1;
+
+    if (input.provider !== undefined) { sets.push(`provider = $${idx++}`); params.push(input.provider); }
+    if (input.modelName !== undefined) { sets.push(`model_name = $${idx++}`); params.push(input.modelName); }
+    if (input.displayName !== undefined) { sets.push(`display_name = $${idx++}`); params.push(input.displayName); }
+    if (input.capabilities !== undefined) { sets.push(`capabilities = $${idx++}`); params.push(JSON.stringify(input.capabilities)); }
+    if (input.baseUrl !== undefined) { sets.push(`base_url = $${idx++}`); params.push(input.baseUrl); }
+    if (input.apiKey !== undefined) { sets.push(`api_key = $${idx++}`); params.push(input.apiKey); }
+    if (input.isEnabled !== undefined) { sets.push(`is_enabled = $${idx++}`); params.push(input.isEnabled ? 1 : 0); }
+
+    if (sets.length === 0) return;
+    sets.push(`updated_at = $${idx++}`);
+    params.push(nowISO());
+    params.push(id);
+    await db.execute(`UPDATE ai_models SET ${sets.join(', ')} WHERE id = $${idx}`, params);
+  }
+
+  async deleteModel(id: string): Promise<void> {
+    const db = await getDb();
+    await db.execute('DELETE FROM ai_models WHERE id = $1', [id]);
+  }
+
+  private mapAIModel(r: {
+    id: string;
+    provider: string;
+    model_name: string;
+    display_name: string | null;
+    capabilities: string;
+    base_url: string | null;
+    api_key: string | null;
+    is_enabled: number;
+    created_at: string;
+    updated_at: string;
+  }): AIModelRecord {
+    return {
+      id: r.id,
+      provider: r.provider,
+      modelName: r.model_name,
+      displayName: r.display_name,
+      capabilities: (() => { try { return JSON.parse(r.capabilities); } catch { return ['text']; } })(),
+      baseUrl: r.base_url,
+      apiKey: r.api_key,
+      isEnabled: r.is_enabled === 1,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    };
+  }
+
+  // ===== Conversations =====
+
+  async listConversations(): Promise<ConversationSummary[]> {
+    const db = await getDb();
+    const rows = await db.select<{
+      id: string;
+      title: string;
+      model_id: string | null;
+      created_at: string;
+      updated_at: string;
+    }[]>(
+      'SELECT id, title, model_id, created_at, updated_at FROM conversations ORDER BY updated_at DESC',
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      modelId: r.model_id,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    }));
+  }
+
+  async getConversation(id: string): Promise<ConversationRecord | null> {
+    const db = await getDb();
+    const rows = await db.select<{
+      id: string;
+      title: string;
+      model_id: string | null;
+      created_at: string;
+      updated_at: string;
+    }[]>(
+      'SELECT id, title, model_id, created_at, updated_at FROM conversations WHERE id = $1',
+      [id],
+    );
+    if (rows.length === 0) return null;
+    const r = rows[0];
+    return {
+      id: r.id,
+      title: r.title,
+      modelId: r.model_id,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    };
+  }
+
+  async createConversation(title?: string, modelId?: string): Promise<ConversationRecord> {
+    const db = await getDb();
+    const id = uuid();
+    const ts = nowISO();
+    await db.execute(
+      `INSERT INTO conversations (id, title, model_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $4)`,
+      [id, title ?? 'New Chat', modelId ?? null, ts],
+    );
+    return { id, title: title ?? 'New Chat', modelId: modelId ?? null, createdAt: ts, updatedAt: ts };
+  }
+
+  async updateConversation(id: string, input: { title?: string; modelId?: string }): Promise<void> {
+    const db = await getDb();
+    const sets: string[] = [];
+    const params: unknown[] = [];
+    let idx = 1;
+    if (input.title !== undefined) { sets.push(`title = $${idx++}`); params.push(input.title); }
+    if (input.modelId !== undefined) { sets.push(`model_id = $${idx++}`); params.push(input.modelId); }
+    if (sets.length === 0) return;
+    sets.push(`updated_at = $${idx++}`);
+    params.push(nowISO());
+    params.push(id);
+    await db.execute(`UPDATE conversations SET ${sets.join(', ')} WHERE id = $${idx}`, params);
+  }
+
+  async deleteConversation(id: string): Promise<void> {
+    const db = await getDb();
+    await db.execute('DELETE FROM conversations WHERE id = $1', [id]);
+  }
+
+  // ===== Messages =====
+
+  async listMessages(conversationId: string): Promise<MessageRecord[]> {
+    const db = await getDb();
+    const rows = await db.select<{
+      id: string;
+      conversation_id: string;
+      role: string;
+      content: string;
+      model_id: string | null;
+      metadata: string | null;
+      created_at: string;
+    }[]>(
+      'SELECT id, conversation_id, role, content, model_id, metadata, created_at FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC',
+      [conversationId],
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      conversationId: r.conversation_id,
+      role: r.role as MessageRecord['role'],
+      content: r.content,
+      modelId: r.model_id,
+      metadata: r.metadata ? (() => { try { return JSON.parse(r.metadata); } catch { return null; } })() : null,
+      createdAt: r.created_at,
+    }));
+  }
+
+  async createMessage(
+    conversationId: string,
+    role: MessageRecord['role'],
+    content: string,
+    metadata?: Record<string, unknown>,
+    modelId?: string,
+  ): Promise<MessageRecord> {
+    const db = await getDb();
+    const id = uuid();
+    const ts = nowISO();
+    await db.execute(
+      `INSERT INTO messages (id, conversation_id, role, content, model_id, metadata, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [id, conversationId, role, content, modelId ?? null, metadata ? JSON.stringify(metadata) : null, ts],
+    );
+    // Update conversation's updated_at
+    await db.execute('UPDATE conversations SET updated_at = $1 WHERE id = $2', [ts, conversationId]);
+    return { id, conversationId, role, content, modelId: modelId ?? null, metadata: metadata ?? null, createdAt: ts };
+  }
+
+  async deleteMessage(id: string): Promise<void> {
+    const db = await getDb();
+    await db.execute('DELETE FROM messages WHERE id = $1', [id]);
   }
 }

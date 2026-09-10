@@ -35,6 +35,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockSelectResults = [];
   mockDb = new Map();
+  // Reset the cached DB singleton by setting it to null via dynamic import trick
+  // Since _db is module-level, we need to reset it through the mock
+  mockDbInstance.select.mockImplementation(async () => mockSelectResults.shift() ?? []);
 });
 
 // ===== Import after mock setup =====
@@ -73,7 +76,9 @@ describe('SQLiteWorkflowRepository', () => {
     );
     const repo = new SQLiteWorkflowRepository();
 
+    // First result is consumed by getDb() SELECT 1 sanity check
     mockSelectResults = [
+      [], // SELECT 1 from getDb()
       [
         {
           id: 'wf-1',

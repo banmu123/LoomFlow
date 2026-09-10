@@ -75,6 +75,24 @@ pub fn run() {
                             sql: include_str!("../migrations/003_settings.sql"),
                             kind: tauri_plugin_sql::MigrationKind::Up,
                         },
+                        tauri_plugin_sql::Migration {
+                            version: 4,
+                            description: "create_ai_models",
+                            sql: include_str!("../migrations/004_ai_models.sql"),
+                            kind: tauri_plugin_sql::MigrationKind::Up,
+                        },
+                        tauri_plugin_sql::Migration {
+                            version: 5,
+                            description: "create_conversations_and_messages",
+                            sql: include_str!("../migrations/005_conversations.sql"),
+                            kind: tauri_plugin_sql::MigrationKind::Up,
+                        },
+                        tauri_plugin_sql::Migration {
+                            version: 6,
+                            description: "create_flow_events",
+                            sql: include_str!("../migrations/006_flow_events.sql"),
+                            kind: tauri_plugin_sql::MigrationKind::Up,
+                        },
                     ],
                 )
                 .build(),

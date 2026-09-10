@@ -3,10 +3,12 @@
  *
  * Desktop: LocalWorkflowRuntime（直接在前端进程跑 FlowEngine）
  * Future: RemoteWorkflowRuntime（调 LoomFlow Server API）
+ *
+ * 支持 SSE 式事件发射：node_start / node_complete / node_error / flow_complete / flow_error
  */
 
-import type { TinyflowData, ExecuteOptions } from '@/lib/tinyflow/types';
-import type { WorkflowRepository, ExecutionRecord } from './repositories/workflow-repository';
+import type { TinyflowData, ExecuteOptions, FlowNode } from '@/lib/tinyflow/types';
+import type { WorkflowRepository, ExecutionRecord, FlowEventRecord } from './repositories/workflow-repository';
 
 export interface RunWorkflowInput {
   flowData: TinyflowData;
@@ -22,9 +24,18 @@ export interface RunWorkflowResult {
   durationMs?: number;
 }
 
+export interface FlowEvent {
+  type: FlowEventRecord['eventType'];
+  nodeId?: string;
+  nodeType?: string;
+  data?: Record<string, unknown>;
+  timestamp: string;
+}
+
 export interface WorkflowRuntime {
   execute(input: RunWorkflowInput): Promise<RunWorkflowResult>;
   stop(executionId: string): Promise<void>;
+  onEvent(callback: (event: FlowEvent) => void): void;
 }
 
 /**
@@ -32,13 +43,36 @@ export interface WorkflowRuntime {
  *
  * 第一阶段：直接调用 @/lib/tinyflow 的 FlowEngine。
  * 执行记录持久化到 SQLite（通过 repository）。
+ * 支持事件发射：节点级 start/complete/error 事件。
  */
 export class LocalWorkflowRuntime implements WorkflowRuntime {
   private repo: WorkflowRepository;
   private abortControllers = new Map<string, AbortController>();
+  private eventCallbacks: Array<(event: FlowEvent) => void> = [];
 
   constructor(repo: WorkflowRepository) {
     this.repo = repo;
+  }
+
+  onEvent(callback: (event: FlowEvent) => void): void {
+    this.eventCallbacks.push(callback);
+  }
+
+  private emit(event: FlowEvent): void {
+    for (const cb of this.eventCallbacks) {
+      try { cb(event); } catch { /* ignore */ }
+    }
+  }
+
+  private async persistEvent(executionId: string, event: FlowEvent): Promise<void> {
+    try {
+      await this.repo.addFlowEvent(executionId, {
+        eventType: event.type,
+        nodeId: event.nodeId ?? null,
+        nodeType: event.nodeType ?? null,
+        data: event.data ?? null,
+      });
+    } catch { /* non-fatal */ }
   }
 
   async execute(input: RunWorkflowInput): Promise<RunWorkflowResult> {
@@ -61,12 +95,18 @@ export class LocalWorkflowRuntime implements WorkflowRuntime {
       ? await this.repo.createExecution(input.workflowId, input.inputs)
       : null;
 
+    const executionId = execution?.id ?? '';
     const abortController = new AbortController();
     if (execution) {
       this.abortControllers.set(execution.id, abortController);
     }
 
     const startTime = Date.now();
+
+    // Emit flow_start
+    const flowStartEvent: FlowEvent = { type: 'flow_start', timestamp: new Date().toISOString() };
+    this.emit(flowStartEvent);
+    if (executionId) await this.persistEvent(executionId, flowStartEvent);
 
     try {
       const timeoutMs = 300_000; // 5 min default
@@ -80,10 +120,23 @@ export class LocalWorkflowRuntime implements WorkflowRuntime {
       };
 
       const engine = new FlowEngine(input.flowData, options);
+
+      // TODO: When FlowEngine exposes node lifecycle hooks, attach listeners here
+      // for node_start / node_complete / node_error events.
+
       await engine.run();
 
       const durationMs = Date.now() - startTime;
       const outputs = this.extractOutputs(input.flowData, engine);
+
+      // Emit flow_complete
+      const flowCompleteEvent: FlowEvent = {
+        type: 'flow_complete',
+        data: { outputs, durationMs },
+        timestamp: new Date().toISOString(),
+      };
+      this.emit(flowCompleteEvent);
+      if (executionId) await this.persistEvent(executionId, flowCompleteEvent);
 
       // Update execution record
       if (execution) {
@@ -104,6 +157,15 @@ export class LocalWorkflowRuntime implements WorkflowRuntime {
     } catch (err) {
       const error = err as Error;
       const durationMs = Date.now() - startTime;
+
+      // Emit flow_error
+      const flowErrorEvent: FlowEvent = {
+        type: 'flow_error',
+        data: { error: error.message, durationMs },
+        timestamp: new Date().toISOString(),
+      };
+      this.emit(flowErrorEvent);
+      if (executionId) await this.persistEvent(executionId, flowErrorEvent);
 
       if (execution) {
         await this.repo.updateExecution(execution.id, {

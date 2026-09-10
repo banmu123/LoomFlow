@@ -9,13 +9,15 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import 'loomflow-ui/dist/index.css';
 import type { Tinyflow as TinyflowInstance } from 'loomflow-ui';
-import type { TinyflowData, FlowNode } from '@/lib/tinyflow/types';
+import type { TinyflowData } from '@/lib/tinyflow/types';
 import { toast } from 'sonner';
-import { ArrowLeft, Save, Play, Square, Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { ArrowLeft, Save, Play, Square, Loader2, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { useT } from '@/lib/i18n';
 import { useRepository } from '../app/repositories';
-import type { WorkflowRecord } from '../app/repositories/workflow-repository';
+import type { WorkflowRecord, WorkflowVersionRecord } from '../app/repositories/workflow-repository';
 import { LocalWorkflowRuntime } from '../app/runtime';
+import type { FlowEvent } from '../app/runtime';
+import { VersionHistoryPanel } from '../components/VersionHistoryPanel';
 
 function createEmptyWorkflow(): TinyflowData {
   return {
@@ -51,6 +53,13 @@ export default function EditorPage() {
   const [runError, setRunError] = useState<string | null>(null);
   const [showResults, setShowResults] = useState(false);
   const runtimeRef = useRef<LocalWorkflowRuntime | null>(null);
+
+  // Node execution tracking
+  const [nodeEvents, setNodeEvents] = useState<Map<string, { status: 'running' | 'completed' | 'error'; data?: Record<string, unknown> }>>(new Map());
+  const [flowEvents, setFlowEvents] = useState<FlowEvent[]>([]);
+
+  // Version history
+  const [showVersions, setShowVersions] = useState(false);
 
   // ===== Load or create workflow =====
   useEffect(() => {
@@ -106,7 +115,26 @@ export default function EditorPage() {
   }, []); // eslint-disable-line
 
   // ===== Init Runtime =====
-  useEffect(() => { runtimeRef.current = new LocalWorkflowRuntime(repo); }, [repo]);
+  useEffect(() => {
+    const runtime = new LocalWorkflowRuntime(repo);
+    runtime.onEvent((event: FlowEvent) => {
+      setFlowEvents((prev) => [...prev, event]);
+      if (event.nodeId) {
+        setNodeEvents((prev) => {
+          const next = new Map(prev);
+          if (event.type === 'node_start') {
+            next.set(event.nodeId!, { status: 'running' });
+          } else if (event.type === 'node_complete') {
+            next.set(event.nodeId!, { status: 'completed', data: event.data });
+          } else if (event.type === 'node_error') {
+            next.set(event.nodeId!, { status: 'error', data: event.data });
+          }
+          return next;
+        });
+      }
+    });
+    runtimeRef.current = runtime;
+  }, [repo]);
 
   // ===== Autosave =====
   useEffect(() => {
@@ -156,6 +184,7 @@ export default function EditorPage() {
     if (!data) return;
     if (dirty) await handleSave();
     setRunning(true); setResult(null); setRunError(null); setShowResults(true);
+    setNodeEvents(new Map()); setFlowEvents([]);
     try {
       const runtime = runtimeRef.current;
       if (!runtime) throw new Error('Runtime not ready');
@@ -165,6 +194,24 @@ export default function EditorPage() {
     } catch (err) { const e = err as Error; setRunError(e.message); toast.error(e.message); }
     finally { setRunning(false); }
   }, [running, dirty, handleSave, currentId]);
+
+  // ===== Version Restore =====
+  const handleVersionRestore = useCallback(async (version: WorkflowVersionRecord) => {
+    if (!instanceRef.current || !currentId) return;
+    // Update the workflow with the version's data
+    const record = await repo.update(currentId, {
+      title: version.title,
+      description: version.description ?? undefined,
+      data: version.data,
+    });
+    // Reload canvas
+    instanceRef.current.setData(version.data);
+    setWorkflow(record);
+    setTitle(record.title);
+    workflowRef.current = record;
+    setDirty(false);
+    setShowVersions(false);
+  }, [currentId, repo]);
 
   // ===== Render =====
   if (loading) return <div className="flex h-full items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
@@ -183,6 +230,15 @@ export default function EditorPage() {
           {dirty && <span className="text-xs text-amber-500">● {t('common.unsaved') || 'Unsaved'}</span>}
         </div>
         <div className="flex items-center gap-2">
+          {currentId && (
+            <button
+              onClick={() => setShowVersions(!showVersions)}
+              className={`inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted ${showVersions ? 'bg-muted' : ''}`}
+            >
+              <Clock className="h-3.5 w-3.5" />
+              Versions
+            </button>
+          )}
           <button onClick={handleSave} disabled={saving || !dirty} className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-50">
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             {t('common.save')}
@@ -193,21 +249,47 @@ export default function EditorPage() {
         </div>
       </div>
 
-      {/* Canvas + Results */}
+      {/* Canvas + Results + Version History */}
       <div className="flex flex-1 overflow-hidden">
         <div ref={containerRef} className="flex-1" />
         {showResults && (
           <div className="w-80 border-l border-border overflow-y-auto">
             <div className="flex items-center justify-between px-4 py-2 border-b border-border">
-              <span className="text-sm font-medium">{t('workflows.executionResult') || 'Result'}</span>
+              <span className="text-sm font-medium">{t('workflows.executionResult') || 'Execution'}</span>
               <button onClick={() => setShowResults(false)} className="text-xs text-muted-foreground hover:text-foreground">✕</button>
             </div>
             <div className="p-4 space-y-3">
               {running && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Running...</div>}
+
+              {/* Node-level events */}
+              {flowEvents.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Trace</div>
+                  {flowEvents.filter((e) => e.nodeId).map((ev, i) => (
+                    <div key={i} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs">
+                      {ev.type === 'node_start' && <Loader2 className="h-3 w-3 animate-spin text-blue-500" />}
+                      {ev.type === 'node_complete' && <CheckCircle2 className="h-3 w-3 text-green-500" />}
+                      {ev.type === 'node_error' && <XCircle className="h-3 w-3 text-red-500" />}
+                      <span className="font-mono text-muted-foreground">{ev.nodeId}</span>
+                      {ev.type === 'node_complete' && ev.data?.durationMs != null && (
+                        <span className="ml-auto text-muted-foreground">{String(ev.data.durationMs)}ms</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {result && <div><div className="flex items-center gap-2 mb-2"><CheckCircle2 className="h-4 w-4 text-green-500" /><span className="text-sm font-medium text-green-600">OK</span></div><pre className="rounded-md bg-muted p-3 text-xs overflow-x-auto whitespace-pre-wrap">{JSON.stringify(result, null, 2)}</pre></div>}
               {runError && <div><div className="flex items-center gap-2 mb-2"><XCircle className="h-4 w-4 text-red-500" /><span className="text-sm font-medium text-red-600">Error</span></div><pre className="rounded-md bg-destructive/10 p-3 text-xs text-destructive whitespace-pre-wrap">{runError}</pre></div>}
             </div>
           </div>
+        )}
+        {showVersions && currentId && (
+          <VersionHistoryPanel
+            workflowId={currentId}
+            onRestore={handleVersionRestore}
+            onClose={() => setShowVersions(false)}
+          />
         )}
       </div>
     </div>
