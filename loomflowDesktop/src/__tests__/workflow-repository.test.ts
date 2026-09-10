@@ -11,7 +11,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // In-memory store for mock DB
 let mockDb: Map<string, unknown[]> = new Map();
-let mockExecuteResults: unknown[] = [];
+const mockExecuteResults: unknown[] = [];
 let mockSelectResults: unknown[][] = [];
 
 const mockDbInstance = {

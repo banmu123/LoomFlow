@@ -47,6 +47,8 @@ const eslintConfig = defineConfig([
     'dist/**',
     // Script files (CommonJS):
     'scripts/**/*.js',
+    // Desktop app (has its own lint/build):
+    'loomflowDesktop/**',
   ]),
 ]);
 

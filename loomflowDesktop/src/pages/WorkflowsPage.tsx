@@ -200,7 +200,7 @@ export default function WorkflowsPage() {
               {!loading && workflows.length === 0 && (
                 <tr>
                   <td colSpan={3} className="px-4 py-10 text-center text-muted-foreground">
-                    No workflows yet. Click "Create Workflow" to get started.
+                    No workflows yet. Click &quot;Create Workflow&quot; to get started.
                   </td>
                 </tr>
               )}

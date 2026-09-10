@@ -271,7 +271,7 @@ export default function ModelsPage() {
                 <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground"><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />Loading...</td></tr>
               )}
               {!loading && models.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">No models configured. Click "Add Model" to get started.</td></tr>
+                <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">No models configured. Click &quot;Add Model&quot; to get started.</td></tr>
               )}
               {!loading && models.map((m) => (
                 <tr key={m.id} className="hover:bg-muted/30">
