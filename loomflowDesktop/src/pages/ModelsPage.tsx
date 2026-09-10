@@ -2,9 +2,10 @@
  * ModelsPage — 模型配置管理
  *
  * 与 Web 端 Admin Models 对齐：CRUD、provider 选择、能力标签、启用/禁用。
+ * 所有用户可见文字均走 i18n（AGENTS.md 第 7 条）。
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Settings2,
   Plus,
@@ -25,21 +26,30 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 
+/** 提供商清单：label 为品牌名（不翻译），defaultUrl 用于自动填充接口地址 */
 const PROVIDERS = [
   { value: 'deepseek', label: 'DeepSeek', defaultUrl: 'https://api.deepseek.com' },
   { value: 'openai', label: 'OpenAI', defaultUrl: 'https://api.openai.com/v1' },
   { value: 'claude', label: 'Claude (Anthropic)', defaultUrl: 'https://api.anthropic.com/v1' },
   { value: 'gemini', label: 'Gemini (Google)', defaultUrl: 'https://generativelanguage.googleapis.com/v1beta' },
-  { value: 'qwen', label: 'Qwen (通义千问)', defaultUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
-  { value: 'ark', label: 'Ark (火山引擎)', defaultUrl: 'https://ark.cn-beijing.volces.com/api/v3' },
-  { value: 'ollama', label: 'Ollama (本地)', defaultUrl: 'http://localhost:11434/v1' },
-  { value: 'custom', label: 'Custom (OpenAI 兼容)', defaultUrl: '' },
+  { value: 'qwen', label: 'Qwen', defaultUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
+  { value: 'ark', label: 'Ark (Volcengine)', defaultUrl: 'https://ark.cn-beijing.volces.com/api/v3' },
+  { value: 'ollama', label: 'Ollama', defaultUrl: 'http://localhost:11434/v1' },
+  { value: 'custom', label: 'Custom', defaultUrl: '' },
 ] as const;
 
+/** 提供商的中文补充说明（紧跟品牌名后展示） */
+const PROVIDER_HINTS: Record<string, string> = {
+  qwen: 'qwenHint',
+  ark: 'arkHint',
+  ollama: 'ollamaHint',
+  custom: 'customHint',
+};
+
 const CAPABILITIES = [
-  { value: 'text', label: 'Text', icon: Cpu },
-  { value: 'vision', label: 'Vision', icon: Eye },
-  { value: 'tool', label: 'Tool', icon: Wrench },
+  { value: 'text', labelKey: 'capText', icon: Cpu },
+  { value: 'vision', labelKey: 'capVision', icon: Eye },
+  { value: 'tool', labelKey: 'capTool', icon: Wrench },
 ] as const;
 
 interface ModelFormProps {
@@ -49,6 +59,7 @@ interface ModelFormProps {
 }
 
 function ModelForm({ initial, onSave, onCancel }: ModelFormProps) {
+  const t = useT();
   const [provider, setProvider] = useState(initial?.provider ?? 'deepseek');
   const [modelName, setModelName] = useState(initial?.modelName ?? '');
   const [displayName, setDisplayName] = useState(initial?.displayName ?? '');
@@ -58,11 +69,11 @@ function ModelForm({ initial, onSave, onCancel }: ModelFormProps) {
   const [saving, setSaving] = useState(false);
 
   const toggleCap = (cap: string) => {
-    setCapabilities((prev) => prev.includes(cap) ? prev.filter((c) => c !== cap) : [...prev, cap]);
+    setCapabilities((prev) => (prev.includes(cap) ? prev.filter((c) => c !== cap) : [...prev, cap]));
   };
 
   const handleSubmit = async () => {
-    if (!modelName.trim()) { toast.error('Model name is required'); return; }
+    if (!modelName.trim()) { toast.error(t('models.nameRequired')); return; }
     setSaving(true);
     try {
       await onSave({
@@ -76,11 +87,13 @@ function ModelForm({ initial, onSave, onCancel }: ModelFormProps) {
     } finally { setSaving(false); }
   };
 
+  const fieldCls = 'mt-1 w-full rounded-md border border-border bg-card px-3 py-2 text-sm';
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="text-xs font-medium text-muted-foreground">Provider</label>
+          <label className="text-xs font-medium text-muted-foreground">{t('models.provider')}</label>
           <select
             value={provider}
             onChange={(e) => {
@@ -89,58 +102,60 @@ function ModelForm({ initial, onSave, onCancel }: ModelFormProps) {
               const found = PROVIDERS.find((pr) => pr.value === p);
               if (found?.defaultUrl) setBaseUrl(found.defaultUrl);
             }}
-            className="mt-1 w-full rounded-md border border-border bg-card px-3 py-2 text-sm"
+            className={fieldCls}
           >
             {PROVIDERS.map((p) => (
-              <option key={p.value} value={p.value}>{p.label}</option>
+              <option key={p.value} value={p.value}>
+                {PROVIDER_HINTS[p.value] ? `${p.label} (${t(`models.${PROVIDER_HINTS[p.value]}`)})` : p.label}
+              </option>
             ))}
           </select>
         </div>
         <div>
-          <label className="text-xs font-medium text-muted-foreground">Model Name</label>
+          <label className="text-xs font-medium text-muted-foreground">{t('models.modelName')}</label>
           <input
             value={modelName}
             onChange={(e) => setModelName(e.target.value)}
-            placeholder="e.g. deepseek-chat, gpt-4o"
-            className="mt-1 w-full rounded-md border border-border bg-card px-3 py-2 text-sm"
+            placeholder={t('models.modelNamePlaceholder')}
+            className={fieldCls}
           />
         </div>
       </div>
 
       <div>
-        <label className="text-xs font-medium text-muted-foreground">Display Name</label>
+        <label className="text-xs font-medium text-muted-foreground">{t('models.displayName')}</label>
         <input
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
-          placeholder="Optional display name"
-          className="mt-1 w-full rounded-md border border-border bg-card px-3 py-2 text-sm"
+          placeholder={t('models.displayNamePlaceholder')}
+          className={fieldCls}
         />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="text-xs font-medium text-muted-foreground">Base URL</label>
+          <label className="text-xs font-medium text-muted-foreground">{t('models.baseUrl')}</label>
           <input
             value={baseUrl}
             onChange={(e) => setBaseUrl(e.target.value)}
-            placeholder="Auto-filled by provider"
-            className="mt-1 w-full rounded-md border border-border bg-card px-3 py-2 text-sm font-mono"
+            placeholder={t('models.baseUrlPlaceholder')}
+            className={`${fieldCls} font-mono`}
           />
         </div>
         <div>
-          <label className="text-xs font-medium text-muted-foreground">API Key</label>
+          <label className="text-xs font-medium text-muted-foreground">{t('models.apiKey')}</label>
           <input
             type="password"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             placeholder="sk-..."
-            className="mt-1 w-full rounded-md border border-border bg-card px-3 py-2 text-sm font-mono"
+            className={`${fieldCls} font-mono`}
           />
         </div>
       </div>
 
       <div>
-        <label className="text-xs font-medium text-muted-foreground">Capabilities</label>
+        <label className="text-xs font-medium text-muted-foreground">{t('models.capabilities')}</label>
         <div className="mt-1 flex gap-2">
           {CAPABILITIES.map((cap) => (
             <button
@@ -153,17 +168,17 @@ function ModelForm({ initial, onSave, onCancel }: ModelFormProps) {
               }`}
             >
               <cap.icon className="h-3.5 w-3.5" />
-              {cap.label}
+              {t(`models.${cap.labelKey}`)}
             </button>
           ))}
         </div>
       </div>
 
       <div className="flex justify-end gap-2 pt-2">
-        <Button variant="outline" onClick={onCancel}>Cancel</Button>
+        <Button variant="outline" onClick={onCancel}>{t('models.cancel')}</Button>
         <Button onClick={handleSubmit} disabled={saving}>
           {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-          {initial ? 'Update' : 'Add Model'}
+          {initial ? t('models.update') : t('models.create')}
         </Button>
       </div>
     </div>
@@ -180,33 +195,45 @@ export default function ModelsPage() {
   const [deleteTarget, setDeleteTarget] = useState<AIModelRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  /** provider value → 展示名 */
+  const providerLabels = useMemo(
+    () => Object.fromEntries(PROVIDERS.map((p) => [p.value, p.label])) as Record<string, string>,
+    [],
+  );
+
   const loadModels = useCallback(async () => {
     setLoading(true);
     try { setModels(await repo.listModels()); }
-    catch { toast.error('Failed to load models'); }
+    catch { toast.error(t('models.loadFailed')); }
     finally { setLoading(false); }
-  }, [repo]);
+  }, [repo, t]);
 
   useEffect(() => { loadModels(); }, [loadModels]);
 
   const handleCreate = async (input: CreateAIModelInput) => {
-    await repo.createModel(input);
-    toast.success('Model added');
-    setShowForm(false);
-    loadModels();
+    try {
+      await repo.createModel(input);
+      toast.success(t('models.added'));
+      setShowForm(false);
+      loadModels();
+    } catch { toast.error(t('models.addFailed')); }
   };
 
   const handleUpdate = async (input: CreateAIModelInput) => {
     if (!editing) return;
-    await repo.updateModel(editing.id, input);
-    toast.success('Model updated');
-    setEditing(null);
-    loadModels();
+    try {
+      await repo.updateModel(editing.id, input);
+      toast.success(t('models.updated'));
+      setEditing(null);
+      loadModels();
+    } catch { toast.error(t('models.updateFailed')); }
   };
 
   const handleToggle = async (model: AIModelRecord) => {
-    await repo.updateModel(model.id, { isEnabled: !model.isEnabled });
-    loadModels();
+    try {
+      await repo.updateModel(model.id, { isEnabled: !model.isEnabled });
+      loadModels();
+    } catch { toast.error(t('models.updateFailed')); }
   };
 
   const handleDelete = async () => {
@@ -214,10 +241,10 @@ export default function ModelsPage() {
     setDeleting(true);
     try {
       await repo.deleteModel(deleteTarget.id);
-      toast.success('Model deleted');
+      toast.success(t('models.deleted'));
       setDeleteTarget(null);
       loadModels();
-    } catch { toast.error('Delete failed'); }
+    } catch { toast.error(t('models.deleteFailed')); }
     finally { setDeleting(false); }
   };
 
@@ -230,21 +257,21 @@ export default function ModelsPage() {
             <Settings2 className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold text-foreground">AI Models</h1>
-            <p className="text-sm text-muted-foreground">Configure LLM providers and models</p>
+            <h1 className="text-lg font-semibold text-foreground">{t('models.title')}</h1>
+            <p className="text-sm text-muted-foreground">{t('models.subtitle')}</p>
           </div>
         </div>
         <Button onClick={() => { setEditing(null); setShowForm(true); }}>
           <Plus className="h-4 w-4" />
-          Add Model
+          {t('models.add')}
         </Button>
       </div>
 
-      <div className="flex-1 p-6 space-y-4">
+      <div className="flex-1 space-y-4 p-6">
         {/* Create/Edit Form */}
         {(showForm || editing) && (
           <div className="rounded-lg border border-border bg-card p-4">
-            <h3 className="mb-3 text-sm font-medium">{editing ? 'Edit Model' : 'Add New Model'}</h3>
+            <h3 className="mb-3 text-sm font-medium">{editing ? t('models.editTitle') : t('models.addTitle')}</h3>
             <ModelForm
               initial={editing ?? undefined}
               onSave={editing ? handleUpdate : handleCreate}
@@ -258,29 +285,29 @@ export default function ModelsPage() {
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-muted-foreground">
               <tr>
-                <th className="px-4 py-2.5 text-left font-medium">Provider</th>
-                <th className="px-4 py-2.5 text-left font-medium">Model</th>
-                <th className="px-4 py-2.5 text-left font-medium">Capabilities</th>
-                <th className="px-4 py-2.5 text-left font-medium">Base URL</th>
-                <th className="px-4 py-2.5 text-center font-medium">Status</th>
-                <th className="px-4 py-2.5 text-right font-medium">Actions</th>
+                <th className="px-4 py-2.5 text-left font-medium">{t('models.colProvider')}</th>
+                <th className="px-4 py-2.5 text-left font-medium">{t('models.colModel')}</th>
+                <th className="px-4 py-2.5 text-left font-medium">{t('models.colCapabilities')}</th>
+                <th className="px-4 py-2.5 text-left font-medium">{t('models.colBaseUrl')}</th>
+                <th className="px-4 py-2.5 text-center font-medium">{t('models.colStatus')}</th>
+                <th className="px-4 py-2.5 text-right font-medium">{t('models.colActions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {loading && (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground"><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />Loading...</td></tr>
+                <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground"><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />{t('models.loading')}</td></tr>
               )}
               {!loading && models.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">No models configured. Click &quot;Add Model&quot; to get started.</td></tr>
+                <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">{t('models.empty')}</td></tr>
               )}
               {!loading && models.map((m) => (
                 <tr key={m.id} className="hover:bg-muted/30">
                   <td className="px-4 py-2.5">
-                    <Badge variant="outline">{PROVIDERS.find((p) => p.value === m.provider)?.label ?? m.provider}</Badge>
+                    <Badge variant="outline">{providerLabels[m.provider] ?? m.provider}</Badge>
                   </td>
                   <td className="px-4 py-2.5">
                     <div className="font-medium text-foreground">{m.displayName || m.modelName}</div>
-                    {m.displayName && <div className="text-xs text-muted-foreground font-mono">{m.modelName}</div>}
+                    {m.displayName && <div className="font-mono text-xs text-muted-foreground">{m.modelName}</div>}
                   </td>
                   <td className="px-4 py-2.5">
                     <div className="flex gap-1">
@@ -289,7 +316,7 @@ export default function ModelsPage() {
                       ))}
                     </div>
                   </td>
-                  <td className="px-4 py-2.5 text-xs text-muted-foreground font-mono max-w-[200px] truncate">
+                  <td className="max-w-[200px] truncate px-4 py-2.5 font-mono text-xs text-muted-foreground">
                     {m.baseUrl || '—'}
                   </td>
                   <td className="px-4 py-2.5 text-center">
@@ -299,7 +326,7 @@ export default function ModelsPage() {
                         m.isEnabled ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-muted text-muted-foreground'
                       }`}
                     >
-                      {m.isEnabled ? <><Check className="h-3 w-3" />Enabled</> : <><X className="h-3 w-3" />Disabled</>}
+                      {m.isEnabled ? <><Check className="h-3 w-3" />{t('models.enabled')}</> : <><X className="h-3 w-3" />{t('models.disabled')}</>}
                     </button>
                   </td>
                   <td className="px-4 py-2.5 text-right">
@@ -318,7 +345,7 @@ export default function ModelsPage() {
       <ConfirmDialog
         open={!!deleteTarget}
         destructive
-        title={deleteTarget ? `Delete model "${deleteTarget.displayName || deleteTarget.modelName}"?` : ''}
+        title={deleteTarget ? t('models.deleteConfirm', { name: deleteTarget.displayName || deleteTarget.modelName }) : ''}
         loading={deleting}
         onConfirm={handleDelete}
         onCancel={() => setDeleteTarget(null)}

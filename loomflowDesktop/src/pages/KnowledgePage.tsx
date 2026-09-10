@@ -17,15 +17,15 @@ export default function KnowledgePage() {
           </div>
           <div>
             <h1 className="text-lg font-semibold">{t('sidebar.knowledge')}</h1>
-            <p className="text-sm text-muted-foreground">Manage your knowledge bases</p>
+            <p className="text-sm text-muted-foreground">{t('knowledge.subtitle')}</p>
           </div>
         </div>
       </div>
       <div className="flex flex-1 items-center justify-center">
         <div className="text-center text-muted-foreground">
           <Library className="mx-auto mb-3 h-12 w-12 text-muted-foreground/30" />
-          <p className="text-sm font-medium">Coming Soon</p>
-          <p className="mt-1 text-xs text-muted-foreground/60">Knowledge base will be available in a future update</p>
+          <p className="text-sm font-medium">{t('common.comingSoonTitle')}</p>
+          <p className="mt-1 text-xs text-muted-foreground/60">{t('common.comingSoonDesc')}</p>
         </div>
       </div>
     </div>

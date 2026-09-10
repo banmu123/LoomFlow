@@ -275,7 +275,7 @@ export function SidebarNav() {
           {!collapsed && (
             <div className="min-w-0">
               <p className="truncate text-xs font-medium">Desktop</p>
-              <p className="text-[10px] text-muted-foreground">Local Mode</p>
+              <p className="text-[10px] text-muted-foreground">{t('sidebar.localMode')}</p>
             </div>
           )}
         </div>
@@ -284,7 +284,7 @@ export function SidebarNav() {
           <Link
             href="/settings"
             className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
-            title="Settings"
+            title={t('sidebar.settings')}
           >
             <Settings className="h-4 w-4" />
           </Link>

@@ -3,6 +3,7 @@
  */
 
 import { Loader2 } from 'lucide-react';
+import { useT } from '@/lib/i18n';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -22,11 +23,12 @@ export function ConfirmDialog({
   description,
   destructive = false,
   loading = false,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
+  confirmLabel,
+  cancelLabel,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const t = useT();
   if (!open) return null;
 
   return (
@@ -46,7 +48,7 @@ export function ConfirmDialog({
             disabled={loading}
             className="rounded-md border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-sm font-medium transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800"
           >
-            {cancelLabel}
+            {cancelLabel ?? t('common.cancel')}
           </button>
           <button
             onClick={onConfirm}
@@ -58,7 +60,7 @@ export function ConfirmDialog({
             }`}
           >
             {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            {confirmLabel}
+            {confirmLabel ?? t('common.confirm')}
           </button>
         </div>
       </div>

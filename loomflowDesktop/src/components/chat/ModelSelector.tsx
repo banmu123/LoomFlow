@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import { ChevronDown, Cpu } from 'lucide-react';
 import { useRepository } from '../../app/repositories';
 import type { AIModelRecord } from '../../app/repositories/workflow-repository';
+import { useT } from '@/lib/i18n';
 
 interface ModelSelectorProps {
   value: string | null;
@@ -17,6 +18,7 @@ interface ModelSelectorProps {
 
 export function ModelSelector({ value, onChange, className }: ModelSelectorProps) {
   const repo = useRepository();
+  const t = useT();
   const [models, setModels] = useState<AIModelRecord[]>([]);
   const [open, setOpen] = useState(false);
 
@@ -30,7 +32,7 @@ export function ModelSelector({ value, onChange, className }: ModelSelectorProps
     return (
       <div className={`inline-flex items-center gap-1.5 rounded-md border border-dashed border-border px-3 py-1.5 text-xs text-muted-foreground ${className ?? ''}`}>
         <Cpu className="h-3.5 w-3.5" />
-        No models configured
+        {t('chat.noModels')}
       </div>
     );
   }

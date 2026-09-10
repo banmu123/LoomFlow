@@ -113,6 +113,24 @@ export function useT() {
   return t;
 }
 
+/**
+ * 在指定语言下翻译 key，不依赖 React 上下文。
+ *
+ * 使用场景：语言切换后立刻弹 toast —— 此刻组件尚未用新 locale 重新渲染，
+ * `useT()` 拿到的 t 仍是旧语言闭包。用本函数显式指定目标语言，
+ * 可避免「切成英文却弹出中文提示」。
+ */
+export function translate(
+  locale: Locale,
+  key: string,
+  params?: Record<string, string | number>,
+): string {
+  const bundle = MESSAGES[locale] ?? zh;
+  const resolved = resolveKey(bundle, key);
+  if (resolved !== undefined) return interpolate(resolved, params);
+  return key;
+}
+
 export function useLocale() {
   const { locale, setLocale } = useContext(I18nContext);
   return { locale, setLocale };

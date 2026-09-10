@@ -14,6 +14,7 @@ import { useRepository } from '../../app/repositories';
 import type { MessageRecord, AIModelRecord } from '../../app/repositories/workflow-repository';
 import { streamChat, toChatMessages } from '../../app/ai-service';
 import { ModelSelector } from './ModelSelector';
+import { useT } from '@/lib/i18n';
 
 interface ChatPanelProps {
   conversationId: string;
@@ -21,6 +22,7 @@ interface ChatPanelProps {
 
 export function ChatPanel({ conversationId }: ChatPanelProps) {
   const repo = useRepository();
+  const t = useT();
   const [messages, setMessages] = useState<MessageRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [input, setInput] = useState('');
@@ -77,7 +79,7 @@ export function ChatPanel({ conversationId }: ChatPanelProps) {
   const handleSend = useCallback(async () => {
     const text = input.trim();
     if (!text || streaming) return;
-    if (!currentModel) { toast.error('Please select a model first'); return; }
+    if (!currentModel) { toast.error(t('chat.selectModelFirst')); return; }
 
     setInput('');
 
@@ -119,7 +121,7 @@ export function ChatPanel({ conversationId }: ChatPanelProps) {
         toast.error(err.message);
       },
     });
-  }, [input, streaming, currentModel, conversationId, repo]);
+  }, [input, streaming, currentModel, conversationId, repo, t]);
 
   const handleStop = useCallback(() => {
     abortRef.current?.abort();
@@ -150,8 +152,8 @@ export function ChatPanel({ conversationId }: ChatPanelProps) {
               <Bot className="h-8 w-8 text-primary" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold">Start a conversation</h2>
-              <p className="mt-1 text-sm text-muted-foreground">Send a message to begin chatting with AI</p>
+              <h2 className="text-lg font-semibold">{t('chat.emptyTitle')}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{t('chat.startNewChatHint')}</p>
             </div>
           </div>
         )}
@@ -201,7 +203,7 @@ export function ChatPanel({ conversationId }: ChatPanelProps) {
                 ) : (
                   <div className="flex items-center gap-1.5 text-muted-foreground">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Thinking...
+                    {t('chat.thinking')}
                   </div>
                 )}
               </div>
@@ -224,7 +226,7 @@ export function ChatPanel({ conversationId }: ChatPanelProps) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Type a message..."
+              placeholder={t('chat.inputPlaceholder')}
               rows={1}
               disabled={streaming}
               className="flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground disabled:opacity-50"
@@ -242,7 +244,7 @@ export function ChatPanel({ conversationId }: ChatPanelProps) {
                 onClick={handleSend}
                 disabled={!input.trim() || !currentModel}
                 className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
-                title="Send (Enter)"
+                title={t('chat.sendHint')}
               >
                 <Send className="h-4 w-4" />
               </button>

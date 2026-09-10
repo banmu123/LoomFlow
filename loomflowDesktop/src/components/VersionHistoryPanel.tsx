@@ -7,6 +7,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Clock, RotateCcw, Loader2, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { useT } from '@/lib/i18n';
 import { useRepository } from '../app/repositories';
 import type { WorkflowVersionRecord } from '../app/repositories/workflow-repository';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,7 @@ function formatTime(iso: string): string {
 
 export function VersionHistoryPanel({ workflowId, onRestore, onClose }: VersionHistoryPanelProps) {
   const repo = useRepository();
+  const t = useT();
   const [versions, setVersions] = useState<WorkflowVersionRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [restoring, setRestoring] = useState<number | null>(null);
@@ -32,19 +34,19 @@ export function VersionHistoryPanel({ workflowId, onRestore, onClose }: VersionH
     setLoading(true);
     repo.listVersions(workflowId)
       .then(setVersions)
-      .catch(() => toast.error('Failed to load versions'))
+      .catch(() => toast.error(t('editor.versionLoadFailed')))
       .finally(() => setLoading(false));
-  }, [workflowId, repo]);
+  }, [workflowId, repo, t]);
 
   const handleRestore = useCallback(async (version: WorkflowVersionRecord) => {
     setRestoring(version.version);
     try {
       onRestore(version);
-      toast.success(`Restored to version ${version.version}`);
+      toast.success(t('editor.versionRestored', { version: version.version }));
     } catch {
-      toast.error('Restore failed');
+      toast.error(t('editor.versionRestoreFailed'));
     } finally { setRestoring(null); }
-  }, [onRestore]);
+  }, [onRestore, t]);
 
   return (
     <div className="flex h-full w-80 flex-col border-l border-border bg-card">
@@ -52,7 +54,7 @@ export function VersionHistoryPanel({ workflowId, onRestore, onClose }: VersionH
       <div className="flex items-center justify-between border-b border-border px-4 py-2">
         <div className="flex items-center gap-2">
           <Clock className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium">Version History</span>
+          <span className="text-sm font-medium">{t('editor.versionHistory')}</span>
         </div>
         <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
           <X className="h-4 w-4" />
@@ -67,7 +69,7 @@ export function VersionHistoryPanel({ workflowId, onRestore, onClose }: VersionH
           </div>
         )}
         {!loading && versions.length === 0 && (
-          <div className="px-4 py-10 text-center text-sm text-muted-foreground">No versions yet</div>
+          <div className="px-4 py-10 text-center text-sm text-muted-foreground">{t('editor.noVersions')}</div>
         )}
         {versions.map((v) => (
           <div key={v.id} className="border-b border-border px-4 py-3 hover:bg-muted/30">
@@ -98,7 +100,7 @@ export function VersionHistoryPanel({ workflowId, onRestore, onClose }: VersionH
                 ) : (
                   <RotateCcw className="h-3 w-3" />
                 )}
-                Restore
+                {t('workflows.restore')}
               </Button>
             </div>
           </div>

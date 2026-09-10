@@ -31,7 +31,7 @@ export function ChatLanding() {
   const handleSend = async () => {
     const text = input.trim();
     if (!text || creating) return;
-    if (!modelId) { toast.error('Please select a model first'); return; }
+    if (!modelId) { toast.error(t('chat.selectModelFirst')); return; }
 
     setCreating(true);
     try {
@@ -44,7 +44,7 @@ export function ChatLanding() {
       window.dispatchEvent(new Event('conversations-updated'));
       navigate(`/chat/${conv.id}`);
     } catch {
-      toast.error('Failed to create conversation');
+      toast.error(t('chat.createConversationFailed'));
     } finally {
       setCreating(false);
     }

@@ -17,15 +17,15 @@ export default function SkillsPage() {
           </div>
           <div>
             <h1 className="text-lg font-semibold">{t('sidebar.skills')}</h1>
-            <p className="text-sm text-muted-foreground">AI-powered workflow generation</p>
+            <p className="text-sm text-muted-foreground">{t('skills.subtitle')}</p>
           </div>
         </div>
       </div>
       <div className="flex flex-1 items-center justify-center">
         <div className="text-center text-muted-foreground">
           <Sparkles className="mx-auto mb-3 h-12 w-12 text-muted-foreground/30" />
-          <p className="text-sm font-medium">Coming Soon</p>
-          <p className="mt-1 text-xs text-muted-foreground/60">Skills will be available in a future update</p>
+          <p className="text-sm font-medium">{t('common.comingSoonTitle')}</p>
+          <p className="mt-1 text-xs text-muted-foreground/60">{t('common.comingSoonDesc')}</p>
         </div>
       </div>
     </div>

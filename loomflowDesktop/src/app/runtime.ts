@@ -26,6 +26,8 @@ export interface RunWorkflowResult {
 
 export interface FlowEvent {
   type: FlowEventRecord['eventType'];
+  /** 关联的执行记录 id（未落库时为 undefined），供 UI 取消执行 / 关联日志 */
+  executionId?: string;
   nodeId?: string;
   nodeType?: string;
   data?: Record<string, unknown>;
@@ -104,12 +106,26 @@ export class LocalWorkflowRuntime implements WorkflowRuntime {
     const startTime = Date.now();
 
     // Emit flow_start
-    const flowStartEvent: FlowEvent = { type: 'flow_start', timestamp: new Date().toISOString() };
+    const flowStartEvent: FlowEvent = {
+      type: 'flow_start',
+      executionId: executionId || undefined,
+      timestamp: new Date().toISOString(),
+    };
     this.emit(flowStartEvent);
     if (executionId) await this.persistEvent(executionId, flowStartEvent);
 
     try {
       const timeoutMs = 300_000; // 5 min default
+
+      // 节点 id → 节点类型，用于事件里带上 nodeType
+      const nodeTypeOf = (nodeId: string): string | undefined =>
+        input.flowData.nodes.find((n) => n.id === nodeId)?.type;
+
+      // 同步发射 + 异步落库（落库失败不影响执行）
+      const dispatch = (event: FlowEvent): void => {
+        this.emit(event);
+        if (executionId) void this.persistEvent(executionId, event);
+      };
 
       const options: ExecuteOptions = {
         flowData: input.flowData,
@@ -117,12 +133,33 @@ export class LocalWorkflowRuntime implements WorkflowRuntime {
         workflowId: input.workflowId ?? null,
         signal: abortController.signal,
         timeoutMs,
+        // 节点生命周期钩子 —— 与 Web 端 runFlow 保持一致的事件语义，
+        // 供 EditorPage Trace 面板实时展示 node_start / node_complete / node_error
+        onNodeStart: (nodeId) => {
+          dispatch({
+            type: 'node_start',
+            executionId: executionId || undefined,
+            nodeId,
+            nodeType: nodeTypeOf(nodeId),
+            timestamp: new Date().toISOString(),
+          });
+        },
+        onNodeComplete: (nodeId, nodeResult) => {
+          const succeeded = nodeResult.status === 'success';
+          dispatch({
+            type: succeeded ? 'node_complete' : 'node_error',
+            executionId: executionId || undefined,
+            nodeId,
+            nodeType: nodeTypeOf(nodeId),
+            data: succeeded
+              ? { outputs: nodeResult.outputs, durationMs: nodeResult.duration }
+              : { error: nodeResult.error ?? `Node ${nodeResult.status}`, durationMs: nodeResult.duration },
+            timestamp: new Date().toISOString(),
+          });
+        },
       };
 
       const engine = new FlowEngine(input.flowData, options);
-
-      // TODO: When FlowEngine exposes node lifecycle hooks, attach listeners here
-      // for node_start / node_complete / node_error events.
 
       await engine.run();
 
@@ -132,6 +169,7 @@ export class LocalWorkflowRuntime implements WorkflowRuntime {
       // Emit flow_complete
       const flowCompleteEvent: FlowEvent = {
         type: 'flow_complete',
+        executionId: executionId || undefined,
         data: { outputs, durationMs },
         timestamp: new Date().toISOString(),
       };
@@ -161,6 +199,7 @@ export class LocalWorkflowRuntime implements WorkflowRuntime {
       // Emit flow_error
       const flowErrorEvent: FlowEvent = {
         type: 'flow_error',
+        executionId: executionId || undefined,
         data: { error: error.message, durationMs },
         timestamp: new Date().toISOString(),
       };

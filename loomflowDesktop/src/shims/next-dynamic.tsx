@@ -2,7 +2,7 @@
  * next/dynamic shim — Vite handles code splitting natively
  * Just return the component directly
  */
-import type { ComponentType } from 'react';
+import { useState, useEffect, type ComponentType } from 'react';
 
 interface DynamicOptions {
   ssr?: boolean;
@@ -37,5 +37,3 @@ export default function dynamic<P extends object>(
 
   return DynamicComponent as ComponentType<P>;
 }
-
-import { useState, useEffect } from 'react';

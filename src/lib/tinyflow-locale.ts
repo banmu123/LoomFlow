@@ -13,6 +13,9 @@ export const TINYFLOW_ZH_EN: Record<string, string> = {
   // 节点标题（左侧节点库 + 画布节点默认标题）
   开始节点: 'Start Node',
   结束节点: 'End Node',
+  // 画布节点实例的默认标题（取自 NodeRegistry 的 label）
+  开始: 'Start',
+  结束: 'End',
   大模型: 'LLM',
   循环: 'Loop',
   知识库: 'Knowledge',
