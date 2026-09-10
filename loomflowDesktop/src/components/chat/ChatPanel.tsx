@@ -89,7 +89,8 @@ export function ChatPanel({ conversationId }: ChatPanelProps) {
     const allMsgs = await repo.listMessages(conversationId);
     if (allMsgs.length <= 2) {
       const title = text.length > 50 ? text.slice(0, 50) + '...' : text;
-      repo.updateConversation(conversationId, { title }).catch(() => {});
+      await repo.updateConversation(conversationId, { title });
+      window.dispatchEvent(new Event('conversations-updated'));
     }
 
     // Stream AI response

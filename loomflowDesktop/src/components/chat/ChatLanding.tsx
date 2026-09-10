@@ -41,6 +41,7 @@ export function ChatLanding() {
       );
       // Save user message
       await repo.createMessage(conv.id, 'user', text);
+      window.dispatchEvent(new Event('conversations-updated'));
       navigate(`/chat/${conv.id}`);
     } catch {
       toast.error('Failed to create conversation');
