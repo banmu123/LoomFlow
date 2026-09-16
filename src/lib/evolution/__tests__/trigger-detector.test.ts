@@ -14,7 +14,7 @@ import type { EvolutionRule } from '../types';
 
 function makeChain(result: { data?: unknown[] }) {
   const obj: Record<string, unknown> = {};
-  ['select', 'eq', 'gte', 'order', 'limit'].forEach((k) => {
+  ['select', 'eq', 'gte', 'lt', 'order', 'limit'].forEach((k) => {
     obj[k] = vi.fn(() => obj);
   });
   obj.then = (resolve: (v: unknown) => void) => {

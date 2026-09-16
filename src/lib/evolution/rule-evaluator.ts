@@ -9,6 +9,7 @@
  */
 
 import { supabase } from '@/lib/supabase/server';
+import { rangeToMs } from '../time-window';
 import type { EvolutionRule } from './types';
 
 export interface EvalResult {
@@ -100,15 +101,4 @@ export async function hasPendingEvent(workflowId: string): Promise<boolean> {
     .eq('workflow_id', workflowId)
     .in('analysis_status', ['pending', 'analyzing']);
   return (count ?? 0) > 0;
-}
-
-// ===== Helpers =====
-
-function rangeToMs(range: string): number {
-  switch (range) {
-    case '24h': return 24 * 3600 * 1000;
-    case '7d': return 7 * 24 * 3600 * 1000;
-    case '30d': return 30 * 24 * 3600 * 1000;
-    default: return 7 * 24 * 3600 * 1000;
-  }
 }

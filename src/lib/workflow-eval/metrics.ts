@@ -6,6 +6,7 @@
  */
 
 import type { NodeTrace, RunTrace } from '../tinyflow/runtime/trace';
+import { rangeToMs as sharedRangeToMs, type TimeRange } from '../time-window';
 import type { ModelPrice } from './pricing';
 
 export interface RunRecordLike {
@@ -21,14 +22,9 @@ export interface RunRecordLike {
 
 export type EvalRange = '24h' | '7d' | '30d';
 
+/** 统一 range→ms（委托 time-window 工具；旧签名保持兼容） */
 export function rangeToMs(range: EvalRange): number {
-  switch (range) {
-    case '24h': return 24 * 3600 * 1000;
-    case '7d': return 7 * 24 * 3600 * 1000;
-    case '30d':
-    default:
-      return 30 * 24 * 3600 * 1000;
-  }
+  return sharedRangeToMs(range as TimeRange);
 }
 
 /** 按时间范围过滤 run 记录 */

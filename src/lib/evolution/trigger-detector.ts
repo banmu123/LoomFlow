@@ -14,6 +14,7 @@ import {
   type RunRecordLike,
   type WorkflowMetrics,
 } from '../workflow-eval/metrics';
+import { buildRegressionWindows, rangeToMs, type TimeWindow } from '../time-window';
 import type { EvolutionRule, DetectionResult, MetricSnapshot } from './types';
 
 // ===== Public API =====
@@ -26,7 +27,7 @@ export function detectCron(rule: EvolutionRule): DetectionResult {
   };
 }
 
-/** metric 触发：当前窗口 vs 基线窗口指标对比 */
+/** metric 触发：当前窗口 vs 基线窗口指标对比（两窗口不重叠） */
 export async function detectMetric(rule: EvolutionRule): Promise<DetectionResult> {
   const metricKey = rule.metric_key;
   const metricOp = rule.metric_op;
@@ -36,12 +37,20 @@ export async function detectMetric(rule: EvolutionRule): Promise<DetectionResult
     return { triggered: false, reason: '规则配置不完整' };
   }
 
-  const currentRuns = await fetchRuns(rule.workflow_id, rule.metric_range ?? '7d');
+  // 当前窗口：[T - metricRange, T)
+  // 基线窗口：[T - metricRange - baselineRange, T - metricRange)
+  // 两窗口不重叠，基线在当前之前
+  const windows = buildRegressionWindows(
+    rule.metric_range ?? '7d',
+    rule.baseline_range ?? '30d',
+  );
+
+  const currentRuns = await fetchRunsInWindow(rule.workflow_id, windows.current);
   if (currentRuns.length < 3) {
     return { triggered: false, reason: `数据不足（${currentRuns.length} 次执行）` };
   }
 
-  const baselineRuns = await fetchRuns(rule.workflow_id, rule.baseline_range ?? '30d');
+  const baselineRuns = await fetchRunsInWindow(rule.workflow_id, windows.baseline);
   const current = aggregateWorkflowMetrics(currentRuns);
   const baseline = baselineRuns.length > 0 ? aggregateWorkflowMetrics(baselineRuns) : undefined;
   const delta = baseline ? buildDelta(current, baseline) : undefined;
@@ -217,14 +226,14 @@ function formatVal(key: string, val: number): string {
 
 // ===== DB Queries =====
 
-async function fetchRuns(workflowId: string, range: string): Promise<RunRecordLike[]> {
-  const ms = rangeToMs(range);
-  const cutoff = new Date(Date.now() - ms).toISOString();
+/** 按时间窗口查询执行记录（start inclusive, end exclusive） */
+async function fetchRunsInWindow(workflowId: string, window: TimeWindow): Promise<RunRecordLike[]> {
   const { data } = await supabase
     .from('flow_runs')
     .select('id, status, created_at, duration_ms, retry_count, token_usage, cost, trace')
     .eq('workflow_id', workflowId)
-    .gte('created_at', cutoff)
+    .gte('created_at', window.startIso)
+    .lt('created_at', window.endIso)
     .order('created_at', { ascending: true })
     .limit(500);
 
@@ -238,13 +247,4 @@ async function fetchRuns(workflowId: string, range: string): Promise<RunRecordLi
     cost: r.cost != null ? Number(r.cost) : null,
     trace: (r.trace ?? null) as RunRecordLike['trace'],
   }));
-}
-
-function rangeToMs(range: string): number {
-  switch (range) {
-    case '24h': return 24 * 3600 * 1000;
-    case '7d': return 7 * 24 * 3600 * 1000;
-    case '30d': return 30 * 24 * 3600 * 1000;
-    default: return 7 * 24 * 3600 * 1000;
-  }
 }
