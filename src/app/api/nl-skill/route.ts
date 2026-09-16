@@ -6,7 +6,7 @@ import { getAllModels } from '@/lib/ai/db-models';
 import { getEnabledSearchProviders } from '@/lib/search/db-providers';
 import { buildSystemPrompt } from '@/lib/workflow-ai/prompts';
 import { validateWorkflow } from '@/lib/tinyflow/schema';
-import { validateSkillDefinition } from '@/lib/workflow-skill/skill-schema';
+import { normalizeSkillDefinition, validateSkillDefinition } from '@/lib/workflow-skill/skill-schema';
 import type { SkillDefinitionV1 } from '@/lib/workflow-skill/skill-types';
 import type { TinyflowData } from '@/lib/tinyflow/types';
 
@@ -87,6 +87,14 @@ export async function POST(request: NextRequest) {
   "workflow": { "nodes": [...], "edges": [...], "viewport": {...} }
 }
 
+## 字段 type 只能取以下值（严禁使用其它值，如 text/int/bool 等都非法）
+- 文本用 "string"；多行长文本用 "textarea"；数字用 "number"；开关用 "boolean"
+- 列表用 "array"；结构化对象用 "object"；下拉枚举用 "select"
+
+## 结构硬性要求
+- inputs / outputs 必须是对象 { "fields": [...] }，不能直接是数组
+- workflow 节点的 type 必须带 Node 后缀：startNode / endNode / llmNode / httpNode / codeNode / knowledgeNode / searchEngineNode / excelNode / templateNode / confirmNode / loopNode（严禁写 llm、http 等短名）
+
 ## 规则
 - input 的字段就是工作流 startNode 的输入参数（refType=ref, ref="input.字段名"）
 - output 字段应映射到 endNode 的输出（ref 引用上游）
@@ -112,13 +120,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'AI 输出无法解析，请重试' }, { status: 500 });
   }
 
+  // 宽容规范化 AI 输出（type 别名归一、inputs/outputs 数组包装等）后再校验，
+  // 避免模型轻微格式偏差导致「一直校验失败」
+  const skill = normalizeSkillDefinition(parsed.skill) as SkillDefinitionV1;
+
   // 校验 Skill 定义 + 工作流
-  const skillValid = validateSkillDefinition(parsed.skill);
+  const skillValid = validateSkillDefinition(skill);
   const workflowValid = validateWorkflow(parsed.workflow);
 
   return NextResponse.json({
     kind: 'skill_draft',
-    skill: parsed.skill,
+    skill,
     workflow: parsed.workflow,
     validation: {
       skill: skillValid,

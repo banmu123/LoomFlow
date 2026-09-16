@@ -72,7 +72,7 @@ export default function SkillsPage() {
   const [skillDraft, setSkillDraft] = useState<{
     skill: SkillDefinition;
     workflow: unknown;
-    validation: { canCreate: boolean; skill: { valid: boolean }; workflow: { valid: boolean; errors: string[] } };
+    validation: { canCreate: boolean; skill: { valid: boolean; errors?: string[] }; workflow: { valid: boolean; errors: string[] } };
   } | null>(null);
 
   // 从工作流创建
@@ -508,9 +508,14 @@ export default function SkillsPage() {
                     <XCircle className="mt-0.5 h-3.5 w-3.5" />
                     <div>
                       {t('skills.validationFail')}
+                      {(skillDraft.validation.skill.errors?.length ?? 0) > 0 && (
+                        <ul className="mt-1 list-inside list-disc">
+                          {skillDraft.validation.skill.errors!.map((e, i) => <li key={`s-${i}`}>{e}</li>)}
+                        </ul>
+                      )}
                       {skillDraft.validation.workflow.errors.length > 0 && (
                         <ul className="mt-1 list-inside list-disc">
-                          {skillDraft.validation.workflow.errors.map((e, i) => <li key={i}>{e}</li>)}
+                          {skillDraft.validation.workflow.errors.map((e, i) => <li key={`w-${i}`}>{e}</li>)}
                         </ul>
                       )}
                     </div>

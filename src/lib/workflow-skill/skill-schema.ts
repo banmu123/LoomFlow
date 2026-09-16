@@ -14,6 +14,56 @@ import type {
   SkillOutputSchema,
 } from './skill-types';
 
+/** 字段类型别名 → 合法 SkillFieldType（AI 生成输出常用变体） */
+const FIELD_TYPE_ALIASES: Record<string, SkillFieldType> = {
+  text: 'string',
+  str: 'string',
+  longtext: 'textarea',
+  multiline: 'textarea',
+  int: 'number',
+  integer: 'number',
+  float: 'number',
+  bool: 'boolean',
+  list: 'array',
+  enum: 'select',
+  map: 'object',
+};
+
+/**
+ * 宽容规范化 AI 生成的 Skill 定义（幂等）：
+ * - inputs/outputs 直接是数组时包装为 {fields: [...]}
+ * - 字段 type 常见别名归一（text→string、bool→boolean 等）
+ * - 缺 schemaVersion 时补 1
+ * 规范化后再走 validateSkillDefinition，可显著提高 NL 生成成功率。
+ */
+export function normalizeSkillDefinition(def: unknown): unknown {
+  if (!def || typeof def !== 'object') return def;
+  const d = def as Record<string, unknown>;
+
+  const normalizeFields = (io: unknown): unknown => {
+    // LLM 常把 inputs/outputs 直接输出为数组 → 包装成 {fields}
+    const rawFields = Array.isArray(io) ? io : (io as Record<string, unknown> | null)?.fields;
+    if (!Array.isArray(rawFields)) return io; // 无法理解的结构，留给校验器报错
+    return {
+      ...(io && typeof io === 'object' && !Array.isArray(io) ? io : {}),
+      fields: rawFields.map((f) => {
+        if (!f || typeof f !== 'object') return f;
+        const field = f as Record<string, unknown>;
+        const alias =
+          typeof field.type === 'string' ? FIELD_TYPE_ALIASES[field.type.toLowerCase()] : undefined;
+        return alias ? { ...field, type: alias } : field;
+      }),
+    };
+  };
+
+  return {
+    ...d,
+    schemaVersion: (d.schemaVersion as number) ?? 1,
+    inputs: normalizeFields(d.inputs),
+    outputs: normalizeFields(d.outputs),
+  };
+}
+
 export function validateSkillDefinition(def: unknown): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   if (!def || typeof def !== 'object') return { valid: false, errors: ['定义不是对象'] };
