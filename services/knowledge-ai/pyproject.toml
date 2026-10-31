@@ -1,0 +1,28 @@
+[project]
+name = "loomflow-knowledge-ai"
+version = "0.1.0"
+description = "LoomFlow 知识库 AI 服务（FastAPI 骨架，M1 阶段不含完整 RAG）"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.5",
+    "uvicorn[standard]>=0.30",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.27",
+    "pytest>=8.3",
+]
+
+# 服务型项目：不作为可安装包发布，uv sync 只装依赖
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# 服务不作为包安装（package = false），把服务根目录加入 import 路径
+pythonpath = ["."]
+addopts = "-q --strict-markers"

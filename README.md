@@ -332,6 +332,7 @@ Full comparison: **[docs/deployment-modes.md](docs/deployment-modes.md)**
 - **[Security](docs/config/security.md)** — sandbox, auth, quotas, audit, isolation
 - **[Node System Architecture](docs/nodes.md)** — NodeDefinition/Registry/Factory, configSchema, plugin SDK
 - **[Deployment Manual](docs/config/Deployment-Manual.md)** — self-host, migrate, HTTPS
+- **[Python AI Service](docs/config/python-ai-service.md)** — optional FastAPI service for knowledge retrieval (M1 skeleton)
 - **[Deployment Modes](docs/deployment-modes.md)** — Docker vs Vercel comparison
 - **[Desktop](docs/desktop.md)** — LoomFlow Desktop: local-first Tauri app with SQLite
 

@@ -5,6 +5,10 @@
 #   2. 填写 .env（必填：POSTGRES_PASSWORD / PGRST_JWT_SECRET / COZE_SUPABASE_SERVICE_ROLE_KEY）
 #   3. docker compose up -d
 # 首次启动自动初始化数据库（postgres 容器 initdb 脚本）
+#
+# 可选：Python AI 知识服务（FastAPI）
+#   docker compose --profile python-ai up -d
+#   默认不启动；未启用时不影响现有任何容器
 # =====================================================
 
 services:
@@ -142,6 +146,41 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
+    networks:
+      - loomflow-net
+
+  # ---- 可选：Knowledge AI（FastAPI 独立进程）----
+  # 默认不启动；启用：docker compose --profile python-ai up -d
+  # 只加入 loomflow-net，供 Node.js 服务端通过 http://loomflow-ai:8000 调用
+  # 不写 depends_on：主应用不依赖本服务，未启用时 Legacy 知识库行为完全不变
+  loomflow-ai:
+    profiles: ["python-ai"]
+    image: loomflow-ai:latest
+    build:
+      context: ./services/knowledge-ai
+      dockerfile: Dockerfile
+    container_name: loomflow-ai
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      PORT: "8000"
+      LOG_LEVEL: ${KNOWLEDGE_AI_LOG_LEVEL:-INFO}
+      # 生产环境缺失/过短时进程启动失败（fail fast），不会静默降级到 Legacy
+      KNOWLEDGE_SERVICE_TOKEN: ${KNOWLEDGE_SERVICE_TOKEN:-}
+      ENABLE_DOCS: ${KNOWLEDGE_AI_ENABLE_DOCS:-false}
+    ports:
+      # 仅绑定回环地址便于宿主机调试，公网不可达
+      - "127.0.0.1:${KNOWLEDGE_AI_PORT:-8000}:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).status == 200 else 1)"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - loomflow-net
 
