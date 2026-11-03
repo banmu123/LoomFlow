@@ -1045,5 +1045,142 @@ CREATE TRIGGER trg_mcp_servers_updated_at
 
 GRANT ALL ON TABLE mcp_servers TO anon, service_role;
 
+-- =====================================================
+-- 64. Workflow Generation Evaluation（生成质量评测）
+-- 与运行期 Evaluation（flow_runs）分离：这里评的是「生成出来的工作流」
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS generation_eval_runs (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workflow_id    UUID REFERENCES workflow_history(id) ON DELETE SET NULL,
+  suite_version  TEXT NOT NULL,
+  prompt_version TEXT NOT NULL,
+  model_id       TEXT,
+  temperature    NUMERIC(4, 2),
+  report         JSONB NOT NULL,
+  created_by     UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_gen_eval_suite ON generation_eval_runs(suite_version, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_gen_eval_model ON generation_eval_runs(model_id, prompt_version);
+
+ALTER TABLE generation_eval_runs ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_policies WHERE policyname = 'Allow all on generation_eval_runs' AND tablename = 'generation_eval_runs') THEN
+    CREATE POLICY "Allow all on generation_eval_runs" ON generation_eval_runs FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+
+-- =====================================================
+-- 65. 工作流自动回滚（仅切换发布版本指针，不改历史版本）
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS rollback_policies (
+  workflow_id         UUID PRIMARY KEY REFERENCES workflow_history(id) ON DELETE CASCADE,
+  enabled             BOOLEAN NOT NULL DEFAULT false,
+  mode                TEXT NOT NULL DEFAULT 'manual' CHECK (mode IN ('manual', 'auto')),
+  dry_run             BOOLEAN NOT NULL DEFAULT true,
+  min_samples         INTEGER NOT NULL DEFAULT 20,
+  cooldown_minutes    INTEGER NOT NULL DEFAULT 60,
+  max_auto_rollbacks  INTEGER NOT NULL DEFAULT 3,
+  max_failures_streak INTEGER NOT NULL DEFAULT 5,
+  thresholds          JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_by          UUID REFERENCES users(id) ON DELETE SET NULL,
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS workflow_rollbacks (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workflow_id     UUID NOT NULL REFERENCES workflow_history(id) ON DELETE CASCADE,
+  from_version    INTEGER,
+  to_version      INTEGER NOT NULL,
+  status          TEXT NOT NULL CHECK (status IN ('requested','dry_run','applied','failed','rejected')),
+  trigger         TEXT,
+  reason          TEXT,
+  metrics         JSONB,
+  actor           UUID REFERENCES users(id) ON DELETE SET NULL,
+  idempotency_key TEXT UNIQUE,
+  error           TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  applied_at      TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_rollbacks_workflow ON workflow_rollbacks(workflow_id, created_at DESC);
+
+ALTER TABLE rollback_policies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workflow_rollbacks ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_policies WHERE policyname = 'Allow all on rollback_policies' AND tablename = 'rollback_policies') THEN
+    CREATE POLICY "Allow all on rollback_policies" ON rollback_policies FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT FROM pg_policies WHERE policyname = 'Allow all on workflow_rollbacks' AND tablename = 'workflow_rollbacks') THEN
+    CREATE POLICY "Allow all on workflow_rollbacks" ON workflow_rollbacks FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+
+-- 原子切换发布版本：比对当前 published_version，避免与人工发布/其他回滚竞争
+CREATE OR REPLACE FUNCTION loomflow_apply_workflow_rollback(
+  p_workflow_id      UUID,
+  p_to_version       INTEGER,
+  p_expected_version INTEGER,
+  p_rollback_id      UUID
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_data    JSONB;
+  v_current INTEGER;
+  v_title   TEXT;
+BEGIN
+  SELECT published_version, title INTO v_current, v_title
+  FROM workflow_history
+  WHERE id = p_workflow_id AND published = true
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'workflow_not_published';
+  END IF;
+
+  IF p_expected_version IS NOT NULL AND v_current IS DISTINCT FROM p_expected_version THEN
+    RAISE EXCEPTION 'version_conflict: expected %, actual %', p_expected_version, v_current;
+  END IF;
+
+  SELECT data INTO v_data
+  FROM workflow_versions
+  WHERE workflow_id = p_workflow_id AND version = p_to_version;
+
+  IF v_data IS NULL THEN
+    RAISE EXCEPTION 'target_version_not_found';
+  END IF;
+
+  UPDATE workflow_history
+  SET published_data = v_data,
+      published_version = p_to_version,
+      updated_at = now()
+  WHERE id = p_workflow_id;
+
+  UPDATE workflow_rollbacks
+  SET status = 'applied', applied_at = now(), from_version = v_current
+  WHERE id = p_rollback_id;
+
+  RETURN jsonb_build_object(
+    'workflow_id', p_workflow_id,
+    'title', v_title,
+    'previous_version', v_current,
+    'published_version', p_to_version
+  );
+END $$;
+
+ALTER TABLE flow_jobs ADD COLUMN IF NOT EXISTS traceparent TEXT;
+
+GRANT ALL ON TABLE generation_eval_runs, rollback_policies, workflow_rollbacks TO anon, service_role;
+GRANT EXECUTE ON FUNCTION loomflow_apply_workflow_rollback(UUID, INTEGER, INTEGER, UUID) TO anon, service_role;
+
 -- 迁移完成后刷新 PostgREST schema 缓存
 NOTIFY pgrst, 'reload schema';

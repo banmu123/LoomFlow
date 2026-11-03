@@ -28,6 +28,8 @@ import { checkTests } from './checks/tests';
 import { checkRegression } from './checks/regression';
 import { checkCost } from './checks/cost';
 import { checkSecurity } from './checks/security';
+import { checkGeneration } from './checks/generation';
+import type { GenerationReport } from '@/lib/workflow-gen-eval';
 
 // ===== Types =====
 
@@ -88,6 +90,8 @@ export async function evaluateQualityGate(
     regressionReport?: RegressionReport | null;
     baselineMetrics?: MetricSnapshot | null;
     testCases?: WorkflowTestCase[];
+    /** 可选的生成评测报告（来自 workflow-gen-eval） */
+    generationReport?: GenerationReport | null;
   } = {},
 ): Promise<QualityGateReport> {
   const policy = options.policy ?? DEFAULT_POLICY;
@@ -131,7 +135,12 @@ export async function evaluateQualityGate(
     checks.push(checkCost(candidateMetrics, options.baselineMetrics, policy.cost.maxCostPerRun));
   }
 
-  // 7. 聚合决策
+  // 7. Generation Eval (可选，默认关闭)
+  if (policy.generationEval?.enabled) {
+    checks.push(checkGeneration(options.generationReport ?? null, policy.generationEval));
+  }
+
+  // 8. 聚合决策
   const { decision, blockingReasons, warnings } = aggregateDecision(checks);
   const durationMs = Date.now() - start;
 

@@ -1,5 +1,6 @@
 import { McpError } from './types';
 import { nextRequestId, parseSseResponse, unwrapResult } from './jsonrpc';
+import { injectTraceContext } from '@/lib/telemetry';
 
 export interface HttpTransportOptions {
   url: string;
@@ -33,13 +34,13 @@ export class StreamableHttpTransport {
   }
 
   private headers(): Record<string, string> {
-    return {
+    return injectTraceContext({
       'content-type': 'application/json',
       accept: 'application/json, text/event-stream',
       ...(this.sessionId ? { 'mcp-session-id': this.sessionId } : {}),
       ...(this.protocolVersion ? { 'mcp-protocol-version': this.protocolVersion } : {}),
       ...(this.options.headers ?? {}),
-    };
+    });
   }
 
   private async post(body: unknown, timeoutMs?: number): Promise<Response> {

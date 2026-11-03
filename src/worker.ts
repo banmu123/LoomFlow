@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase/server';
 import { runFlow } from '@/lib/tinyflow/runFlow';
 import type { TinyflowData } from '@/lib/tinyflow/types';
 import { computeHash } from '@/lib/workflow-hash';
+import { initTelemetry, shutdownTelemetry } from '@/lib/telemetry';
 import {
   JobError,
   SupabaseJobQueue,
@@ -23,6 +24,8 @@ const logger: WorkerLogger = {
   warn: (message, meta) => console.warn(`[worker] ${message}`, meta ?? ''),
   error: (message, meta) => console.error(`[worker] ${message}`, meta ?? ''),
 };
+
+initTelemetry('loomflow-worker');
 
 function intFromEnv(name: string, fallback: number): number {
   const raw = process.env[name];
@@ -130,6 +133,7 @@ async function shutdown(signal: string): Promise<void> {
   logger.info(`received ${signal}, shutting down gracefully`);
   try {
     await runtime.stop();
+    await shutdownTelemetry();
     process.exit(0);
   } catch (err) {
     console.error('[worker] shutdown failed', err);

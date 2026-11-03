@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { contextFromTraceparent, recordJobEvent, withSpan } from '@/lib/telemetry';
 import { computeBackoffMs, hasAttemptsLeft } from './backoff';
 import { JobError, classifyJobError } from './errors';
 import type { FlowJob, JobQueue } from './types';
@@ -256,7 +257,7 @@ export class WorkerRuntime {
       }, this.cancelPollIntervalMs);
       cancelTimer.unref?.();
 
-      const result = await this.runner(job, {
+      const result = await this.runWithTelemetry(job, flowId, controller, {
         flowId,
         signal: controller.signal,
         onCheckpoint: (checkpoint) => {
@@ -364,6 +365,41 @@ export class WorkerRuntime {
 
   private isShutdownAbort(controller: AbortController): boolean {
     return controller.signal.aborted && controller.signal.reason instanceof WorkerShutdownError;
+  }
+
+  /** 单任务 Span：从 job.traceparent 恢复跨进程父上下文 */
+  private async runWithTelemetry(
+    job: FlowJob,
+    flowId: string,
+    controller: AbortController,
+    ctx: JobRunContext,
+  ): Promise<JobExecutionResult> {
+    recordJobEvent({ event: 'claimed' });
+    const startedAt = Date.now();
+    const remote = contextFromTraceparent(job.traceparent);
+    const attributes = {
+      'workflow.id': job.workflow_id,
+      'workflow.job.id': job.id,
+      'workflow.flow.id': flowId,
+      'workflow.job.attempt': job.attempts,
+    };
+
+    try {
+      const result = await withSpan(
+        'workflow.job',
+        attributes,
+        () => this.runner(job, ctx),
+        remote ? { context: remote } : {},
+      );
+      recordJobEvent({
+        event: result.status === 'completed' ? 'succeeded' : 'failed',
+        durationMs: Date.now() - startedAt,
+      });
+      return result;
+    } catch (err) {
+      recordJobEvent({ event: 'failed', durationMs: Date.now() - startedAt });
+      throw err;
+    }
   }
 
   private async claimSafely(limit: number): Promise<FlowJob[]> {

@@ -86,6 +86,23 @@
 
 ---
 
+## ✅ v0.4.2 — Evaluation & Observability
+
+**生成质量可量化、链路可追踪、版本可回退。**
+
+- ✅ 工作流生成基准数据集 `wf-gen-v1`（10 案例，基于真实节点类型）
+- ✅ 生成评测引擎（结构 / 语义 / 运行 / 成本，Schema 与任务完成分开统计）
+- ✅ Prompt / Model A/B 对比报告
+- ✅ 可选 LLM-as-a-Judge（版本化 Prompt，权重上限 20%）
+- ✅ Quality Gate 可选接入 `generationEval` 检查
+- ✅ OpenTelemetry Trace（HTTP → 节点 → 模型 / MCP / Python）与 W3C 上下文传播
+- ✅ 低基数 Metrics + 属性脱敏
+- ✅ 自动回滚（回归触发、Dry Run、人工审批、冷却、幂等、版本冲突保护）
+- 🔲 生成评测可视化 UI
+- 🔲 自动回滚定时触发（当前通过 API/脚本）
+
+---
+
 ## 🔲 v0.5 — Developer Ecosystem
 
 **可扩展的开发者生态。**

@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase/server';
 import { getClientIp, logAudit } from '@/lib/audit';
 import { computeHash } from '@/lib/workflow-hash';
 import { SupabaseJobQueue, jobStatusToApiStatus } from '@/lib/jobs';
+import { currentTraceContext } from '@/lib/telemetry';
 
 export const runtime = 'nodejs';
 
@@ -47,6 +48,8 @@ export async function POST(
         // 发布 API 执行「发布时快照」，入队时一并固化，避免排队期间被编辑影响
         workflowSnapshot: auth.workflow.data as unknown as Record<string, unknown>,
         workflowHash: computeHash(auth.workflow.data),
+        // 把当前 HTTP 请求的 trace 上下文带给 Worker（跨进程链路）
+        traceparent: currentTraceContext()?.traceparent ?? null,
       });
 
       await supabase.from('api_call_logs').insert({

@@ -339,6 +339,9 @@ Full comparison: **[docs/deployment-modes.md](docs/deployment-modes.md)**
 - **[Python Tools](docs/config/python-tools.md)** — sheet/document/extraction service contracts
 - **[Model Gateway](docs/config/model-gateway.md)** — routing, fallback, circuit breaker, cost
 - **[MCP & Agent](docs/config/mcp-agent.md)** — MCP client, tool registry, agent runtime
+- **[Generation Eval](docs/config/generation-eval.md)** — benchmark dataset, metrics, prompt A/B
+- **[Observability](docs/config/observability.md)** — OpenTelemetry tracing/metrics, OTLP
+- **[Workflow Rollback](docs/config/rollback.md)** — regression-triggered version rollback
 - **[Deployment Modes](docs/deployment-modes.md)** — Docker vs Vercel comparison
 - **[Desktop](docs/desktop.md)** — LoomFlow Desktop: local-first Tauri app with SQLite
 

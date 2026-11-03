@@ -15,6 +15,7 @@ from app.api.router import api_router
 from app.core.config import Settings, get_settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
+from app.core.telemetry import instrument_fastapi
 
 REQUEST_ID_HEADER = "X-Request-Id"
 logger = logging.getLogger("loomflow.agent_tools")
@@ -60,6 +61,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return response
 
     register_exception_handlers(app)
+    # 先注册异常处理，再挂 OTel 中间件（顺序影响 Span 是否能覆盖异常路径）
+    instrument_fastapi(app, settings.app_name)
     app.include_router(health_router)
     app.include_router(api_router, prefix=settings.api_prefix)
     return app

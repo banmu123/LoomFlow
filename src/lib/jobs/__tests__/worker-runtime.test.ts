@@ -19,6 +19,7 @@ function makeJob(overrides: Partial<FlowJob> = {}): FlowJob {
     status: 'running',
     inputs: { q: 'hello' },
     idempotency_key: null,
+    traceparent: null,
     attempts: 1,
     max_attempts: 3,
     available_at: now,

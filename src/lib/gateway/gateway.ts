@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { ModelDefinition } from '@/lib/ai';
 import { getAllModels } from '@/lib/ai/db-models';
 import { isSafeHttpUrl } from '@/lib/url-security';
+import { recordModelCall, withSpan } from '@/lib/telemetry';
 import { callProvider, ProviderCallError } from './adapter';
 import { CircuitBreaker } from './circuit-breaker';
 import { gatewayMetrics, GatewayMetrics } from './metrics';
@@ -139,21 +140,40 @@ export function createGateway(overrides: Partial<GatewayDeps> = {}) {
       const { signal } = timeoutSignal(timeoutMs, request.abortSignal);
 
       try {
-        const response = await deps.callProvider({
-          model: candidate,
-          messages: request.messages,
-          system: request.system,
-          temperature: request.temperature,
-          maxOutputTokens: request.maxOutputTokens,
-          tools: request.tools,
-          abortSignal: signal,
-        });
+        const response = await withSpan(
+          'gen_ai.chat',
+          {
+            'gen_ai.request.model': candidate.id,
+            'gen_ai.provider.name': candidate.provider,
+            'gen_ai.request.fallback': attempts.length > 0,
+          },
+          () =>
+            deps.callProvider({
+              model: candidate,
+              messages: request.messages,
+              system: request.system,
+              temperature: request.temperature,
+              maxOutputTokens: request.maxOutputTokens,
+              tools: request.tools,
+              abortSignal: signal,
+            }),
+        );
 
         const latencyMs = deps.now() - attemptStart;
         const usage: GatewayUsage = response.usage;
         const cost = estimateCost(usage, priceFor(candidate.id, deps.pricing));
 
         deps.breaker.recordSuccess(breakerKey);
+        recordModelCall({
+          modelId: candidate.id,
+          provider: candidate.provider,
+          success: true,
+          durationMs: latencyMs,
+          fallbackUsed: attempts.length > 0,
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
+          cost: cost.amount,
+        });
         deps.metrics.record({
           modelId: candidate.id,
           provider: candidate.provider,

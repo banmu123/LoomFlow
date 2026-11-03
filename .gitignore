@@ -180,6 +180,9 @@ docs/config/*
 !docs/config/python-tools.md
 !docs/config/model-gateway.md
 !docs/config/mcp-agent.md
+!docs/config/generation-eval.md
+!docs/config/observability.md
+!docs/config/rollback.md
 !docs/docker-deploy.md
 # 内部开发记录（不公开）
 devlopRecprd/

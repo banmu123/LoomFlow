@@ -1,5 +1,7 @@
 /** Python 工具服务（services/agent-tools）的调用客户端。 */
 
+import { injectTraceContext, withSpan } from '@/lib/telemetry';
+
 export const PYTHON_TOOL_PATHS = {
   'data.analyze': '/api/v1/tools/data/analyze',
   'data.transform': '/api/v1/tools/data/transform',
@@ -106,15 +108,20 @@ export async function callPythonTool(
 
   let response: Response;
   try {
-    response = await doFetch(`${config.url}${path}`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-loomflow-service-token': config.token,
-      },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(timeoutMs + 2000),
-    });
+    response = await withSpan(
+      'python_tool.call',
+      { 'tool.name': name, 'tool.timeout_ms': timeoutMs },
+      () =>
+        doFetch(`${config.url}${path}`, {
+          method: 'POST',
+          headers: injectTraceContext({
+            'content-type': 'application/json',
+            'x-loomflow-service-token': config.token,
+          }),
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(timeoutMs + 2000),
+        }),
+    );
   } catch (err) {
     const reason = (err as Error).name === 'TimeoutError' ? '请求超时' : (err as Error).message;
     throw new PythonToolUnavailableError(`Python 工具服务不可用：${reason}`);

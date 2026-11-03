@@ -4,6 +4,9 @@ import next from 'next';
 import { initScheduler } from './lib/scheduler';
 import { initEvolutionScheduler } from './lib/evolution/scheduler';
 import { getRuntimeMode } from './lib/runtime/mode';
+import { initTelemetry, recordHttpRequest, shutdownTelemetry, withSpan } from './lib/telemetry';
+
+initTelemetry('loomflow-web');
 
 const dev = process.env.COZE_PROJECT_ENV !== 'PROD';
 const hostname = process.env.HOSTNAME || 'localhost';
@@ -27,17 +30,37 @@ app.prepare().then(() => {
   }
 
   const server = createServer(async (req, res) => {
+    const startedAt = Date.now();
+    const parsedUrl = parse(req.url!, true);
+    // 只记录路由模板，避免把用户 ID / query 变成高基数标签
+    const route = (parsedUrl.pathname ?? '/').split('/').slice(0, 4).join('/') || '/';
+
     try {
-      const parsedUrl = parse(req.url!, true);
-      // 注入当前路径给服务端 layout（用于登录后 redirect 回原页面）
-      if (parsedUrl.pathname) {
-        req.headers['x-pathname'] = parsedUrl.pathname;
-      }
-      await handle(req, res, parsedUrl);
+      await withSpan(
+        'http.server.request',
+        {
+          'http.method': req.method ?? 'GET',
+          'http.route': route,
+        },
+        async () => {
+          // 注入当前路径给服务端 layout（用于登录后 redirect 回原页面）
+          if (parsedUrl.pathname) {
+            req.headers['x-pathname'] = parsedUrl.pathname;
+          }
+          await handle(req, res, parsedUrl);
+        },
+      );
     } catch (err) {
       console.error('Error occurred handling', req.url, err);
       res.statusCode = 500;
       res.end('Internal server error');
+    } finally {
+      recordHttpRequest({
+        method: req.method ?? 'GET',
+        route,
+        status: res.statusCode,
+        durationMs: Date.now() - startedAt,
+      });
     }
   });
   server.once('error', err => {
@@ -51,4 +74,10 @@ app.prepare().then(() => {
       } [runtime: ${runtimeMode}]`,
     );
   });
+
+  for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+    process.on(signal, () => {
+      void shutdownTelemetry();
+    });
+  }
 });

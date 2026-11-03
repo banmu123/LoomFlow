@@ -21,6 +21,8 @@ export interface QualityGatePolicy {
   tests: GateCheckPolicy & { minPassRate?: number; requireAtLeastOne?: boolean };
   regression: GateCheckPolicy & { blockOnCritical?: boolean };
   cost: GateCheckPolicy & { maxCostPerRun?: number };
+  /** 生成质量（可选；未提供报告时自动 skip） */
+  generationEval?: GateCheckPolicy & { blockBelowScore?: number };
 }
 
 export const DEFAULT_POLICY: QualityGatePolicy = {
@@ -30,6 +32,8 @@ export const DEFAULT_POLICY: QualityGatePolicy = {
   tests:          { enabled: true, level: 'required', minPassRate: 1.0, requireAtLeastOne: false },
   regression:     { enabled: true, level: 'advisory', blockOnCritical: false },
   cost:           { enabled: true, level: 'advisory', maxCostPerRun: 0.05 },
+  // 默认关闭：只有显式提供生成评测报告时才启用
+  generationEval: { enabled: false, level: 'advisory', blockBelowScore: 60 },
 };
 
 /** Gate evaluation 有效期（30 分钟） */

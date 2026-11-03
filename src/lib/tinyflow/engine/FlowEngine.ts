@@ -37,6 +37,7 @@ import {
   deserializeCheckpoint,
   restoreContext as restoreContextFromData,
 } from '../runtime/checkpoint';
+import { withSpan } from '@/lib/telemetry';
 
 type RetryPolicyShape = {
   maxRetries: number;
@@ -352,7 +353,16 @@ export class FlowEngine {
         }
       };
 
-      const promise = executor.execute(node, this.context, subFlowRunner, nodeSignal);
+      const promise = withSpan(
+        'workflow.node',
+        {
+          'workflow.id': this.options.workflowId ?? '',
+          'workflow.flow.id': this.context.flowId,
+          'workflow.node.id': node.id,
+          'workflow.node.type': node.type,
+        },
+        () => executor.execute(node, this.context, subFlowRunner, nodeSignal),
+      );
       const timeoutMs = nodeTimeoutMs > 0 ? nodeTimeoutMs : 0;
       const outputs = await withTimeout(
         promise,

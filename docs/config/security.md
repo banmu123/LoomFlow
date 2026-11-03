@@ -106,3 +106,16 @@
 | Agent 预算 | 最大步数、Token、超时三重硬限制；超出即停止并返回状态 |
 | 取消 | AbortSignal 贯通模型调用与工具调用 |
 | 审计 | MCP Server 创建、Agent 工具调用均记录（不记录凭据与完整参数） |
+
+## 11. 可观测性与自动回滚
+
+| 项 | 实现 |
+|----|------|
+| Trace 属性 | 白名单式写入；`apiKey/authorization/token/secret/password/cookie` 键直接丢弃，字符串截断 512 字符，对象不写入 |
+| 用户内容 | 不记录完整 prompt / 文档正文；只记录 id、类型、耗时、状态 |
+| Metrics 基数 | 只用 method/route/status/model/provider/event，不使用 user_id/request_id |
+| 导出 | 仅 OTLP，默认关闭；Collector/后端由部署方决定 |
+| 回滚范围 | 只切换 `published_data`/`published_version`，不触碰 Schema、代码、基础设施 |
+| 回滚并发 | 事务内 `FOR UPDATE` + `expected_version` 比对 + 幂等键 |
+| 回滚默认值 | 关闭、Dry Run、Manual；`auto` 仅管理员可为指定工作流开启 |
+| 回滚审计 | 策略变更与执行均写 `audit_logs`（含 from/to/decision/verified） |

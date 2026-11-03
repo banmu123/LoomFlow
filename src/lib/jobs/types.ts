@@ -33,6 +33,8 @@ export interface FlowJob {
   status: JobStatus;
   inputs: Record<string, unknown>;
   idempotency_key: string | null;
+  /** W3C traceparent（提交时注入，Worker 恢复链路） */
+  traceparent: string | null;
   attempts: number;
   max_attempts: number;
   available_at: string;
@@ -66,6 +68,8 @@ export interface CreateJobInput {
   workflowHash?: string | null;
   /** 受理时的执行快照（发布 API 传 published_data） */
   workflowSnapshot?: Record<string, unknown> | null;
+  /** 提交时捕获的 W3C traceparent（异步任务跨进程链路） */
+  traceparent?: string | null;
 }
 
 export interface FailJobInput {

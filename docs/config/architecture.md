@@ -137,3 +137,31 @@ Python Tool 节点 → @/lib/python-tools → FastAPI 工具服务
 2. **工具即数据**：MCP 工具输出视为不可信内容，包裹边界并截断；
 3. **权限前置**：工具 scope 与 Agent `allowedScope` 比对，超出直接拒绝，不"先执行再报错"；
 4. **不假装智能**：路由是确定的排序规则，Agent 是带预算的循环，不是黑盒。
+
+## 7. 评测、可观测性与回滚（第三阶段）
+
+```
+生成链路：NL → Workflow JSON → Schema → Repair
+                        ↓
+              Generation Eval（wf-gen-v1）
+              ├─ 结构：Schema / 节点类型 / 连通性 / 参数
+              ├─ 语义：节点选择 / 意图 / 约束
+              ├─ 运行：执行成功 / 任务完成 / 修复率
+              └─ 成本：延迟 / Token / 估算成本
+                        ↓
+                 Quality Gate（可选 generationEval）
+
+运行链路：HTTP → flow_jobs(traceparent) → Worker → FlowEngine → Node → Gateway / MCP / Python
+                        ↓
+                 OpenTelemetry（Trace + Metrics + OTLP）
+
+发布链路：Version B 上线 → 回归检测 → 回滚决策 → 指针切回 Version A
+```
+
+| 模块 | 位置 | 职责 |
+|------|------|------|
+| Generation Eval | `src/lib/workflow-gen-eval/` | 基准集、确定性指标、A/B、Judge 兜底 |
+| Telemetry | `src/lib/telemetry/` | SDK 初始化、Span/Metric 封装、W3C 传播、脱敏 |
+| Rollback | `src/lib/rollback/` | 决策纯函数、策略存储、原子版本切换 |
+
+复用关系：回归判定复用 `workflow-eval/regression.ts`；门禁复用 `quality-gate`；发布指针复用既有 `published_version/published_data`。

@@ -34,6 +34,7 @@ export class SupabaseJobQueue implements JobQueue {
       max_attempts: input.maxAttempts ?? 3,
       workflow_hash: input.workflowHash ?? null,
       workflow_snapshot: input.workflowSnapshot ?? null,
+      traceparent: input.traceparent ?? null,
     };
 
     const inserted: Response<FlowJob> = await this.client
