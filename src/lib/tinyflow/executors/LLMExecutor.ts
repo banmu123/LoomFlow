@@ -2,12 +2,30 @@ import type { FlowNode, FlowContext } from '../types';
 import { BaseExecutor } from './BaseExecutor';
 import type { ParameterResolver } from '../engine/ParameterResolver';
 import type { ExpressionEvaluator } from '../engine/ExpressionEvaluator';
-import { generateText } from 'ai';
 import type { ModelMessage } from 'ai';
 
 // 模型动态注册：从注册表（内置 + 用户配置合并）解析模型与 provider
-import { getProviderClientForModel, hasCapability } from '@/lib/ai';
+import { hasCapability } from '@/lib/ai';
 import { getAllModels } from '@/lib/ai/db-models';
+import { modelGateway } from '@/lib/gateway';
+
+/** 备用模型配置：支持数组或逗号分隔字符串 */
+function parseFallbackModelIds(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => String(item).trim())
+      .filter(Boolean)
+      .slice(0, 3);
+  }
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .slice(0, 3);
+  }
+  return [];
+}
 
 export class LLMExecutor extends BaseExecutor {
   constructor(paramResolver: ParameterResolver, exprEvaluator: ExpressionEvaluator) {
@@ -31,7 +49,6 @@ export class LLMExecutor extends BaseExecutor {
     const rawModelId = String(data.llmId);
 
     // 模型合法性完全交给 Model Registry（动态注册），不做硬编码白名单/静默回退
-    // 节点 llmId 必须来自「模型配置」，未配置则明确报错（由前端下拉 / AI 生成注入保证一致性）
     const models = await getAllModels();
     const model = models.find((m) => m.id === rawModelId);
     if (!model) {
@@ -39,14 +56,7 @@ export class LLMExecutor extends BaseExecutor {
         `未知模型: ${rawModelId}，请在「模型配置」中添加该模型或修改 LLM 节点配置`,
       );
     }
-    const modelId = model.id;
     const supportsVision = hasCapability(model, 'vision');
-
-    // provider 从模型定义解析（模型级 baseURL/apiKey 优先）
-    const provider = getProviderClientForModel(model);
-    if (!provider) {
-      throw new Error(`未知 provider: ${model.provider}（模型 ${modelId}）`);
-    }
 
     const temperature = data.temperature ?? 0.7;
     const outType = data.outType || 'text';
@@ -99,18 +109,29 @@ export class LLMExecutor extends BaseExecutor {
       }
     }
 
-        const { text, usage } = await generateText({
-      model: provider(modelId),
+    // 统一走 Model Gateway：路由 / 降级 / 熔断 / 用量与成本统计
+    const result = await modelGateway.callModel({
       messages,
       system: systemPrompt || undefined,
-      temperature,
+      modelId: model.id,
+      fallbackModelIds: parseFallbackModelIds(data.fallbackModelIds),
+      temperature: Number(temperature),
       maxOutputTokens: Number(data.maxTokens) || 8192,
+      timeoutMs: data.timeoutMs ? Number(data.timeoutMs) : undefined,
       abortSignal: signal,
-      timeout: data.timeoutMs ? Number(data.timeoutMs) : undefined,
     });
 
+    const text = result.text;
     // tokens 随输出附带（节点级 trace 展示 + 下游可引用）
-    const tokens = usage?.totalTokens ?? 0;
+    const tokens = result.usage.totalTokens;
+
+    const base = {
+      tokens,
+      model: result.modelId,
+      provider: result.provider,
+      cost: result.cost,
+      fallbackCount: result.fallbacks.length,
+    };
 
     if (outType === 'json') {
       let jsonResult: unknown = {};
@@ -119,9 +140,9 @@ export class LLMExecutor extends BaseExecutor {
       } catch {
         jsonResult = text;
       }
-      return { root: jsonResult, output: text, tokens };
+      return { ...base, root: jsonResult, output: text };
     }
 
-    return { output: text, tokens };
+    return { ...base, output: text };
   }
 }

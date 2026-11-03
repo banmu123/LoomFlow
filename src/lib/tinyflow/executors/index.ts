@@ -12,6 +12,8 @@ import { ConditionExecutor } from './ConditionExecutor';
 import { ConfirmExecutor } from './ConfirmExecutor';
 import { LoopExecutor } from './LoopExecutor';
 import { ExcelExecutor } from './ExcelExecutor';
+import { PythonToolExecutor } from './PythonToolExecutor';
+import { AgentExecutor } from './AgentExecutor';
 import type { ParameterResolver } from '../engine/ParameterResolver';
 import type { ExpressionEvaluator } from '../engine/ExpressionEvaluator';
 
@@ -36,6 +38,8 @@ export class ExecutorRegistryClass {
     this.register('confirmNode', ConfirmExecutor);
     this.register('loopNode', LoopExecutor);
     this.register('excelNode', ExcelExecutor);
+    this.register('pythonToolNode', PythonToolExecutor);
+    this.register('agentNode', AgentExecutor);
   }
 
   register(type: string, executor: ExecutorConstructor): void {

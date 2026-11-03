@@ -177,6 +177,9 @@ docs/config/*
 !docs/config/runtime-architecture.md
 !docs/config/worker-queue.md
 !docs/config/code-sandbox.md
+!docs/config/python-tools.md
+!docs/config/model-gateway.md
+!docs/config/mcp-agent.md
 !docs/docker-deploy.md
 # 内部开发记录（不公开）
 devlopRecprd/

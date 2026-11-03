@@ -100,6 +100,40 @@ AI SDK（DeepSeek / Ark / OpenAI-compatible）
 | NodeDefinition ≠ NodeData | 类型描述与实例配置分离，可扩展 |
 | Schema 从 NodeRegistry 派生 | 新增节点无需改校验层 |
 | 执行前校验 | 配置错误提前拦截（而非运行时失败） |
-| Code 沙箱（vm + 超时） | 用户代码隔离执行 |
+| Code 沙箱（容器 + 权限模型） | 用户代码隔离执行，vm 不再作为边界 |
 | 模型能力驱动多模态 | 新增视觉模型无需改引擎 |
 | 最终输出回退汇总 | 外部调用总能拿到结果 |
+
+## 6. AI 基础设施（第二阶段）
+
+```
+LLM / Agent 节点
+      ↓
+Model Gateway（路由 / 降级 / 熔断 / 成本 / 指标）
+      ↓
+Provider Adapter（ModelRegistry + AI SDK）
+      ↓
+DeepSeek / OpenAI / Qwen / Ark / Claude / Ollama
+
+Agent 节点 → Agent Runtime（步数/预算/权限/追踪）
+      ↓
+MCP Registry（工具发现 / 白名单 / 权限）
+      ↓
+MCP Server（Streamable HTTP / STDIO）
+
+Python Tool 节点 → @/lib/python-tools → FastAPI 工具服务
+```
+
+| 模块 | 位置 | 职责 |
+|------|------|------|
+| Model Gateway | `src/lib/gateway/` | 候选排序、429/5xx/超时降级、熔断、Token/成本统计、baseURL SSRF 校验 |
+| MCP Client | `src/lib/mcp/` | initialize / tools.list / tools.call，HTTP 与 STDIO 两种传输 |
+| Agent Runtime | `src/lib/agent/` | 多轮工具调用、最大步数、Token 预算、超时、取消、权限审批 |
+| Python 工具服务 | `services/agent-tools/` | 表格、文档、文本、字段提取（不执行任意代码） |
+
+设计原则：
+
+1. **复用而不重写**：模型解析仍走 `getProviderClientForModel`，执行仍走 FlowEngine；
+2. **工具即数据**：MCP 工具输出视为不可信内容，包裹边界并截断；
+3. **权限前置**：工具 scope 与 Agent `allowedScope` 比对，超出直接拒绝，不"先执行再报错"；
+4. **不假装智能**：路由是确定的排序规则，Agent 是带预算的循环，不是黑盒。

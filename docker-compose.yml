@@ -256,6 +256,39 @@ services:
     networks:
       - loomflow-net
 
+  # ---- 可选：Agent Tools（FastAPI 数据处理 / 文档解析）----
+  # 默认不启动；启用：docker compose --profile ai-tools up -d
+  # 与 knowledge-ai 独立：不同的密钥、不同的镜像、可单独扩缩容
+  agent-tools:
+    profiles: ["ai-tools"]
+    image: loomflow-agent-tools:latest
+    build:
+      context: ./services/agent-tools
+      dockerfile: Dockerfile
+    container_name: loomflow-agent-tools
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      PORT: "8090"
+      LOG_LEVEL: ${AGENT_TOOLS_LOG_LEVEL:-INFO}
+      KNOWLEDGE_SERVICE_TOKEN: ${AGENT_TOOLS_TOKEN:-}
+      ENABLE_DOCS: ${AGENT_TOOLS_ENABLE_DOCS:-false}
+    ports:
+      # 仅回环地址，便于宿主机调试
+      - "127.0.0.1:${AGENT_TOOLS_PORT:-8091}:8090"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8090/ready', timeout=5).status == 200 else 1)"
+      interval: 20s
+      timeout: 8s
+      retries: 5
+      start_period: 15s
+    networks:
+      - loomflow-net
+
 volumes:
   pgdata:
     name: loomflow-pgdata

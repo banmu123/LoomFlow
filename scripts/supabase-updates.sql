@@ -1005,5 +1005,45 @@ ALTER TABLE flow_runs ADD COLUMN IF NOT EXISTS job_id UUID;
 ALTER TABLE flow_runs ADD COLUMN IF NOT EXISTS trace_id TEXT;
 CREATE INDEX IF NOT EXISTS idx_flow_runs_job ON flow_runs(job_id);
 
+-- =====================================================
+-- 63. MCP Server 注册表（Streamable HTTP）
+-- STDIO Server 只允许部署级配置（MCP_STDIO_SERVERS_JSON），不进数据库，
+-- 避免普通用户通过接口让服务器执行系统命令。
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS mcp_servers (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       UUID REFERENCES users(id) ON DELETE CASCADE,
+  name          TEXT NOT NULL,
+  url           TEXT NOT NULL,
+  credentials   TEXT,                                  -- 加密后的请求头 JSON
+  allowed_tools JSONB,                                 -- null = 允许全部已发现工具
+  scope         TEXT NOT NULL DEFAULT 'read' CHECK (scope IN ('read','write','dangerous')),
+  enabled       BOOLEAN NOT NULL DEFAULT true,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_mcp_servers_user ON mcp_servers(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mcp_servers_user_name
+  ON mcp_servers(user_id, name)
+  WHERE user_id IS NOT NULL;
+
+ALTER TABLE mcp_servers ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_policies WHERE policyname = 'Allow all on mcp_servers' AND tablename = 'mcp_servers') THEN
+    CREATE POLICY "Allow all on mcp_servers" ON mcp_servers FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+
+DROP TRIGGER IF EXISTS trg_mcp_servers_updated_at ON mcp_servers;
+CREATE TRIGGER trg_mcp_servers_updated_at
+  BEFORE UPDATE ON mcp_servers
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+GRANT ALL ON TABLE mcp_servers TO anon, service_role;
+
 -- 迁移完成后刷新 PostgREST schema 缓存
 NOTIFY pgrst, 'reload schema';

@@ -1,0 +1,30 @@
+[project]
+name = "loomflow-agent-tools"
+version = "0.1.0"
+description = "LoomFlow 数据处理 / 文档解析工具服务（FastAPI，不含任意代码执行）"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.5",
+    "uvicorn[standard]>=0.30",
+    "pandas>=2.2",
+    "openpyxl>=3.1",
+    "pypdf>=5.0",
+    "python-docx>=1.1",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.27",
+    "pytest>=8.3",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q --strict-markers"

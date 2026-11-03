@@ -307,6 +307,9 @@ AUTH_SECRET=$(openssl rand -hex 32)
 - **[安全设计](docs/config/security.md)** — 沙箱/认证/配额/审计/隔离
 - **[节点系统架构](docs/nodes.md)** — NodeDefinition/Registry/Factory、configSchema、插件 SDK
 - **[部署手册](docs/config/Deployment-Manual.md)** — 自托管/迁移/HTTPS
+- **[Python 工具服务](docs/config/python-tools.md)** — 表格/文档/字段提取接口契约
+- **[Model Gateway](docs/config/model-gateway.md)** — 模型路由/降级/熔断/成本
+- **[MCP 与 Agent](docs/config/mcp-agent.md)** — MCP 客户端、工具注册、Agent 运行时
 
 ---
 

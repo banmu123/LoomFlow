@@ -82,9 +82,10 @@ describe('NodeRegistry 查询', () => {
 });
 
 describe('内置节点注册（全局单例）', () => {
-  it('12 个内置节点全部注册', () => {
+  it('14 个内置节点全部注册（新增 Agent / Python 工具节点）', () => {
     const types = nodeRegistry.list().map((n) => n.type).sort();
     expect(types).toEqual([
+      'agentNode',
       'codeNode',
       'conditionNode',
       'confirmNode',
@@ -94,6 +95,7 @@ describe('内置节点注册（全局单例）', () => {
       'knowledgeNode',
       'llmNode',
       'loopNode',
+      'pythonToolNode',
       'searchEngineNode',
       'startNode',
       'templateNode',

@@ -79,5 +79,30 @@
 |------|------|
 | HTTPS | 生产建议 Nginx + certbot（部署手册第四章），当前默认 HTTP |
 | 分享页 | 公开访问（token 256-bit 不可枚举），试运行消耗模型额度 |
-| Code 沙箱 | 同步超时保护；资源（CPU/内存）限制为 Node 进程级 |
+| Code 沙箱 | 容器 + 权限模型；共享内核，不是 VM 级隔离（见 code-sandbox.md） |
 | 登录接口 | 无独立限流（依赖失败锁定机制） |
+
+## 9. 模型调用（Model Gateway）
+
+| 项 | 实现 |
+|----|------|
+| 凭证 | 沿用 `ai_models.api_key` 加密存储；网关不写日志、不返回前端 |
+| 自定义 baseURL | 仅 http/https；拒绝回环/私网/链路本地/云元数据（`169.254.169.254`）；DNS 解析后二次校验 |
+| 本地模型例外 | `MODEL_ALLOW_PRIVATE_HOSTS`（默认 `ollama`）显式放行，其他 provider 不得指向内网 |
+| 降级 | 429/5xx/超时切候选；401/403/404 立即停止，不无限重试 |
+| 请求放大 | 每候选只调用一次；候选上限 3；熔断打开直接跳过 |
+| 成本 | 价格来自配置；未配置标记 unknown，不编造金额 |
+
+## 10. MCP 与 Agent
+
+| 项 | 实现 |
+|----|------|
+| Server 地址 | SSRF 校验 + 可选域名白名单 `MCP_ALLOWED_HOSTS` |
+| STDIO | 仅部署级配置（`MCP_STDIO_SERVERS_JSON`），命令必须命中 allowlist；普通用户无法创建 |
+| 凭证 | HTTP Server 请求头加密存储，接口不返回 |
+| 工具权限 | 白名单 + `read/write/dangerous` 等级；危险操作需 `approved` |
+| Prompt Injection | 工具输出包裹 `<tool_output>` 边界、截断 8k 字符；系统提示词声明工具输出为数据 |
+| 工具参数 | 拒绝 `__proto__`/`constructor`/`prototype`；必须是 JSON 对象 |
+| Agent 预算 | 最大步数、Token、超时三重硬限制；超出即停止并返回状态 |
+| 取消 | AbortSignal 贯通模型调用与工具调用 |
+| 审计 | MCP Server 创建、Agent 工具调用均记录（不记录凭据与完整参数） |

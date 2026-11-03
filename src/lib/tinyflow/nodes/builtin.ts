@@ -507,6 +507,180 @@ export const EXCEL_NODE: NodeDefinition = {
   ],
 };
 
+// ===== Python 工具（调用独立 FastAPI 服务，不在本地执行用户代码）=====
+
+export const PYTHON_TOOL_NODE: NodeDefinition = {
+  type: 'pythonToolNode',
+  label: 'Python 工具',
+  description: '调用数据处理 / 文档解析工具（表格、PDF、文本清洗、字段提取）',
+  category: 'data',
+  inputs: [
+    {
+      name: 'input',
+      label: 'Input',
+      dataType: 'string',
+      required: false,
+    },
+  ],
+  outputs: [
+    {
+      name: 'output',
+      label: 'Result',
+      dataType: 'object',
+    },
+  ],
+  executorType: 'pythonToolNode',
+  builtin: true,
+  configSchema: [
+    {
+      name: 'tool',
+      label: '工具',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 'data.analyze', label: '表格分析（summary / preview / columns）' },
+        { value: 'data.transform', label: '表格清洗与转换' },
+        { value: 'documents.parse', label: '文档解析（PDF / DOCX / 文本）' },
+        { value: 'text.clean', label: '文本清洗' },
+        { value: 'extract', label: '字段提取（邮箱 / 金额 / 日期 / 键值）' },
+      ],
+    },
+    {
+      name: 'input',
+      label: '输入内容',
+      type: 'textarea',
+      rows: 6,
+      description:
+        '支持 {{节点.字段}} 插值。二进制文档（PDF/DOCX）请改在参数里传 content_base64。',
+    },
+    {
+      name: 'params',
+      label: '参数（JSON）',
+      type: 'json',
+      description: '如 {"operation":"summary","preview_rows":5}；同样支持插值。',
+    },
+    {
+      name: 'timeoutMs',
+      label: '超时（毫秒）',
+      type: 'number',
+      default: 25000,
+      min: 1000,
+      max: 60000,
+    },
+  ],
+};
+
+// ===== Agent（受控多轮工具调用）=====
+
+export const AGENT_NODE: NodeDefinition = {
+  type: 'agentNode',
+  label: 'Agent',
+  description: '根据目标动态调用 MCP 工具，受步数 / Token / 超时 / 权限约束',
+  category: 'ai',
+  inputs: [
+    {
+      name: 'goal',
+      label: 'Goal',
+      dataType: 'string',
+      required: true,
+    },
+  ],
+  outputs: [
+    {
+      name: 'output',
+      label: 'Answer',
+      dataType: 'string',
+    },
+    {
+      name: 'steps',
+      label: 'Steps',
+      dataType: 'object',
+    },
+  ],
+  capabilities: ['text', 'tool'],
+  executorType: 'agentNode',
+  builtin: true,
+  configSchema: [
+    {
+      name: 'goal',
+      label: '目标',
+      type: 'textarea',
+      required: true,
+      rows: 4,
+      description: '支持 {{节点.字段}} 插值。Agent 会围绕该目标决定是否继续调用工具。',
+    },
+    {
+      name: 'llmId',
+      label: '模型',
+      type: 'select',
+      required: true,
+      optionsProvider: async () => {
+        try {
+          return await fetchModelOptions();
+        } catch {
+          return [];
+        }
+      },
+    },
+    {
+      name: 'mcpServerId',
+      label: 'MCP Server',
+      type: 'string',
+      required: true,
+      placeholder: 'MCP Server ID',
+      description: '来自 MCP 配置；Agent 只能调用该 Server 下已发现的工具。',
+    },
+    {
+      name: 'systemPrompt',
+      label: '系统提示词',
+      type: 'textarea',
+      rows: 3,
+    },
+    {
+      name: 'allowedScope',
+      label: '自动执行权限',
+      type: 'select',
+      default: 'read',
+      options: [
+        { value: 'read', label: '只读（写操作需审批）' },
+        { value: 'write', label: '读写' },
+        { value: 'dangerous', label: '危险操作（不建议）' },
+      ],
+    },
+    {
+      name: 'approvedTools',
+      label: '已审批工具',
+      type: 'string',
+      placeholder: 'write_doc, delete_doc',
+      description: '逗号分隔。列出的工具可绕过权限上限自动执行。',
+    },
+    {
+      name: 'maxSteps',
+      label: '最大步数',
+      type: 'number',
+      default: 6,
+      min: 1,
+      max: 20,
+    },
+    {
+      name: 'tokenBudget',
+      label: 'Token 预算',
+      type: 'number',
+      default: 20000,
+      min: 1000,
+      max: 200000,
+    },
+    {
+      name: 'timeoutMs',
+      label: '总超时（毫秒）',
+      type: 'number',
+      default: 120000,
+      min: 5000,
+      max: 600000,
+    },
+  ],
+};
+
 // ===== 统一注册 =====
 
 nodeRegistry.register(START_NODE);
@@ -521,6 +695,8 @@ nodeRegistry.register(CONDITION_NODE);
 nodeRegistry.register(CONFIRM_NODE);
 nodeRegistry.register(LOOP_NODE);
 nodeRegistry.register(EXCEL_NODE);
+nodeRegistry.register(PYTHON_TOOL_NODE);
+nodeRegistry.register(AGENT_NODE);
 
 // ===== 一致性校验（运行时动态执行，避免静态打包 coze SDK） =====
 // 校验每个节点的 executorType 在 ExecutorRegistry 中存在（防幽灵节点）

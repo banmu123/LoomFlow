@@ -71,6 +71,21 @@
 
 ---
 
+## ✅ v0.4.1 — AI Infrastructure & Agent Runtime
+
+**把模型、工具与 Agent 纳入统一基础设施。**
+
+- ✅ Python 工具服务（表格分析/转换、PDF/DOCX 解析、文本清洗、字段提取）
+- ✅ Model Gateway（能力/成本路由、备用模型、429/5xx 降级、熔断、用量与成本统计）
+- ✅ 模型配置 SSRF 校验（自定义 baseURL 禁止指向内网/云元数据）
+- ✅ MCP Client（Streamable HTTP + STDIO、工具发现、Schema 校验、超时）
+- ✅ MCP 工具权限（白名单、read/write/dangerous、危险操作审批、审计）
+- ✅ Agent Node（多轮 Tool Calling、步数/Token/超时预算、取消、工具追踪）
+- 🔲 MCP 管理 UI（当前为 API + SQL）
+- 🔲 Agent 运行中交互式审批（需持久化 Agent 状态）
+
+---
+
 ## 🔲 v0.5 — Developer Ecosystem
 
 **可扩展的开发者生态。**
