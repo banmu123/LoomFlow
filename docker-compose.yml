@@ -140,6 +140,10 @@ services:
       TZ: Asia/Shanghai
       # 自托管环境：应用经 Nginx 访问 PostgREST（覆盖 .env 中的云地址）
       COZE_SUPABASE_URL: http://nginx:80
+      # 代码节点走独立沙箱（不依赖 node:vm）；沙箱不可用时失败关闭
+      LOOMFLOW_CODE_SANDBOX: ${LOOMFLOW_CODE_SANDBOX:-container}
+      SANDBOX_RUNNER_URL: http://sandbox-runner:8090
+      SANDBOX_RUNNER_TOKEN: ${SANDBOX_RUNNER_TOKEN:-}
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:5000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
       interval: 30s
@@ -148,6 +152,74 @@ services:
       start_period: 20s
     networks:
       - loomflow-net
+      - sandbox-net
+
+  # ---- 独立 Worker（从 flow_jobs 领取任务并执行）----
+  # 与 Web 共用同一镜像与业务代码，只是入口不同；可水平扩容（多副本）
+  loomflow-worker:
+    image: loomflow:latest
+    build: .
+    restart: unless-stopped
+    command: ["node", "dist/worker.js"]
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+      nginx:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      COZE_PROJECT_ENV: PROD
+      NODE_OPTIONS: "--max-old-space-size=2048"
+      TZ: Asia/Shanghai
+      COZE_SUPABASE_URL: http://nginx:80
+      LOOMFLOW_CODE_SANDBOX: ${LOOMFLOW_CODE_SANDBOX:-container}
+      SANDBOX_RUNNER_URL: http://sandbox-runner:8090
+      SANDBOX_RUNNER_TOKEN: ${SANDBOX_RUNNER_TOKEN:-}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
+      WORKER_LEASE_SECONDS: ${WORKER_LEASE_SECONDS:-60}
+      WORKER_SHUTDOWN_GRACE_MS: ${WORKER_SHUTDOWN_GRACE_MS:-30000}
+    stop_grace_period: 45s
+    networks:
+      - loomflow-net
+      - sandbox-net
+
+  # ---- 代码沙箱 Runner（只接受内部调用，无公网入口）----
+  # 关键隔离：非 root、只读根文件系统、cap_drop ALL、PID/内存/CPU 限制、
+  # 独立 internal 网络（无外网出口）。业务应用不接触 Docker Socket。
+  sandbox-runner:
+    image: loomflow-sandbox:latest
+    build:
+      context: ./services/code-sandbox
+      dockerfile: Dockerfile
+    container_name: loomflow-sandbox
+    restart: unless-stopped
+    environment:
+      PORT: "8090"
+      SANDBOX_RUNNER_TOKEN: ${SANDBOX_RUNNER_TOKEN:-}
+      SANDBOX_MAX_CONCURRENCY: ${SANDBOX_MAX_CONCURRENCY:-2}
+      SANDBOX_MAX_TIMEOUT_MS: ${SANDBOX_MAX_TIMEOUT_MS:-10000}
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 1.0
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8090/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - sandbox-net
 
   # ---- 可选：Knowledge AI（FastAPI 独立进程）----
   # 默认不启动；启用：docker compose --profile python-ai up -d
@@ -192,3 +264,9 @@ networks:
   loomflow-net:
     name: loomflow-net
     driver: bridge
+
+  # 沙箱专用网络：internal 表示没有外网出口，只有加入该网络的容器能互访
+  sandbox-net:
+    name: loomflow-sandbox-net
+    driver: bridge
+    internal: true

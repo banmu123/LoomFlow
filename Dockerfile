@@ -33,9 +33,10 @@ ENV COZE_SUPABASE_URL=https://placeholder.invalid \
     AUTH_SECRET=placeholder-build-secret
 # 直接 next build + tsup（跳过 scripts/build.sh 里的重复 pnpm install）
 # Turbopack 编译缓存持久化（/app/.next/cache 跨构建保留）——只编译变更部分，不再全量重建
+# 同时产出 Web 服务（dist/server.js）与 Worker（dist/worker.js），两者共用同一镜像
 RUN --mount=type=cache,target=/app/.next/cache \
     pnpm next build && \
-    pnpm tsup src/server.ts --format cjs --platform node --target node20 --outDir dist --no-splitting --no-minify
+    pnpm tsup src/server.ts src/worker.ts --format cjs --platform node --target node20 --outDir dist --no-splitting --no-minify
 
 # ---- Stage 2: 运行 ----
 FROM node:20-slim AS runner

@@ -60,6 +60,10 @@
 - ✅ Quality Gate UI（发布流程集成，ALLOW / WARNING / BLOCK）
 - ✅ 幂等执行（idempotency key、重复防重）
 - ✅ 执行可靠性（timeout / retry / cancel / checkpoint / trace）
+- ✅ 独立 Worker + PostgreSQL 持久化队列（租约、心跳、指数退避、死信、手动重试）
+- ✅ 异步执行 API（提交返回 jobId，状态可跨进程查询）
+- ✅ 代码沙箱（独立 Runner 容器，非 root / 只读 / 无外网，沙箱不可用时失败关闭）
+- 🔲 异步模式的人工确认（跨进程 resume）
 - 🔲 自动回滚（Quality Gate 检测到退化时可选自动回退）
 - 🔲 Secrets 管理（集中管理 API Key、凭证，替代散落在节点配置中）
 - 🔲 协作编辑（多人同时编辑同一工作流）

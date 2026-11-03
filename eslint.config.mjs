@@ -47,6 +47,8 @@ const eslintConfig = defineConfig([
     'dist/**',
     // Script files (CommonJS):
     'scripts/**/*.js',
+    // Standalone Node services (CommonJS runtime, not part of the Next build):
+    'services/code-sandbox/**',
     // Desktop app (has its own lint/build):
     'loomflowDesktop/**',
   ]),

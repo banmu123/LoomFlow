@@ -4,17 +4,18 @@
 
 ## 1. 代码执行沙箱（Code Node）
 
-`src/lib/tinyflow/executors/CodeExecutor.ts`
+`src/lib/sandbox/` + `services/code-sandbox/`（详见 [code-sandbox.md](code-sandbox.md)）
 
 | 机制 | 实现 |
 |------|------|
-| 隔离 | `node:vm` 创建受限上下文（contextualized） |
-| 不可访问 | `process` / `require` / `globalThis`（typeof 返回 undefined） |
-| 暴露能力 | 仅 `inputs` + `utils`（fetch/JSON/Math/Date 等白名单） |
-| 超时 | 同步执行 5 秒限制（`ERR_SCRIPT_EXECUTION_TIMEOUT` → 明确报错） |
-| 错误处理 | 异常转换为可读中文错误，不泄露内部信息 |
+| 隔离 | 独立 Runner 容器 + `node --permission` 子进程；`node:vm` 只负责代码语义，**不作为安全边界** |
+| 不可访问 | 文件系统（权限模型 + 容器只读）、`process` / `require` / 环境变量（子进程 `env: {}`） |
+| 网络 | Runner 位于 `internal` 网络，无外网出口；Docker Socket 不挂载 |
+| 资源限制 | 非 root、`cap_drop ALL`、pids/内存/CPU 限制、执行超时 5s（上限 10s） |
+| 失败关闭 | 沙箱不可用直接报错，**不回退到 vm**；`LOOMFLOW_CODE_SANDBOX=vm` 仅限本地显式启用 |
+| 错误处理 | 统一错误码（`timeout` / `sandbox_unavailable` / `execution_error`），不泄露内部信息 |
 
-**边界**：沙箱限制同步执行；返回 Promise 的部分由外层控制。异步/网络行为受 fetch 白名单约束。
+**边界**：容器隔离是纵深防御，不是"绝对安全"；共享内核、Node 权限模型的强度有限。面向不可信多租户应替换为 gVisor/Firecracker。残余风险见 [code-sandbox.md](code-sandbox.md) 第 8 节。
 
 ## 2. 认证与登录
 

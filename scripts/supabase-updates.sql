@@ -750,5 +750,260 @@ CREATE INDEX IF NOT EXISTS idx_qge_workflow ON quality_gate_evaluations(workflow
 CREATE INDEX IF NOT EXISTS idx_qge_created_by ON quality_gate_evaluations(created_by);
 CREATE INDEX IF NOT EXISTS idx_qge_expires ON quality_gate_evaluations(expires_at);
 
+-- =====================================================
+-- 62. Runtime: 持久化任务队列（Worker 架构）
+-- 设计要点：
+--   1) 追加式变更，全部 IF NOT EXISTS，可重复执行
+--   2) 领取用 UPDATE ... FROM (SELECT ... FOR UPDATE SKIP LOCKED)，原子且不重复
+--   3) 交付语义为 at-least-once，靠 idempotency_key 与租约把重复执行控制在可接受范围
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS flow_jobs (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workflow_id         UUID NOT NULL REFERENCES workflow_history(id) ON DELETE CASCADE,
+  user_id             UUID REFERENCES users(id) ON DELETE SET NULL,
+  source              TEXT NOT NULL DEFAULT 'api',
+  status              TEXT NOT NULL DEFAULT 'queued'
+                      CHECK (status IN ('queued','running','retrying','succeeded','failed','cancel_requested','cancelled','dead_letter')),
+  inputs              JSONB NOT NULL DEFAULT '{}'::jsonb,
+  idempotency_key     TEXT,
+  attempts            INTEGER NOT NULL DEFAULT 0,
+  max_attempts        INTEGER NOT NULL DEFAULT 3,
+  available_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  locked_by           TEXT,
+  locked_at           TIMESTAMPTZ,
+  lease_expires_at    TIMESTAMPTZ,
+  heartbeat_at        TIMESTAMPTZ,
+  flow_id             UUID,
+  workflow_hash       TEXT,
+  -- 提交时的执行快照：保证排队期间编辑/重新发布不影响已受理的任务
+  workflow_snapshot   JSONB,
+  checkpoint          JSONB,
+  resume_checkpoint   JSONB,
+  cancel_requested_at TIMESTAMPTZ,
+  error_class         TEXT,
+  error_message       TEXT,
+  result              JSONB,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  started_at          TIMESTAMPTZ,
+  finished_at         TIMESTAMPTZ
+);
+
+-- 同一工作流下幂等键唯一（不同工作流可用同一业务键）
+CREATE UNIQUE INDEX IF NOT EXISTS idx_flow_jobs_idempotency
+  ON flow_jobs (workflow_id, idempotency_key)
+  WHERE idempotency_key IS NOT NULL;
+
+-- 领取路径：按可执行时间排序扫描
+CREATE INDEX IF NOT EXISTS idx_flow_jobs_claim
+  ON flow_jobs (status, available_at);
+CREATE INDEX IF NOT EXISTS idx_flow_jobs_workflow_created
+  ON flow_jobs (workflow_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_flow_jobs_flow ON flow_jobs (flow_id);
+CREATE INDEX IF NOT EXISTS idx_flow_jobs_lease
+  ON flow_jobs (lease_expires_at)
+  WHERE status = 'running';
+
+ALTER TABLE flow_jobs ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_policies WHERE policyname = 'Allow all on flow_jobs' AND tablename = 'flow_jobs') THEN
+    CREATE POLICY "Allow all on flow_jobs" ON flow_jobs FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+
+-- Worker 心跳（存活观测；不参与领取决策，领取只看 job 租约）
+CREATE TABLE IF NOT EXISTS worker_heartbeats (
+  worker_id    TEXT PRIMARY KEY,
+  hostname     TEXT,
+  version      TEXT,
+  concurrency  INTEGER,
+  started_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  metadata     JSONB
+);
+
+ALTER TABLE worker_heartbeats ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_policies WHERE policyname = 'Allow all on worker_heartbeats' AND tablename = 'worker_heartbeats') THEN
+    CREATE POLICY "Allow all on worker_heartbeats" ON worker_heartbeats FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+
+-- 原子领取：SKIP LOCKED 保证同一任务不会被两个 Worker 同时拿到
+CREATE OR REPLACE FUNCTION loomflow_claim_flow_jobs(
+  p_worker_id     TEXT,
+  p_limit         INTEGER DEFAULT 1,
+  p_lease_seconds INTEGER DEFAULT 60
+)
+RETURNS SETOF flow_jobs
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN QUERY
+  WITH candidates AS (
+    SELECT id
+    FROM flow_jobs
+    WHERE status IN ('queued', 'retrying')
+      AND available_at <= now()
+    ORDER BY available_at ASC, created_at ASC
+    FOR UPDATE SKIP LOCKED
+    LIMIT GREATEST(1, LEAST(p_limit, 20))
+  ), updated AS (
+    UPDATE flow_jobs j
+    SET status = 'running',
+        attempts = j.attempts + 1,
+        locked_by = p_worker_id,
+        locked_at = now(),
+        lease_expires_at = now() + make_interval(secs => GREATEST(10, LEAST(p_lease_seconds, 3600))),
+        heartbeat_at = now(),
+        started_at = COALESCE(j.started_at, now()),
+        updated_at = now()
+    FROM candidates c
+    WHERE j.id = c.id
+    RETURNING j.*
+  )
+  SELECT * FROM updated;
+END $$;
+
+-- 过期租约回收：重试或进入死信（指数退避由服务端计算，Worker 崩溃也能自愈）
+CREATE OR REPLACE FUNCTION loomflow_reap_expired_flow_jobs(
+  p_max_backoff_seconds INTEGER DEFAULT 300
+)
+RETURNS TABLE (job_id UUID, new_status TEXT, attempts INTEGER)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN QUERY
+  WITH expired AS (
+    SELECT id, attempts, max_attempts
+    FROM flow_jobs
+    WHERE status = 'running'
+      AND lease_expires_at IS NOT NULL
+      AND lease_expires_at < now()
+    FOR UPDATE SKIP LOCKED
+  ), updated AS (
+    UPDATE flow_jobs j
+    SET status = CASE WHEN e.attempts >= e.max_attempts THEN 'dead_letter' ELSE 'retrying' END,
+        available_at = CASE
+          WHEN e.attempts >= e.max_attempts THEN j.available_at
+          ELSE now() + make_interval(secs =>
+            LEAST(GREATEST(p_max_backoff_seconds, 10), (5 * power(2, GREATEST(e.attempts, 1)))::int))
+        END,
+        locked_by = NULL,
+        locked_at = NULL,
+        lease_expires_at = NULL,
+        error_class = COALESCE(j.error_class, 'lease_expired'),
+        error_message = COALESCE(j.error_message, 'worker lease expired'),
+        finished_at = CASE WHEN e.attempts >= e.max_attempts THEN now() ELSE NULL END,
+        updated_at = now()
+    FROM expired e
+    WHERE j.id = e.id
+    RETURNING j.id, j.status, j.attempts
+  )
+  SELECT * FROM updated;
+END $$;
+
+-- 优雅关闭：归还任务且不消耗重试次数（attempts 在领取时 +1，这里减回去）
+CREATE OR REPLACE FUNCTION loomflow_release_flow_job(
+  p_job_id   UUID,
+  p_worker_id TEXT
+)
+RETURNS flow_jobs
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  updated flow_jobs;
+BEGIN
+  UPDATE flow_jobs
+  SET status = 'retrying',
+      attempts = GREATEST(attempts - 1, 0),
+      available_at = now(),
+      locked_by = NULL,
+      locked_at = NULL,
+      lease_expires_at = NULL,
+      error_class = 'worker_shutdown',
+      error_message = 'worker stopped gracefully before completion',
+      updated_at = now()
+  WHERE id = p_job_id
+    AND locked_by = p_worker_id
+    AND status = 'running'
+  RETURNING * INTO updated;
+
+  RETURN updated;
+END $$;
+
+-- 手动重试死信任务：保留 attempts 历史，但保证还能再跑一次
+CREATE OR REPLACE FUNCTION loomflow_requeue_flow_job(p_job_id UUID)
+RETURNS flow_jobs
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  updated flow_jobs;
+BEGIN
+  UPDATE flow_jobs
+  SET status = 'queued',
+      available_at = now(),
+      locked_by = NULL,
+      locked_at = NULL,
+      lease_expires_at = NULL,
+      error_class = NULL,
+      error_message = NULL,
+      finished_at = NULL,
+      max_attempts = GREATEST(max_attempts, attempts + 1),
+      updated_at = now()
+  WHERE id = p_job_id
+    AND status IN ('dead_letter', 'failed', 'cancelled')
+  RETURNING * INTO updated;
+
+  RETURN updated;
+END $$;
+
+-- 取消：排队中直接终止；运行中标记 cancel_requested，由 Worker 观察后中止
+CREATE OR REPLACE FUNCTION loomflow_cancel_flow_job(p_job_id UUID)
+RETURNS flow_jobs
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  updated flow_jobs;
+BEGIN
+  UPDATE flow_jobs
+  SET status = CASE WHEN status = 'running' THEN 'cancel_requested' ELSE 'cancelled' END,
+      cancel_requested_at = now(),
+      finished_at = CASE WHEN status = 'running' THEN NULL ELSE now() END,
+      updated_at = now()
+  WHERE id = p_job_id
+    AND status IN ('queued', 'retrying', 'running')
+  RETURNING * INTO updated;
+
+  RETURN updated;
+END $$;
+
+GRANT ALL ON TABLE flow_jobs, worker_heartbeats TO anon, service_role;
+GRANT EXECUTE ON FUNCTION loomflow_claim_flow_jobs(TEXT, INTEGER, INTEGER) TO anon, service_role;
+GRANT EXECUTE ON FUNCTION loomflow_reap_expired_flow_jobs(INTEGER) TO anon, service_role;
+GRANT EXECUTE ON FUNCTION loomflow_release_flow_job(UUID, TEXT) TO anon, service_role;
+GRANT EXECUTE ON FUNCTION loomflow_requeue_flow_job(UUID) TO anon, service_role;
+GRANT EXECUTE ON FUNCTION loomflow_cancel_flow_job(UUID) TO anon, service_role;
+
+-- 执行记录关联 job / trace（可空，向后兼容旧记录）
+ALTER TABLE flow_runs ADD COLUMN IF NOT EXISTS job_id UUID;
+ALTER TABLE flow_runs ADD COLUMN IF NOT EXISTS trace_id TEXT;
+CREATE INDEX IF NOT EXISTS idx_flow_runs_job ON flow_runs(job_id);
+
 -- 迁移完成后刷新 PostgREST schema 缓存
 NOTIFY pgrst, 'reload schema';

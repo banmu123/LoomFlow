@@ -9,6 +9,8 @@
     "lint": "eslint",
     "lint:build": "eslint . --quiet",
     "start": "bash ./scripts/start.sh",
+    "worker": "tsx src/worker.ts",
+    "worker:dev": "tsx watch src/worker.ts",
     "ts-check": "tsc -p tsconfig.json",
     "validate": "pnpm run --parallel '/^(ts-check|lint:build)$/'",
     "test": "vitest run",

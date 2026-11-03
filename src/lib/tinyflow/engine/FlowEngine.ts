@@ -85,7 +85,7 @@ export class FlowEngine {
       (options.resumeCheckpoint
         ? restoreContextFromCheckpoint(options.resumeCheckpoint)
         : {
-            flowId: crypto.randomUUID(),
+            flowId: options.flowId ?? crypto.randomUUID(),
             inputs: options.inputs || {},
             nodeOutputs: new Map(),
             nodeStatuses: new Map(),

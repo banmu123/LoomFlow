@@ -3,6 +3,8 @@ import { getWorkflowByApiKey } from '@/lib/publish-auth';
 import { flowRunStore } from '@/lib/tinyflow';
 import { extractFinalOutputs } from '@/lib/tinyflow/runFlow';
 import { saveFlowRun } from '@/lib/tinyflow/runFlow';
+import { supabase } from '@/lib/supabase/server';
+import { SupabaseJobQueue } from '@/lib/jobs';
 import type { FlowError } from '@/lib/tinyflow/types';
 
 export const runtime = 'nodejs';
@@ -15,6 +17,22 @@ export async function POST(
   const { id, flowId } = await params;
   const auth = await getWorkflowByApiKey(request.headers.get('authorization'), id);
   if (auth instanceof Response) return auth;
+
+  // 异步任务由 Worker 进程执行，引擎实例不在本进程内，无法跨进程恢复暂停点。
+  // 明确报错而不是静默失败：确认类工作流请使用同步执行。
+  const queue = new SupabaseJobQueue(supabase);
+  const job = (await queue.getJobById(flowId)) ?? (await queue.getJobByFlowId(flowId));
+  if (job) {
+    return Response.json(
+      {
+        error:
+          '异步任务暂不支持人工确认：执行引擎运行在 Worker 进程中，无法跨进程恢复。请改用同步执行（不传 async）。',
+        jobId: job.id,
+        jobStatus: job.status,
+      },
+      { status: 409 },
+    );
+  }
 
   const record = flowRunStore.get(flowId);
   if (!record) {

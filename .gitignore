@@ -174,10 +174,14 @@ docs/config/*
 !docs/config/custom-node-guide.md
 !docs/config/python-ai-architecture.md
 !docs/config/python-ai-service.md
+!docs/config/runtime-architecture.md
+!docs/config/worker-queue.md
+!docs/config/code-sandbox.md
 !docs/docker-deploy.md
 # 内部开发记录（不公开）
 devlopRecprd/
 # 本地工具目录
 .claude/
 .mimocode/
+.workbuddy/
 AGENTS.md

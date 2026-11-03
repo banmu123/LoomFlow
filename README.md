@@ -333,6 +333,9 @@ Full comparison: **[docs/deployment-modes.md](docs/deployment-modes.md)**
 - **[Node System Architecture](docs/nodes.md)** — NodeDefinition/Registry/Factory, configSchema, plugin SDK
 - **[Deployment Manual](docs/config/Deployment-Manual.md)** — self-host, migrate, HTTPS
 - **[Python AI Service](docs/config/python-ai-service.md)** — optional FastAPI service for knowledge retrieval (M1 skeleton)
+- **[Runtime Architecture](docs/config/runtime-architecture.md)** — worker, durable queue, sandbox: design and trade-offs
+- **[Worker & Queue](docs/config/worker-queue.md)** — async execution, leases, retries, dead letters, scaling
+- **[Code Sandbox](docs/config/code-sandbox.md)** — isolation layers, threat model, residual risks
 - **[Deployment Modes](docs/deployment-modes.md)** — Docker vs Vercel comparison
 - **[Desktop](docs/desktop.md)** — LoomFlow Desktop: local-first Tauri app with SQLite
 

@@ -153,6 +153,8 @@ export interface RetryConfig {
 export interface ExecuteOptions {
   flowData: TinyflowData;
   inputs: Record<string, unknown>;
+  /** 执行 id（由调用方预分配时传入；不传则内部生成） */
+  flowId?: string;
   userId?: string | null;
   /** 关联工作流 id（trace/backfill） */
   workflowId?: string | null;

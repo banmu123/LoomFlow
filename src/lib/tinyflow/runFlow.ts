@@ -26,17 +26,25 @@ export interface RunFlowResult {
 }
 
 export interface RunFlowOptions {
-  source?: 'internal' | 'api';
+  source?: 'internal' | 'api' | 'worker';
   workflowId?: string | null;
   userId?: string | null;
+  /** 外部指定执行 id（Worker 预先分配，便于崩溃前后关联同一次执行） */
+  flowId?: string;
+  /** 关联的队列任务 id（写入 flow_runs.job_id） */
+  jobId?: string | null;
   /** 幂等键：相同 key 的重复请求直接返回首次结果 */
   idempotencyKey?: string;
   /** 工作流级超时（ms） */
   timeoutMs?: number;
   /** 并发上限（依赖允许时生效） */
   maxConcurrency?: number;
-  /** 外部取消信号（HTTP 连接断开 / 用户取消） */
+  /** 外部取消信号（HTTP 连接断开 / 用户取消 / Worker 关闭） */
   signal?: AbortSignal;
+  /** 从 checkpoint 恢复（Worker 重试） */
+  resumeCheckpoint?: unknown;
+  /** 每次 checkpoint 落库后的额外回调（任务级持久化） */
+  onCheckpoint?: (checkpoint: unknown) => void;
 }
 
 // 提取最终输出：endNode 配置了输出引用时用 endNode 结果；
@@ -68,7 +76,11 @@ export function extractFinalOutputs(
 export type SaveFlowRunData = {
   workflowId?: string | null;
   userId?: string | null;
-  source?: 'internal' | 'api';
+  source?: 'internal' | 'api' | 'worker';
+  /** 任务队列 id（异步执行时写入，旧记录为 null） */
+  jobId?: string | null;
+  /** 链路追踪 id（默认等于 flowId） */
+  traceId?: string | null;
   status?: string;
   inputs?: Record<string, unknown> | null;
   outputs?: Record<string, unknown> | null;
@@ -105,6 +117,8 @@ export async function saveFlowRun(
       workflow_id: data.workflowId ?? null,
       user_id: data.userId ?? null,
       source: data.source ?? 'internal',
+      job_id: data.jobId ?? null,
+      trace_id: data.traceId ?? null,
       status: data.status ?? 'running',
       inputs: data.inputs ?? null,
       outputs: data.outputs ?? null,
@@ -183,7 +197,7 @@ export async function runFlow(
   inputs: Record<string, unknown>,
   options: RunFlowOptions = {},
 ): Promise<RunFlowResult> {
-  const flowId = crypto.randomUUID();
+  const flowId = options.flowId ?? crypto.randomUUID();
   const events: Array<{ type: string; data: unknown; timestamp: number }> = [];
   const startTime = Date.now();
 
@@ -206,11 +220,14 @@ export async function runFlow(
   const engine = new FlowEngine(flowData, {
     flowData,
     inputs,
+    // 与 flow_runs.id / flow_jobs.flow_id 保持一致（trace id 也用它）
+    flowId,
     userId: options.userId,
     workflowId: options.workflowId ?? null,
     signal: options.signal,
     timeoutMs: options.timeoutMs,
     maxConcurrency: options.maxConcurrency,
+    resumeCheckpoint: options.resumeCheckpoint,
     onNodeStart: (nodeId: string) => {
       events.push({ type: 'node_start', data: { nodeId }, timestamp: Date.now() });
     },
@@ -237,6 +254,8 @@ export async function runFlow(
     },
     onCheckpoint: (fid, cp) => {
       persistCheckpoint(fid, cp as CheckpointData).catch(() => {});
+      // 任务级 checkpoint：Worker 崩溃后可在同一任务上恢复
+      options.onCheckpoint?.(cp);
     },
   });
 
@@ -255,6 +274,8 @@ export async function runFlow(
     workflowId: options.workflowId,
     userId: options.userId,
     source: options.source,
+    jobId: options.jobId,
+    traceId: flowId,
     status: 'running',
     inputs: redactForTrace(inputs) as Record<string, unknown> | null,
     flowData: flowData,
